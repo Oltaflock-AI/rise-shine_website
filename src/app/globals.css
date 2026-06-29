@@ -1,26 +1,200 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ===============================================================
+   RISE & SHINE TRAVELS — Brand design system
+   Palette + type from the official brand guideline:
+     red #E21E26 · deep red #8D191C · navy #083249
+     charcoal #404041 · silver #C6C5C6 · page #F7F8F9
+   Fonts: Roboto (UI/body) + Dancing Script (script accent)
+   =============================================================== */
+
+@theme {
+  /* ---- brand colours ---- */
+  --color-red: #e21e26;
+  --color-red-deep: #8d191c;
+  --color-red-mid: #c11a20;
+  --color-navy: #083249;
+  --color-navy-light: #0e4a68;
+  --color-navy-bright: #15608a;
+  --color-charcoal: #404041;
+  --color-silver: #c6c5c6;
+  --color-silver-light: #e3e6e8;
+
+  /* ---- neutrals / surfaces ---- */
+  --color-cream: #f7f8f9; /* page background */
+  --color-cream-2: #eef2f4; /* soft section */
+  --color-cream-3: #e7ecef;
+  --color-line: #e2e7ea;
+  --color-ink: #102a39; /* headings (deep navy) */
+  --color-ink-soft: #45525c;
+  --color-muted: #5e6a72; /* secondary text (AA on cream) */
+
+  /* ---- typography ---- */
+  --font-sans: var(--font-roboto), system-ui, -apple-system, sans-serif;
+  --font-script: var(--font-dancing), "Segoe Script", cursive;
+
+  /* ---- radii ---- */
+  --radius-brand-sm: 13px;
+  --radius-brand: 20px;
+  --radius-brand-lg: 30px;
+
+  /* ---- shadows (navy-tinted) ---- */
+  --shadow-brand-sm: 0 2px 10px rgba(8, 50, 73, 0.06);
+  --shadow-brand: 0 18px 44px rgba(8, 50, 73, 0.12);
+  --shadow-brand-lg: 0 36px 80px rgba(8, 50, 73, 0.2);
+  --shadow-brand-red: 0 16px 38px rgba(226, 30, 38, 0.3);
+
+  /* ---- animations ---- */
+  --animate-sunrise: sunrise 9s ease-in-out infinite alternate;
+  --animate-morph: morph 12s ease-in-out infinite;
+  --animate-marquee: marquee 34s linear infinite;
+  --animate-fade-up: fade-up 0.5s ease both;
+
+  /* container */
+  --breakpoint-3xl: 120rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes sunrise {
+  from {
+    transform: translateY(40px) scale(0.95);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(-12px) scale(1.05);
+    opacity: 1;
+  }
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes morph {
+  0%,
+  100% {
+    border-radius: 42% 58% 60% 40% / 50% 45% 55% 50%;
+  }
+  50% {
+    border-radius: 60% 40% 42% 58% / 45% 55% 50% 50%;
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* -------------------- base -------------------- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-cream);
+    color: var(--color-charcoal);
+    font-family: var(--font-sans);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    color: var(--color-ink);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  ::selection {
+    background: var(--color-red);
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-red);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+}
+
+/* -------------------- brand utilities -------------------- */
+@layer utilities {
+  .grad-red {
+    background-image: linear-gradient(
+      120deg,
+      var(--color-red) 0%,
+      var(--color-red-mid) 50%,
+      var(--color-red-deep) 100%
+    );
+  }
+  .grad-navy {
+    background-image: linear-gradient(
+      135deg,
+      var(--color-navy) 0%,
+      var(--color-navy-light) 60%,
+      var(--color-navy-bright) 100%
+    );
+  }
+  .text-script {
+    font-family: var(--font-script);
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+  .h-xl {
+    font-size: clamp(2.6rem, 6vw, 4.7rem);
+  }
+  .h-lg {
+    font-size: clamp(2rem, 4.2vw, 3.2rem);
+  }
+  .h-md {
+    font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+  }
+}
+
+/* scroll-reveal: hidden until the Reveal component adds .is-visible */
+.reveal {
+  opacity: 0;
+  transform: translateY(34px);
+  transition:
+    opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0s);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
 }
