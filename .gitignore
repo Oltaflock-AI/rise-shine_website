@@ -42,3 +42,8 @@ next-env.d.ts
 
 # project reference materials (contains live API credentials — never commit)
 /reference
+
+# large source material — kept locally, not deployed (logos are copied into /public/brand)
+# .docx/.pptx itineraries + decks (~114MB) and the raw logo originals (~4.5MB)
+/docs
+/logos

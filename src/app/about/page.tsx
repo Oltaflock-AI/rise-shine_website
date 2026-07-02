@@ -44,10 +44,10 @@ export default function AboutPage() {
               />
               <div className="relative overflow-hidden rounded-brand-lg shadow-brand-lg">
                 <Image
-                  src="/brand/founders.png"
+                  src="/brand/founders.webp"
                   alt="Rise & Shine Travel founders Hardik Patel and Alpesh"
-                  width={1393}
-                  height={2477}
+                  width={820}
+                  height={1459}
                   sizes="(min-width: 1024px) 40vw, 90vw"
                   className="h-auto w-full object-cover"
                 />
