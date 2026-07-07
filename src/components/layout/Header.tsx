@@ -8,6 +8,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import { navItems, site } from "@/data/site";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
+import { HeaderAuth, HeaderAuthMobile } from "./HeaderAuth";
 import { cn } from "@/lib/cn";
 
 export function Header() {
@@ -37,7 +38,11 @@ export function Header() {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const navText = scrolled ? "text-ink" : "text-white";
+  // Pages that render a LIGHT background at the very top (no dark hero) need
+  // dark header text even before scrolling, or the nav is invisible.
+  const lightTop = pathname === "/login" || pathname === "/signup";
+  const onLight = scrolled || lightTop;
+  const navText = onLight ? "text-ink" : "text-white";
 
   return (
     <header
@@ -64,7 +69,7 @@ export function Header() {
               priority
               className={cn(
                 "h-9 w-auto transition-opacity duration-300 sm:h-11",
-                scrolled && "opacity-0",
+                onLight && "opacity-0",
               )}
             />
             <Image
@@ -75,7 +80,7 @@ export function Header() {
               priority
               className={cn(
                 "absolute left-0 top-0 h-9 w-auto transition-opacity duration-300 sm:h-11",
-                scrolled ? "opacity-100" : "opacity-0",
+                onLight ? "opacity-100" : "opacity-0",
               )}
             />
           </Link>
@@ -118,6 +123,7 @@ export function Header() {
 
           {/* CTA + burger */}
           <div className="flex items-center gap-2">
+            <HeaderAuth scrolled={onLight} />
             <Button
               href="/plan-my-trip"
               arrow
@@ -184,6 +190,7 @@ export function Header() {
           <Button href="/plan-my-trip" arrow fullWidth className="mt-7">
             Plan My Trip
           </Button>
+          <HeaderAuthMobile onNavigate={() => setMenuOpen(false)} />
         </nav>
       </div>
     </header>

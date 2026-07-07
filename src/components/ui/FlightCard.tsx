@@ -1,6 +1,7 @@
 import Image from "next/image";
-import { ArrowRight, Plane } from "lucide-react";
+import { Plane } from "lucide-react";
 import { airlineLogo } from "@/data/airlineLogos";
+import { BookButton } from "./BookButton";
 import type { FlightOffer } from "@/lib/tbo";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -89,14 +90,21 @@ export function FlightCard({
           </div>
           <div className="text-[0.68rem] text-muted">{fmtDate(first?.depTime)}</div>
         </div>
-        <a
-          href={enquireHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="grad-red inline-flex flex-none items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.85rem] font-semibold text-white shadow-brand-red"
-        >
-          Book <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
-        </a>
+        <BookButton
+          query={{
+            airline: offer.airlineName,
+            flightNo: offer.segments.map((s) => s.flightNumber).join(" · "),
+            from: first?.from ?? "",
+            to: last?.to ?? "",
+            dep: first?.depTime ?? "",
+            arr: last?.arrTime ?? "",
+            stops: String(offer.stops),
+            dur: String(offer.durationMin),
+            fare: String(offer.fareINR),
+            refundable: offer.isRefundable ? "1" : "0",
+            wa: enquireHref,
+          }}
+        />
       </div>
     </div>
   );
