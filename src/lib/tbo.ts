@@ -9,8 +9,12 @@
  * TBO_END_USER_IP. See reference/api-setup/apiSetup.md. Booking is not wired
  * (certification pending) — we surface live search fares with an enquiry CTA.
  */
+import { TboValidationError, validateSearch } from "./tbo-validate";
+
 const AUTH_URL =
   "http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate";
+// Search lives on the Air service; Book/Ticket use the separate AirBook service
+// (see tbo-book.ts) — TBO requires each method to go to its own URL.
 const SEARCH_URL =
   "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search";
 
@@ -72,6 +76,10 @@ export type FlightSearch = {
   inbound?: FlightOffer[];
   /** Cheapest total per adult (round-trip = out + in). */
   cheapestINR?: number;
+  /** TBO transaction id — must be passed to FareQuote/Book/Ticket. Expires 15 min after search. */
+  traceId?: string;
+  /** When the search ran, so the booking flow can enforce TBO's 15-minute TraceId window. */
+  searchedAt?: number;
   error?: string;
 };
 
@@ -247,30 +255,46 @@ async function rawSearch(token: string, o: RawSearchOpts) {
   });
   const segments = [seg(o.from, o.to, o.departISO)];
   if (o.returnISO) segments.push(seg(o.to, o.from, o.returnISO));
-  const r = await fetch(SEARCH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      EndUserIp: cfg().ip,
-      TokenId: token,
-      AdultCount: String(Math.max(1, o.adults)),
-      ChildCount: String(o.children),
-      InfantCount: String(o.infants),
-      DirectFlight: o.directOnly ? "true" : "false",
-      OneStopFlight: "false",
-      JourneyType: o.returnISO ? "2" : "1",
-      PreferredAirlines: o.preferredAirlines,
-      Segments: segments,
-      Sources: null,
-    }),
-    cache: "no-store",
-  });
-  return r.json();
+  const body = {
+    EndUserIp: cfg().ip,
+    TokenId: token,
+    AdultCount: String(Math.max(1, o.adults)),
+    ChildCount: String(o.children),
+    InfantCount: String(o.infants),
+    DirectFlight: o.directOnly ? "true" : "false",
+    OneStopFlight: "false",
+    JourneyType: o.returnISO ? "2" : "1",
+    PreferredAirlines: o.preferredAirlines,
+    Segments: segments,
+    Sources: null,
+  };
+  // Reject a bad search here rather than at the supplier (TBO checklist: Search Method Validation).
+  validateSearch(body);
+
+  // International searches can exceed 30s; TBO recommends a 60s ceiling.
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 60_000);
+  try {
+    const r = await fetch(SEARCH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctl.signal,
+      cache: "no-store",
+    });
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 // ── result cache (in-memory, per route+date+pax) ──
 const searchCache = new Map<string, { data: FlightSearch; exp: number }>();
-const SEARCH_TTL = 30 * 60 * 1000;
+/**
+ * Under TBO's 15-minute TraceId window — a cached result carries its TraceId, and
+ * serving one past expiry would fail at FareQuote/Book with "session expired".
+ */
+const SEARCH_TTL = 10 * 60 * 1000;
 
 export type SearchArgs = {
   from: string;
@@ -333,20 +357,32 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
   let token = await authenticate();
   if (!token) return fail("auth");
 
-  let j: { Response?: { ResponseStatus?: number; Results?: RawResult[][]; Error?: { ErrorMessage?: string } } };
+  type SearchResponse = {
+    Response?: {
+      ResponseStatus?: number;
+      TraceId?: string;
+      Results?: RawResult[][];
+      Error?: { ErrorCode?: number; ErrorMessage?: string };
+    };
+  };
+  let j: SearchResponse;
   try {
     j = await rawSearch(token, opts);
-  } catch {
+  } catch (e) {
+    // A bad request never reaches TBO — surface why.
+    if (e instanceof TboValidationError) return fail(e.message);
     return fail("network");
   }
 
-  // token may have expired → re-auth once and retry
-  if (j?.Response?.ResponseStatus !== 1) {
+  // ErrorCode 6 = Invalid Token → regenerate and retry once.
+  // TBO's checklist is explicit: match the CODE, not the message text.
+  if (j?.Response?.Error?.ErrorCode === 6) {
     token = await authenticate(true);
     if (token) {
       try {
         j = await rawSearch(token, opts);
-      } catch {
+      } catch (e) {
+        if (e instanceof TboValidationError) return fail(e.message);
         return fail("network");
       }
     }
@@ -376,7 +412,11 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     outbound,
     inbound,
     cheapestINR,
+    traceId: R.TraceId,
+    searchedAt: Date.now(),
   };
+  // Cache results for the list view, but never past TBO's 15-minute TraceId window —
+  // a stale TraceId would fail at FareQuote/Book.
   searchCache.set(key, { data, exp: Date.now() + SEARCH_TTL });
   return data;
 }
