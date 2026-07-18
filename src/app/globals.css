@@ -217,6 +217,42 @@
   }
 }
 
+/* Policy / legal page prose (Terms, Refund) */
+.legal-prose {
+  line-height: 1.75;
+}
+.legal-prose h2 {
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.legal-prose p {
+  color: var(--color-ink-soft);
+}
+.legal-prose strong {
+  color: var(--color-navy);
+  font-weight: 600;
+}
+.legal-prose a {
+  color: var(--color-red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-prose ul {
+  margin: 0.25rem 0;
+  padding-left: 1.35rem;
+  list-style: disc;
+}
+.legal-prose ul li {
+  margin-top: 0.6rem;
+  padding-left: 0.35rem;
+}
+.legal-prose ul li::marker {
+  color: var(--color-red);
+}
+
 /* scroll-reveal: hidden until the Reveal component adds .is-visible */
 .reveal {
   opacity: 0;

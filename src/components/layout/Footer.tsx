@@ -22,6 +22,8 @@ const footerCols: { heading: string; links: { label: string; href: string }[] }[
         { label: "Services", href: "/services" },
         { label: "Contact", href: "/contact" },
         { label: "Plan My Trip", href: "/plan-my-trip" },
+        { label: "Terms & Conditions", href: "/terms" },
+        { label: "Cancellation & Refund", href: "/refund-policy" },
       ],
     },
   ];
