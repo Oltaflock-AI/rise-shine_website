@@ -46,6 +46,10 @@ export type FlightSegment = {
   depTime: string;
   arrTime: string;
   durationMin: number;
+  /** Checked-in allowance as TBO reports it, e.g. "15 KG" / "1 PC" (empty when unknown). */
+  baggage: string;
+  /** Cabin allowance, e.g. "7 KG" (empty when unknown). */
+  cabinBaggage: string;
 };
 
 export type FlightOffer = {
@@ -125,6 +129,8 @@ type RawSeg = {
   Origin?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; DepTime?: string };
   Destination?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; ArrTime?: string };
   Duration?: number;
+  Baggage?: string;
+  CabinBaggage?: string;
 };
 type RawFareBreakdown = {
   PassengerType?: number; // 1 = Adult, 2 = Child, 3 = Infant
@@ -157,6 +163,8 @@ function mapSegment(s: RawSeg): FlightSegment {
     depTime: s.Origin?.DepTime ?? "",
     arrTime: s.Destination?.ArrTime ?? "",
     durationMin: s.Duration ?? 0,
+    baggage: s.Baggage ?? "",
+    cabinBaggage: s.CabinBaggage ?? "",
   };
 }
 

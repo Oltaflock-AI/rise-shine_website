@@ -6,8 +6,8 @@ import { FlightResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
-import { FlightCard } from "@/components/ui/FlightCard";
-import { searchFlights, defaultDates, type FlightOffer } from "@/lib/tbo";
+import { FlightResultsClient } from "@/components/ui/FlightResultsClient";
+import { searchFlights, defaultDates } from "@/lib/tbo";
 import { resolveAirport } from "@/data/airports";
 import { site } from "@/data/site";
 
@@ -19,19 +19,6 @@ export const metadata: Metadata = {
     "Search real-time flight fares from Ahmedabad and across India with Rise & Shine Travels.",
   robots: { index: false },
 };
-
-const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-
-function waHref(offer: FlightOffer, adults: number): string {
-  const s0 = offer.segments[0];
-  const sL = offer.segments[offer.segments.length - 1];
-  const text = `Hi Rise & Shine! I'd like to book this flight:
-${offer.airlineName} (${offer.segments.map((s) => s.flightNumber).join(" / ")})
-${s0?.from} ${(s0?.depTime || "").slice(11, 16)} → ${sL?.to} ${(sL?.arrTime || "").slice(11, 16)} · ${offer.stops === 0 ? "non-stop" : `${offer.stops} stop`}
-Fare ₹${inr.format(offer.fareINR)} per adult × ${adults}.
-Please confirm availability and proceed to book.`;
-  return `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(text)}`;
-}
 
 export default async function FlightsPage({
   searchParams,
@@ -129,9 +116,10 @@ export default async function FlightsPage({
   }
 
   // Re-suspend (show the searching fallback) whenever the search itself changes.
+  // Sorting and result filters are client-side now — they never re-trigger this.
   const searchKey = [
     from, to, departISO, returnISO ?? "", adults, childCount, infantCount,
-    cabin, directOnly ? 1 : 0, sp.airline ?? "", sp.sort ?? "",
+    cabin, directOnly ? 1 : 0, sp.airline ?? "",
   ].join("|");
 
   return (
@@ -218,29 +206,6 @@ async function FlightResults({
     preferredAirlines,
   });
 
-  // Sort (URL-driven; TBO returns cheapest-first, which stays the default).
-  const sort = sp.sort === "dur" || sp.sort === "dep" ? sp.sort : "price";
-  const bySort = (list: FlightOffer[]) =>
-    sort === "dur"
-      ? [...list].sort((a, b) => a.durationMin - b.durationMin || a.fareINR - b.fareINR)
-      : sort === "dep"
-        ? [...list].sort((a, b) => (a.segments[0]?.depTime || "").localeCompare(b.segments[0]?.depTime || "") || a.fareINR - b.fareINR)
-        : list;
-  const sortHref = (s: string) => {
-    const p = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) if (v) p.set(k, v);
-    if (s === "price") p.delete("sort");
-    else p.set("sort", s);
-    return `/flights?${p.toString()}`;
-  };
-  const sortChip = (active: boolean) =>
-    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
-      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
-    }`;
-
-  const outbound = bySort(res.outbound).slice(0, 20);
-  const inbound = res.inbound ? bySort(res.inbound).slice(0, 20) : undefined;
-
   // Everything the checkout needs to price + issue the ticket with TBO. Both the
   // TraceId and its timestamp must be present — the 15-minute expiry is measured off it.
   const bookingCtx =
@@ -293,67 +258,17 @@ async function FlightResults({
               </div>
             </div>
           ) : (
-            <>
-              <div className="mb-4 flex flex-wrap items-center gap-1.5 gap-y-2">
-                <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
-                <Link href={sortHref("price")} className={sortChip(sort === "price")}>Cheapest</Link>
-                <Link href={sortHref("dur")} className={sortChip(sort === "dur")}>Fastest</Link>
-                <Link href={sortHref("dep")} className={sortChip(sort === "dep")}>Departure</Link>
-              </div>
-
-              <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-[1.15rem] font-bold text-ink">
-                  {outbound.length} flight{outbound.length > 1 ? "s" : ""}{" "}
-                  {trip === "round" ? "(outbound)" : ""} · {fromCity} → {toCity}
-                </h2>
-                {res.cheapestINR != null && (
-                  <span className="text-[0.9rem] text-muted">
-                    from{" "}
-                    <b className="text-navy">
-                      ₹{inr.format(res.cheapestINR)}
-                    </b>{" "}
-                    {trip === "round" ? "round-trip / adult" : "/ adult"}
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {outbound.map((o) => (
-                  <FlightCard key={o.id} offer={o} enquireHref={waHref(o, adults)} booking={bookingCtx} />
-                ))}
-              </div>
-
-              {trip === "round" && inbound && inbound.length > 0 && (
-                <>
-                  <h2 className="mb-6 mt-12 text-[1.15rem] font-bold text-ink">
-                    Return · {toCity} → {fromCity}
-                  </h2>
-                  <div className="space-y-4">
-                    {inbound.map((o) => (
-                      <FlightCard
-                        key={o.id}
-                        offer={o}
-                        enquireHref={waHref(o, adults)}
-                        booking={
-                          bookingCtx && returnISO
-                            ? { ...bookingCtx, departISO: returnISO }
-                            : bookingCtx
-                        }
-                      />
-                    ))}
-                  </div>
-                  <p className="mt-4 text-[0.82rem] text-muted">
-                    Fares are shown per direction. Your round-trip total combines the
-                    outbound and return you choose.
-                  </p>
-                </>
-              )}
-
-              <p className="mt-8 text-center text-[0.82rem] text-muted">
-                Live fares via our booking system · prices are confirmed at the time of
-                booking. Tap <b>Book</b> to confirm availability with our team.
-              </p>
-            </>
+            <FlightResultsClient
+              outbound={res.outbound}
+              inbound={res.inbound}
+              adults={adults}
+              trip={trip}
+              fromCity={fromCity}
+              toCity={toCity}
+              booking={bookingCtx}
+              returnISO={returnISO}
+              initialSort={sp.sort}
+            />
           )}
     </>
   );
