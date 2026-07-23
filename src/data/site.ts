@@ -54,11 +54,10 @@ export const site = {
 
   hours: "Monday – Saturday · 10:00 AM – 7:00 PM",
 
-  // TODO: confirm official social handles with the client.
   socials: {
-    facebook: "https://www.facebook.com/riseandshinetravels",
-    instagram: "https://www.instagram.com/riseandshinetravels",
-    youtube: "https://www.youtube.com/@riseandshinetravels",
+    facebook: "https://www.facebook.com/share/191ptG3xrK/",
+    instagram: "https://www.instagram.com/rise_and_shine_travel",
+    youtube: "https://www.youtube.com/@rise_and_shine_travel",
     whatsapp: "https://wa.me/919725597232",
   },
 } as const;
