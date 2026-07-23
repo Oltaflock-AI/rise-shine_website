@@ -176,6 +176,8 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       isVoucherBooking: true,
       rooms: buildRooms(),
       validation: v,
+      // Display context mirrored into the customer's account view.
+      stay: { hotelName: b.hotel, city: b.city, checkIn: b.checkIn, checkOut: b.checkOut },
     };
   }
 

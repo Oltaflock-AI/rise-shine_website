@@ -7,7 +7,8 @@ import { SearchBar } from "@/components/sections/SearchBar";
 import { HotelCard } from "@/components/ui/HotelCard";
 import { searchHotels } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
-import { resolveHotelCity, HOTEL_CITIES } from "@/data/hotel-cities";
+import { POPULAR_CITIES } from "@/data/hotel-cities";
+import { resolveCity } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function HotelsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const city = resolveHotelCity(sp.city);
+  const city = resolveCity(sp.city);
   const rooms = Math.min(6, Math.max(1, parseInt(sp.rooms || "1", 10) || 1));
   const adultsPerRoom = Math.min(8, Math.max(1, parseInt(sp.adults || "2", 10) || 2));
 
@@ -66,10 +67,10 @@ export default async function HotelsPage({
                 Pick a destination and dates above to see live rates.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {HOTEL_CITIES.map((c) => (
+                {POPULAR_CITIES.map((c) => (
                   <Link
-                    key={c.slug}
-                    href={`/hotels?city=${c.slug}`}
+                    key={c.cityCode}
+                    href={`/hotels?city=${c.cityCode}`}
                     className="rounded-full border border-line px-4 py-1.5 text-[0.85rem] font-semibold text-ink hover:border-red hover:text-red"
                   >
                     {c.label}

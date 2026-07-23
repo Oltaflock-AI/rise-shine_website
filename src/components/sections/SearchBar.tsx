@@ -21,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import { AIRPORTS } from "@/data/airports";
-import { HOTEL_CITIES } from "@/data/hotel-cities";
+import { POPULAR_CITIES, type HotelCity } from "@/data/hotel-cities";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
@@ -440,6 +440,7 @@ function HotelsPanel() {
   const router = useRouter();
   const cityListId = useId();
   const [city, setCity] = useState("");
+  const [suggestions, setSuggestions] = useState<HotelCity[]>(POPULAR_CITIES);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [today, setToday] = useState("");
@@ -450,16 +451,37 @@ function HotelsPanel() {
     setCheckOut((d) => d || iso(16));
   }, []);
 
+  // Debounced destination autocomplete against the full TBO city dataset.
+  useEffect(() => {
+    const q = city.trim();
+    if (q.length < 2) {
+      setSuggestions(POPULAR_CITIES);
+      return;
+    }
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/hotels/cities?q=${encodeURIComponent(q)}`, { signal: ctl.signal })
+        .then((r) => r.json())
+        .then((j) => j?.cities?.length && setSuggestions(j.cities))
+        .catch(() => {});
+    }, 200);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
+  }, [city]);
+
   const search = (e: React.FormEvent) => {
     e.preventDefault();
-    // Map the typed destination to a known TBO city slug when we can; otherwise
-    // pass the raw text and let the results page resolve it.
+    // Selecting a datalist option leaves its label in the input — map it back to
+    // its TBO CityCode. Unmatched free text is resolved server-side.
     const q = city.trim().toLowerCase();
     const match =
-      HOTEL_CITIES.find((c) => c.slug === q || c.label.toLowerCase() === q) ||
-      HOTEL_CITIES.find((c) => c.label.toLowerCase().includes(q) && q.length > 1);
+      suggestions.find((c) => c.label.toLowerCase() === q) ||
+      POPULAR_CITIES.find((c) => c.label.toLowerCase() === q) ||
+      (q.length > 1 ? suggestions.find((c) => c.label.toLowerCase().startsWith(q)) : undefined);
     const p = new URLSearchParams();
-    p.set("city", match ? match.slug : city.trim());
+    p.set("city", match ? match.cityCode : city.trim());
     if (checkIn) p.set("checkIn", checkIn);
     if (checkOut) p.set("checkOut", checkOut);
     p.set("rooms", "1");
@@ -487,8 +509,8 @@ function HotelsPanel() {
             />
           </label>
           <datalist id={cityListId}>
-            {HOTEL_CITIES.map((c) => (
-              <option key={c.slug} value={c.label} />
+            {suggestions.map((c) => (
+              <option key={c.cityCode} value={c.label} />
             ))}
           </datalist>
         </Field>

@@ -1,5 +1,7 @@
 import { bookHotel, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
 import type { HotelValidationInfo } from "@/lib/tbo-hotel";
+import { getUser } from "@/lib/supabase/server";
+import { saveHotelBookingHistory, type HotelStay } from "@/lib/booking-history";
 import {
   razorpayConfigured,
   verifyPaymentSignature,
@@ -36,6 +38,8 @@ export async function POST(req: Request) {
     validation?: HotelValidationInfo;
     clientReferenceId?: string;
     payment?: Payment;
+    /** Display context (hotel name/city/dates) mirrored to the account view. */
+    stay?: HotelStay;
   };
   try {
     body = await req.json();
@@ -83,7 +87,8 @@ export async function POST(req: Request) {
     isVoucherBooking: body.isVoucherBooking,
     rooms: body.rooms,
     validation: body.validation,
-    clientReferenceId: body.clientReferenceId,
+    // Always present: the recovery key for GetBookingDetail if Book times out.
+    clientReferenceId: body.clientReferenceId || crypto.randomUUID(),
   };
 
   const result = await bookHotel(request);
@@ -112,6 +117,26 @@ export async function POST(req: Request) {
         },
         { status: 502 },
       );
+    }
+  }
+
+  // Confirmed (and paid): mirror to the customer's account. Best-effort and
+  // awaited BEFORE responding (serverless may freeze after return); a failure
+  // here must never fail a paid booking. Guests (no session) aren't persisted.
+  if (result.ok) {
+    try {
+      const user = await getUser();
+      if (user) {
+        await saveHotelBookingHistory(
+          user.id,
+          request,
+          body.stay ?? {},
+          result,
+          payment ? { ...payment, amountInr: Math.round(request.netAmount) } : undefined,
+        );
+      }
+    } catch (e) {
+      console.error("[api/hotels/book] booking-history write failed (booking unaffected):", e);
     }
   }
 

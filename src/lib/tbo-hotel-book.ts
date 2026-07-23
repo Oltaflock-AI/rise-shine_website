@@ -18,6 +18,7 @@
  */
 import { TboHotelError } from "./tbo-hotel-static";
 import { bookingCall, type HotelValidationInfo } from "./tbo-hotel";
+import { hotelBookingDetail } from "./tbo-hotel-post";
 
 const TIMEOUT_BOOK = 300_000; // Book may run long — never cut it short.
 
@@ -117,6 +118,34 @@ function ip(): string {
 }
 
 /**
+ * After a Book timeout: poll GetBookingDetail by our ClientReferenceNo to learn
+ * whether the booking actually went through. Returns a definitive result when
+ * TBO answers (confirmed → ok, cancelled/failed → failed), or null when the
+ * booking can't be found / detail service is unreachable — the caller then
+ * surfaces the "verify manually, do not retry" state.
+ */
+async function recoverBookByReference(clientReferenceNo: string): Promise<HotelBookResult | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 10_000));
+    const d = await hotelBookingDetail({ clientReferenceNo });
+    if (!d.ok) continue;
+    if (d.status === 1) {
+      return {
+        ok: true,
+        status: "confirmed",
+        bookingId: d.bookingId,
+        confirmationNo: d.confirmationNo,
+        bookingRefNo: d.bookingRefNo,
+      };
+    }
+    if (d.status === 0 || d.status === 6) {
+      return { ok: false, status: d.status === 6 ? "cancelled" : "failed", error: "The booking did not go through." };
+    }
+  }
+  return null;
+}
+
+/**
  * Book — commit the reserved room. Validates first (422-style), then calls TBO
  * once. On timeout it recovers via GetBookingDetail rather than re-booking.
  */
@@ -168,16 +197,23 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
   try {
     j = await bookingCall<Resp>("Book", body, TIMEOUT_BOOK);
   } catch (e) {
-    // A timeout must NEVER trigger a re-book. Surface an actionable state.
-    if (e instanceof TboHotelError && e.name === "TboHotelError") {
-      return {
-        ok: false,
-        status: "unknown",
-        error:
-          "The booking request timed out. Do NOT retry — check status with GetBookingDetail using your booking reference before trying again.",
-      };
+    // A timeout/network fault must NEVER trigger a re-book (double-book risk).
+    // Instead, ask TBO read-only whether the booking exists — Book always carries
+    // our ClientReferenceId, so GetBookingDetail can find it either way.
+    if (req.clientReferenceId) {
+      const rec = await recoverBookByReference(req.clientReferenceId);
+      if (rec) return rec;
     }
-    return { ok: false, status: "unknown", error: e instanceof Error ? e.message : "network" };
+    return {
+      ok: false,
+      status: "unknown",
+      error:
+        e instanceof TboHotelError
+          ? "The booking request timed out and could not be confirmed either way. Do NOT retry — our team will verify against the booking reference before any re-attempt."
+          : e instanceof Error
+            ? e.message
+            : "network",
+    };
   }
 
   const B = j.BookResult;

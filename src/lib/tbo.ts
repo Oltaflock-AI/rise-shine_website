@@ -111,6 +111,15 @@ async function authenticate(force = false): Promise<string | null> {
   }
 }
 
+/**
+ * Shared TBO TokenId for OTHER TBO services (e.g. the hotel post-booking
+ * family on HotelBE) — same Sharedapi Authenticate, same agency creds, same
+ * cache. Returns null when creds are missing/rejected.
+ */
+export async function getAuthToken(force = false): Promise<string | null> {
+  return authenticate(force);
+}
+
 type RawSeg = {
   Airline?: { AirlineCode?: string; AirlineName?: string; FlightNumber?: string };
   Origin?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; DepTime?: string };
