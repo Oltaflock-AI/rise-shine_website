@@ -10,6 +10,7 @@ import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
+import { formatDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -151,7 +152,7 @@ export default async function HotelsPage({
                   {res.offers.length} hotel{res.offers.length > 1 ? "s" : ""} · {city.label}
                 </h2>
                 <span className="text-[0.9rem] text-muted">
-                  {sp.checkIn} → {sp.checkOut} · {nights} night{nights > 1 ? "s" : ""}
+                  {formatDate(sp.checkIn)} → {formatDate(sp.checkOut)} · {nights} night{nights > 1 ? "s" : ""}
                 </span>
               </div>
 
