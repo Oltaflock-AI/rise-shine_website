@@ -3,11 +3,16 @@
 import { useMemo, useState } from "react";
 import {
   Briefcase,
+  Check,
   ChevronDown,
+  Clock,
+  IndianRupee,
   Luggage,
   Plane,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { FlightCard, type BookingContext } from "./FlightCard";
 import type { FlightOffer } from "@/lib/tbo";
@@ -16,8 +21,83 @@ import { cn } from "@/lib/cn";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
-type SortKey = "price" | "dur" | "dep";
+type SortKey = "best" | "price" | "dur" | "dep";
 type Direction = "out" | "in";
+
+/** Sort a result list. "best" blends price (60%), journey time (30%) and stops (10%). */
+function bySort(list: FlightOffer[], key: SortKey): FlightOffer[] {
+  if (list.length < 2) return list;
+  if (key === "price")
+    return [...list].sort((a, b) => a.fareINR - b.fareINR || a.durationMin - b.durationMin);
+  if (key === "dur")
+    return [...list].sort((a, b) => a.durationMin - b.durationMin || a.fareINR - b.fareINR);
+  if (key === "dep")
+    return [...list].sort(
+      (a, b) =>
+        (a.segments[0]?.depTime || "").localeCompare(b.segments[0]?.depTime || "") ||
+        a.fareINR - b.fareINR,
+    );
+  const fares = list.map((o) => o.fareINR);
+  const durs = list.map((o) => o.durationMin);
+  const fLo = Math.min(...fares);
+  const fHi = Math.max(...fares);
+  const dLo = Math.min(...durs);
+  const dHi = Math.max(...durs);
+  const norm = (v: number, lo: number, hi: number) => (hi > lo ? (v - lo) / (hi - lo) : 0);
+  const score = (o: FlightOffer) =>
+    norm(o.fareINR, fLo, fHi) * 0.6 +
+    norm(o.durationMin, dLo, dHi) * 0.3 +
+    Math.min(o.stops, 2) * 0.05;
+  return [...list].sort((a, b) => score(a) - score(b) || a.fareINR - b.fareINR);
+}
+
+const SORT_OPTIONS: {
+  key: SortKey;
+  label: string;
+  menuLabel: string;
+  icon: typeof Sparkles;
+  /** Icon chip colors in the dropdown + Sort button. */
+  chip: string;
+  banner: string;
+  bannerClass: string;
+}[] = [
+  {
+    key: "best",
+    label: "Best",
+    menuLabel: "Best",
+    icon: Sparkles,
+    chip: "bg-red/10 text-red",
+    banner: "Our best mix of price, journey time and stops",
+    bannerClass: "border-red/15 bg-red/5 text-ink",
+  },
+  {
+    key: "price",
+    label: "Cheapest",
+    menuLabel: "Cheapest first",
+    icon: IndianRupee,
+    chip: "bg-emerald-100 text-emerald-700",
+    banner: "The cheapest price we've found",
+    bannerClass: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  },
+  {
+    key: "dur",
+    label: "Fastest",
+    menuLabel: "Fastest first",
+    icon: Zap,
+    chip: "bg-amber-100 text-amber-700",
+    banner: "The quickest journeys first",
+    bannerClass: "border-amber-200 bg-amber-50 text-amber-900",
+  },
+  {
+    key: "dep",
+    label: "Departure",
+    menuLabel: "Outbound: Departure time",
+    icon: Clock,
+    chip: "bg-sky-100 text-sky-700",
+    banner: "Sorted by departure time — earliest first",
+    bannerClass: "border-sky-200 bg-sky-50 text-sky-900",
+  },
+];
 
 const DISPLAY_CAP = 25;
 const AIRPORT_PREVIEW = 5;
@@ -333,8 +413,11 @@ export function FlightResultsClient({
   }, [all]);
 
   const [sort, setSort] = useState<SortKey>(
-    initialSort === "dur" || initialSort === "dep" ? initialSort : "price",
+    initialSort === "dur" || initialSort === "dep" || initialSort === "price"
+      ? initialSort
+      : "best",
   );
+  const [sortOpen, setSortOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showAirports, setShowAirports] = useState(false);
   const [showAllOut, setShowAllOut] = useState(false);
@@ -399,19 +482,9 @@ export function FlightResultsClient({
       if (bagChecked && !m.hasCheckedBag) return false;
       return true;
     };
-    const bySort = (list: FlightOffer[]) =>
-      sort === "dur"
-        ? [...list].sort((a, b) => a.durationMin - b.durationMin || a.fareINR - b.fareINR)
-        : sort === "dep"
-          ? [...list].sort(
-              (a, b) =>
-                (a.segments[0]?.depTime || "").localeCompare(b.segments[0]?.depTime || "") ||
-                a.fareINR - b.fareINR,
-            )
-          : list; // TBO already returns cheapest-first
-    const out = bySort(all.filter((m) => m.dir === "out" && passes(m)).map((m) => m.offer));
+    const out = bySort(all.filter((m) => m.dir === "out" && passes(m)).map((m) => m.offer), sort);
     const inn = inbound
-      ? bySort(all.filter((m) => m.dir === "in" && passes(m)).map((m) => m.offer))
+      ? bySort(all.filter((m) => m.dir === "in" && passes(m)).map((m) => m.offer), sort)
       : undefined;
     return { shownOut: out, shownIn: inn };
   }, [all, inbound, sort, stops, airlines, layoverPorts, depOut, depRet, dur, lay, bagCabin, bagChecked]);
@@ -427,11 +500,17 @@ export function FlightResultsClient({
         : undefined
       : cheapestOut;
 
-  const sortChip = (active: boolean) =>
-    cn(
-      "rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors",
-      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50",
-    );
+  // Leader stats per tab, off the FILTERED outbound list — what each sort would surface first.
+  const tabStats = useMemo(() => {
+    const mk = (k: SortKey) => {
+      const top = bySort(shownOut, k)[0];
+      return top ? { fare: top.fareINR, dur: top.durationMin } : undefined;
+    };
+    return { best: mk("best"), price: mk("price"), dur: mk("dur") } as const;
+  }, [shownOut]);
+
+  const activeOption = SORT_OPTIONS.find((o) => o.key === sort) ?? SORT_OPTIONS[0];
+  const fmtDurShort = (m: number) => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}`;
 
   const stopOptions: { bucket: 0 | 1 | 2; label: string }[] = [
     { bucket: 0, label: "Direct" },
@@ -652,19 +731,124 @@ export function FlightResultsClient({
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="mb-4 flex flex-wrap items-center gap-1.5 gap-y-2">
-          <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">
-            Sort
-          </span>
-          <button type="button" onClick={() => setSort("price")} className={sortChip(sort === "price")}>
-            Cheapest
-          </button>
-          <button type="button" onClick={() => setSort("dur")} className={sortChip(sort === "dur")}>
-            Fastest
-          </button>
-          <button type="button" onClick={() => setSort("dep")} className={sortChip(sort === "dep")}>
-            Departure
-          </button>
+        <div className="mb-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+            {/* Best / Cheapest / Fastest stat tabs */}
+            <div className="grid flex-1 grid-cols-3 divide-x divide-line overflow-hidden rounded-brand-lg border border-line bg-white shadow-brand-sm">
+              {(["best", "price", "dur"] as const).map((k) => {
+                const opt = SORT_OPTIONS.find((o) => o.key === k)!;
+                const stat = tabStats[k];
+                const active = sort === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSort(k)}
+                    aria-pressed={active}
+                    className={cn(
+                      "px-3 py-3 text-left transition-colors sm:px-5",
+                      active ? "bg-navy text-white" : "hover:bg-line/30",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "block text-[0.8rem] font-semibold",
+                        active ? "text-white/70" : "text-muted",
+                      )}
+                    >
+                      {opt.label}
+                    </span>
+                    <span className="block text-[1.05rem] font-bold leading-tight">
+                      {stat ? `₹${inr.format(stat.fare)}` : "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "block text-[0.78rem]",
+                        active ? "text-white/70" : "text-muted",
+                      )}
+                    >
+                      {stat ? fmtDurShort(stat.dur) : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Full sort dropdown */}
+            <div className="relative sm:w-48">
+              <button
+                type="button"
+                onClick={() => setSortOpen((o) => !o)}
+                aria-expanded={sortOpen}
+                aria-haspopup="listbox"
+                className="flex h-full w-full items-center justify-center gap-2 rounded-brand-lg border border-line bg-white px-4 py-3 text-[0.95rem] font-bold text-ink shadow-brand-sm transition-colors hover:border-red/40"
+              >
+                <span className={cn("grid h-6 w-6 place-items-center rounded-full", activeOption.chip)}>
+                  <activeOption.icon className="h-3.5 w-3.5" aria-hidden />
+                </span>
+                Sort
+                <ChevronDown
+                  className={cn("h-4 w-4 text-muted transition-transform", sortOpen && "rotate-180")}
+                  aria-hidden
+                />
+              </button>
+              {sortOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden
+                    tabIndex={-1}
+                    onClick={() => setSortOpen(false)}
+                    className="fixed inset-0 z-30 cursor-default"
+                  />
+                  <div
+                    role="listbox"
+                    aria-label="Sort flights"
+                    className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-brand-lg border border-line bg-white py-1.5 shadow-brand"
+                  >
+                    {SORT_OPTIONS.map((o) => {
+                      const active = sort === o.key;
+                      return (
+                        <button
+                          key={o.key}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => {
+                            setSort(o.key);
+                            setSortOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-3 px-4 py-2.5 text-left text-[0.9rem] transition-colors",
+                            active ? "bg-line/30 font-bold text-ink" : "font-medium text-ink hover:bg-line/20",
+                          )}
+                        >
+                          <span className={cn("grid h-7 w-7 flex-none place-items-center rounded-full", o.chip)}>
+                            <o.icon className="h-4 w-4" aria-hidden />
+                          </span>
+                          <span className="flex-1">{o.menuLabel}</span>
+                          {active && <Check className="h-4 w-4 flex-none text-red" aria-hidden />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Contextual banner for the active sort */}
+          {shownOut.length > 0 && (
+            <div
+              className={cn(
+                "mt-3 flex items-center gap-2.5 rounded-brand-lg border px-4 py-3 text-[0.9rem] font-semibold",
+                activeOption.bannerClass,
+              )}
+            >
+              <activeOption.icon className="h-4 w-4 flex-none" aria-hidden />
+              {activeOption.banner}
+            </div>
+          )}
         </div>
 
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
