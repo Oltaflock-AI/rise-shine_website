@@ -580,6 +580,26 @@ export function FlightResultsClient({
           ))}
       </Section>
 
+      {domain.airlines.length > 0 && (
+        <Section title="Airlines">
+          <SelectClear
+            allSelected={airlines.size === domain.airlines.length}
+            noneSelected={airlines.size === 0}
+            onAll={() => setAirlines(new Set(domain.airlines.map((a) => a.code)))}
+            onClear={() => setAirlines(new Set())}
+          />
+          {domain.airlines.map((a) => (
+            <CheckRow
+              key={a.code}
+              checked={airlines.has(a.code)}
+              onChange={(on) => setAirlines((prev) => toggleIn(prev, a.code, on))}
+              label={a.name}
+              fromINR={a.min}
+            />
+          ))}
+        </Section>
+      )}
+
       {domain.anyBagInfo && (
         <Section title="Baggage">
           <CheckRow
@@ -690,25 +710,6 @@ export function FlightResultsClient({
         </Section>
       )}
 
-      {domain.airlines.length > 1 && (
-        <Section title="Airlines">
-          <SelectClear
-            allSelected={airlines.size === domain.airlines.length}
-            noneSelected={airlines.size === 0}
-            onAll={() => setAirlines(new Set(domain.airlines.map((a) => a.code)))}
-            onClear={() => setAirlines(new Set())}
-          />
-          {domain.airlines.map((a) => (
-            <CheckRow
-              key={a.code}
-              checked={airlines.has(a.code)}
-              onChange={(on) => setAirlines((prev) => toggleIn(prev, a.code, on))}
-              label={a.name}
-              fromINR={a.min}
-            />
-          ))}
-        </Section>
-      )}
     </div>
   );
 
