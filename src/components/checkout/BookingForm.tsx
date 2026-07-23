@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { formatDate } from "@/lib/format-date";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -668,7 +669,7 @@ export function BookingForm({
             {b.from} → {b.to}
           </p>
           <p className="mb-4 text-[0.85rem] text-muted">
-            {b.depart} · {b.flightNo}
+            {formatDate(b.depart)} · {b.flightNo}
           </p>
           <div className="flex items-baseline justify-between border-t border-line pt-3">
             <span className="text-[0.85rem] text-muted">Total</span>

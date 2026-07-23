@@ -8,17 +8,9 @@ import { useAuth } from "@/lib/auth";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { HotelBookingForm } from "./HotelBookingForm";
+import { formatDate } from "@/lib/format-date";
 
-const fmtDate = (iso: string) => {
-  const d = (iso || "").slice(0, 10);
-  if (!d) return "";
-  return new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
+const fmtDate = formatDate;
 
 type Booking = Record<string, string>;
 

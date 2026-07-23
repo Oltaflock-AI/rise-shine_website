@@ -8,6 +8,7 @@ import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
+import { formatDate } from "@/lib/format-date";
 
 /** One row of the customer's booking mirror (see migrations 0001/0002/0004). */
 type BookingRow = {
@@ -35,8 +36,7 @@ type BookingRow = {
 };
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-const fmtDate = (d: string | null) =>
-  d ? new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+const fmtDate = formatDate;
 
 export function AccountView() {
   const { user, ready, logout } = useAuth();

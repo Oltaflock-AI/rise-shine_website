@@ -3,20 +3,13 @@ import { Plane } from "lucide-react";
 import { airlineLogo } from "@/data/airlineLogos";
 import { BookButton } from "./BookButton";
 import type { FlightOffer } from "@/lib/tbo";
+import { formatDate } from "@/lib/format-date";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 const fmtTime = (iso: string) => (iso || "").slice(11, 16);
 const fmtDur = (m: number) =>
   `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
-const fmtDate = (iso: string) => {
-  const d = iso?.slice(0, 10);
-  if (!d) return "";
-  return new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  });
-};
+const fmtDate = formatDate;
 
 /** What the checkout needs to actually book this fare with TBO. */
 export type BookingContext = {

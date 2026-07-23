@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { formatDate } from "@/lib/format-date";
 
 // ── Razorpay hosted checkout ──
 type RzpResponse = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -267,7 +268,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       amount: order.amount ?? 0,
       currency: order.currency ?? "INR",
       name: "Rise & Shine Travels",
-      description: `${b.hotel ?? "Hotel"} · ${b.checkIn} → ${b.checkOut}`,
+      description: `${b.hotel ?? "Hotel"} · ${formatDate(b.checkIn)} → ${formatDate(b.checkOut)}`,
       prefill: { email: lead?.email, contact: lead?.phone },
       notes: { bookingCode: b.bookingCode ?? "" },
       theme: { color: "#e11d2a" },
@@ -318,7 +319,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-red" aria-hidden />
         <h2 className="h-sm mb-1">Booking confirmed</h2>
         <p className="mb-6 text-muted">
-          {b.hotel} · {b.checkIn} → {b.checkOut}
+          {b.hotel} · {formatDate(b.checkIn)} → {formatDate(b.checkOut)}
         </p>
         <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-[0.9rem]">
           <div className="flex justify-between gap-4 border-b border-line pb-2">
