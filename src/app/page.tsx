@@ -10,11 +10,21 @@ import { Accreditations } from "@/components/sections/Accreditations";
 import { CTABand } from "@/components/sections/CTABand";
 import { Button } from "@/components/ui/Button";
 import { site } from "@/data/site";
+import { getGoogleReviews } from "@/lib/google-reviews";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Slim, serializable slice for the client-side Hero badge; Testimonials
+  // fetches the full feed itself (the underlying GETs are memoized per render).
+  const live = await getGoogleReviews();
   return (
     <>
-      <Hero />
+      <Hero
+        reviews={
+          live
+            ? { rating: live.rating, count: live.count, url: live.url }
+            : undefined
+        }
+      />
       <SearchBar />
       <Marquee />
       <ServicesOverview />

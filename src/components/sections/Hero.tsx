@@ -15,7 +15,9 @@ const heroPhotos = [
   "photo-1512453979798-5ea266f8880c",
 ];
 
-export function Hero() {
+export type HeroReviews = { rating: number; count: number; url: string };
+
+export function Hero({ reviews }: { reviews?: HeroReviews }) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function Hero() {
           </div>
 
           <div className="mt-12">
-            <GoogleReviews tone="dark" />
+            <GoogleReviews tone="dark" {...reviews} />
           </div>
         </div>
       </Container>
