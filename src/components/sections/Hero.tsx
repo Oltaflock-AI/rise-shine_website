@@ -68,7 +68,7 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
       />
 
       <Container className="relative z-10 w-full">
-        <div className="max-w-2xl pt-24">
+        <div className="max-w-2xl pb-28 pt-24 lg:pb-0">
           <span className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-white/10 py-2 pl-2.5 pr-4 text-[0.82rem] font-medium backdrop-blur">
             <span className="grad-red rounded-full px-2.5 py-1 text-[0.72rem] font-bold tracking-wide">
               EST. {site.established}
