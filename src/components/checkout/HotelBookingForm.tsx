@@ -78,6 +78,8 @@ const TITLES = ["Mr", "Mrs", "Ms", "Miss"];
 type Guest = {
   roomIndex: number;
   lead: boolean;
+  /** Set for child guests (from the search occupancy); drives PaxType at Book. */
+  childAge?: number;
   title: string;
   first: string;
   last: string;
@@ -92,26 +94,33 @@ type Guest = {
 export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string>; contactEmail: string }) {
   const rooms = Math.max(1, Number(b.rooms || 1));
   const adults = Math.max(1, Number(b.adults || 2));
+  // Children per room, carried from the search (ages comma-joined).
+  const childAges = (b.ages || "")
+    .split(",")
+    .map((a) => parseInt(a, 10))
+    .filter((a) => Number.isFinite(a) && a >= 1 && a <= 17)
+    .slice(0, Math.max(0, Number(b.children || 0)));
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [guests, setGuests] = useState<Guest[]>(() => {
+    const blank = (roomIndex: number, lead: boolean, childAge?: number): Guest => ({
+      roomIndex,
+      lead,
+      childAge,
+      title: childAge != null ? "Miss" : "Mr",
+      first: "",
+      last: "",
+      email: roomIndex === 0 && lead ? contactEmail : "",
+      phone: "",
+      pan: "",
+      passportNo: "",
+      passportIssue: "",
+      passportExp: "",
+    });
     const list: Guest[] = [];
     for (let r = 0; r < rooms; r++) {
-      for (let a = 0; a < adults; a++) {
-        list.push({
-          roomIndex: r,
-          lead: a === 0,
-          title: "Mr",
-          first: "",
-          last: "",
-          email: r === 0 && a === 0 ? contactEmail : "",
-          phone: "",
-          pan: "",
-          passportNo: "",
-          passportIssue: "",
-          passportExp: "",
-        });
-      }
+      for (let a = 0; a < adults; a++) list.push(blank(r, a === 0));
+      for (const age of childAges) list.push(blank(r, false, age));
     }
     return list;
   });
@@ -152,11 +161,15 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
   function buildRooms() {
     const byRoom: Array<{ passengers: Record<string, unknown>[] }> = Array.from({ length: rooms }, () => ({ passengers: [] }));
     for (const g of guests) {
+      // TBO Book treats ≤12 as a Child (PaxType 2, Age required); older
+      // "children" from the search ride as adults.
+      const isChild = g.childAge != null && g.childAge <= 12;
       byRoom[g.roomIndex].passengers.push({
         title: g.title,
         firstName: g.first.trim(),
         lastName: g.last.trim(),
-        paxType: 1,
+        paxType: isChild ? 2 : 1,
+        ...(isChild ? { age: g.childAge } : {}),
         leadPassenger: g.lead,
         ...(g.lead ? { email: g.email.trim(), phone: g.phone.trim() } : {}),
         ...(g.pan.trim() ? { pan: g.pan.trim().toUpperCase() } : {}),
@@ -349,6 +362,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                   <div key={i} className="border-t border-dashed border-line pt-4 first:border-0 first:pt-0">
                     <p className="mb-2 text-[0.8rem] font-semibold text-muted">
                       Guest {guests.filter((x) => x.roomIndex === r).indexOf(g) + 1}
+                      {g.childAge != null && <span className="ml-1">· Child ({g.childAge} yrs)</span>}
                       {g.lead && <span className="ml-1 text-red">· Lead (contact)</span>}
                     </p>
                     <div className="grid gap-3 sm:grid-cols-[6rem_1fr_1fr]">

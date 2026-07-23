@@ -92,8 +92,9 @@ export function HotelCheckoutView() {
                     {fmtDate(b.checkIn)} → {fmtDate(b.checkOut)}
                   </span>
                   <span>
-                    {nights} night{nights > 1 ? "s" : ""} · {b.rooms} room{Number(b.rooms) > 1 ? "s" : ""} · {b.adults} guest
-                    {Number(b.adults) > 1 ? "s" : ""}/room
+                    {nights} night{nights > 1 ? "s" : ""} · {b.rooms} room{Number(b.rooms) > 1 ? "s" : ""} ·{" "}
+                    {Number(b.adults || 2) + Number(b.children || 0)} guest
+                    {Number(b.adults || 2) + Number(b.children || 0) > 1 ? "s" : ""}/room
                   </span>
                   {b.room && <span>{b.room}</span>}
                 </div>
