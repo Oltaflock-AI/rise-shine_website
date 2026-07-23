@@ -3,18 +3,26 @@ import { Stars } from "./Stars";
 import { cn } from "@/lib/cn";
 
 /**
- * Trust signal built around the real, audit-verified aggregate Google rating
- * (see `site.reviews`). Numbers live in data, not markup, so swapping the
- * hardcoded value for a live Google Places feed later is a one-file change.
+ * Trust signal built around the aggregate Google rating. Defaults to the
+ * audit-verified static numbers in `site.reviews`; server components with the
+ * live Places feed (see `lib/google-reviews`) pass fresh values via props.
  */
 export function GoogleReviews({
   tone = "light",
   className,
+  rating: ratingProp,
+  count: countProp,
+  url: urlProp,
 }: {
   tone?: "light" | "dark";
   className?: string;
+  rating?: number;
+  count?: number;
+  url?: string;
 }) {
-  const { rating, count, url } = site.reviews;
+  const rating = ratingProp ?? site.reviews.rating;
+  const count = countProp ?? site.reviews.count;
+  const url = urlProp ?? site.reviews.url;
   const ratingText = rating.toFixed(1);
   const label = `Rated ${ratingText} out of 5 from ${count} Google reviews`;
 

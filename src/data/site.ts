@@ -18,15 +18,14 @@ export const site = {
   email: "info@riseandshinetravel.com",
 
   // Aggregate Google Business rating — verified in the OltaFlock audit (Issue 19).
-  // Rendered via <GoogleReviews>. To go live later, flip `source` to "live" and
-  // wire a Google Places feed using placeId + an API key (no other code changes).
+  // FALLBACK values: with GOOGLE_MAPS_API_KEY set, `lib/google-reviews` feeds
+  // <Testimonials>/<GoogleReviews> live numbers from the Google Places API and
+  // these are only used when that feed is unavailable (or in the client-side Hero).
   reviews: {
     rating: 5.0,
     count: 97,
-    source: "static" as "static" | "live",
     // TODO(khush): confirm the public Google Business profile / reviews URL.
     url: "https://www.google.com/search?q=Rise+%26+Shine+Travel+Chandkheda+Ahmedabad+reviews",
-    // TODO: add Google Places `placeId` here when moving to a live feed.
   },
 
   // Landline (Ahmedabad) + mobile / WhatsApp
