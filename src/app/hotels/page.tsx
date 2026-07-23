@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
 import { HotelCard } from "@/components/ui/HotelCard";
 import { searchHotels } from "@/lib/tbo-hotel";
-import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
+import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
@@ -42,6 +42,26 @@ export default async function HotelsPage({
     .filter((a) => Number.isFinite(a) && a >= 1 && a <= 17)
     .slice(0, childrenPerRoom);
   const guestsPerRoom = adultsPerRoom + childAges.length;
+
+  // ── filters & sort (URL-driven, server-rendered) ──
+  // Meal + refundable pass through to TBO's Search Filters (verified: MealType
+  // genuinely narrows results; Refundable picks refundable rooms). Stars and
+  // sorting are OURS — TBO ignores its documented StarRating filter.
+  const minStars = [3, 4, 5].includes(Number(sp.stars)) ? Number(sp.stars) : 0;
+  const refundableOnly = sp.refundable === "1";
+  const meal = sp.meal === "WithMeal" || sp.meal === "RoomOnly" ? sp.meal : undefined;
+  const sort = sp.sort === "price-desc" || sp.sort === "stars" ? sp.sort : "price";
+
+  /** Current search URL with some params changed (empty string removes one). */
+  const qs = (overrides: Record<string, string>) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v) p.set(k, v);
+      else p.delete(k);
+    }
+    return `/hotels?${p.toString()}`;
+  };
 
   const header = (
     <section className="bg-navy pb-8 pt-28 text-white sm:pt-32">
@@ -117,24 +137,53 @@ export default async function HotelsPage({
           adults: adultsPerRoom,
           childrenAges: childAges.length ? childAges : undefined,
         })),
+        refundableOnly,
+        mealType: meal,
       })
     : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn, checkOutISO: sp.checkOut, offers: [], error: "no-hotel-codes" };
+
+  // Photos + authoritative star ratings for the returned hotels — one batched,
+  // cached static call. Cosmetic: failure just means no images on cards.
+  const infoMap = res.ok && res.offers.length
+    ? await hotelInfoBatch(res.offers.map((o) => o.hotelCode))
+    : new Map<string, never>();
+
+  // Stars filter + sort are applied here, after TBO's own meal/refundable pass.
+  const starsOf = (code: string) =>
+    infoMap.get(code)?.rating ||
+    ({ onestar: 1, twostar: 2, threestar: 3, fourstar: 4, fivestar: 5 }[
+      (stubByCode.get(code)?.rating ?? "").toLowerCase().replace(/[^a-z]/g, "")
+    ] ?? 0);
+  let offers = res.ok ? res.offers.filter((o) => !minStars || starsOf(o.hotelCode) >= minStars) : [];
+  if (sort === "price-desc") offers = [...offers].sort((a, b) => b.cheapestFare - a.cheapestFare);
+  else if (sort === "stars") offers = [...offers].sort((a, b) => starsOf(b.hotelCode) - starsOf(a.hotelCode) || a.cheapestFare - b.cheapestFare);
+
+  const occupancyQS = [
+    `checkIn=${sp.checkIn}`,
+    `checkOut=${sp.checkOut}`,
+    `rooms=${rooms}`,
+    `adults=${adultsPerRoom}`,
+    ...(childAges.length ? [`children=${childAges.length}`, `ages=${childAges.join(",")}`] : []),
+    `city=${encodeURIComponent(city.cityCode)}`,
+  ].join("&");
+
+  const chip = (active: boolean) =>
+    `rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors ${
+      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
+    }`;
 
   return (
     <>
       {header}
       <section className="py-12 sm:py-16">
         <Container>
-          {!res.ok || !res.offers.length ? (
+          {!res.ok ? (
             <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
               <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
-              <h2 className="h-sm mb-2">
-                {res.ok ? "No hotels match your dates" : "Live rates are unavailable right now"}
-              </h2>
+              <h2 className="h-sm mb-2">Live rates are unavailable right now</h2>
               <p className="mb-6 text-muted">
-                {res.ok
-                  ? `We couldn't find availability in ${city.label} for these dates. Try different dates, or send us your stay and we'll price it by hand.`
-                  : `We couldn't reach the hotel system for ${city.label} just now. Send us your stay and our team will get you the best rate.`}
+                We couldn&apos;t reach the hotel system for {city.label} just now. Send us your
+                stay and our team will get you the best rate.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>
@@ -147,35 +196,98 @@ export default async function HotelsPage({
             </div>
           ) : (
             <>
+              {/* filter / sort rail */}
+              <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Stars</span>
+                  {[0, 3, 4, 5].map((s) => (
+                    <Link key={s} href={qs({ stars: s ? String(s) : "" })} className={chip(minStars === s)}>
+                      {s === 0 ? "Any" : `${s}★+`}
+                    </Link>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Link href={qs({ refundable: refundableOnly ? "" : "1" })} className={chip(refundableOnly)}>
+                    Free cancellation
+                  </Link>
+                  <Link href={qs({ meal: meal === "WithMeal" ? "" : "WithMeal" })} className={chip(meal === "WithMeal")}>
+                    With breakfast
+                  </Link>
+                  <Link href={qs({ meal: meal === "RoomOnly" ? "" : "RoomOnly" })} className={chip(meal === "RoomOnly")}>
+                    Room only
+                  </Link>
+                </div>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
+                  <Link href={qs({ sort: "" })} className={chip(sort === "price")}>
+                    Price ↑
+                  </Link>
+                  <Link href={qs({ sort: "price-desc" })} className={chip(sort === "price-desc")}>
+                    Price ↓
+                  </Link>
+                  <Link href={qs({ sort: "stars" })} className={chip(sort === "stars")}>
+                    Stars
+                  </Link>
+                </div>
+              </div>
+
               <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[1.15rem] font-bold text-ink">
-                  {res.offers.length} hotel{res.offers.length > 1 ? "s" : ""} · {city.label}
+                  {offers.length} hotel{offers.length !== 1 ? "s" : ""} · {city.label}
                 </h2>
                 <span className="text-[0.9rem] text-muted">
                   {formatDate(sp.checkIn)} → {formatDate(sp.checkOut)} · {nights} night{nights > 1 ? "s" : ""}
                 </span>
               </div>
 
-              <div className="space-y-4">
-                {res.offers.map((o) => (
-                  <HotelCard
-                    key={o.hotelCode}
-                    offer={o}
-                    stub={stubByCode.get(o.hotelCode)}
-                    nights={nights}
-                    checkIn={sp.checkIn!}
-                    checkOut={sp.checkOut!}
-                    rooms={rooms}
-                    adults={adultsPerRoom}
-                    childAges={childAges}
-                    cityLabel={city.label}
-                  />
-                ))}
-              </div>
+              {!offers.length ? (
+                <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
+                  <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
+                  <h2 className="h-sm mb-2">No hotels match</h2>
+                  <p className="mb-6 text-muted">
+                    {minStars || refundableOnly || meal
+                      ? "No hotels match these filters for your dates — try relaxing a filter."
+                      : `We couldn't find availability in ${city.label} for these dates. Try different dates, or send us your stay and we'll price it by hand.`}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {(minStars || refundableOnly || meal) ? (
+                      <Button href={qs({ stars: "", refundable: "", meal: "" })} arrow>
+                        Clear filters
+                      </Button>
+                    ) : (
+                      <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>
+                        Enquire for This Stay
+                      </Button>
+                    )}
+                    <Button href={site.phone.whatsappHref} variant="light">
+                      WhatsApp Us
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {offers.map((o) => (
+                    <HotelCard
+                      key={o.hotelCode}
+                      offer={o}
+                      stub={{ ...stubByCode.get(o.hotelCode), rating: String(starsOf(o.hotelCode) || "") }}
+                      nights={nights}
+                      checkIn={sp.checkIn!}
+                      checkOut={sp.checkOut!}
+                      rooms={rooms}
+                      adults={adultsPerRoom}
+                      childAges={childAges}
+                      cityLabel={city.label}
+                      image={infoMap.get(o.hotelCode)?.images?.[0]}
+                      detailHref={`/hotels/${o.hotelCode}?${occupancyQS}`}
+                    />
+                  ))}
+                </div>
+              )}
 
               <p className="mt-8 text-center text-[0.82rem] text-muted">
                 Live rates via our booking system · prices are confirmed at the time of
-                booking. Tap <b>Book</b> to confirm availability with our team.
+                booking. Tap a hotel to see all room options.
               </p>
             </>
           )}

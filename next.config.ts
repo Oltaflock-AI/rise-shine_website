@@ -31,6 +31,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      // TBO hotel photography (static HotelDetails Images[] URLs).
+      {
+        protocol: "https",
+        hostname: "www.tboholidays.com",
+      },
+      {
+        protocol: "https",
+        hostname: "tboholidays.com",
+      },
     ],
   },
   async redirects() {

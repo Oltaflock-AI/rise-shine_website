@@ -1,4 +1,6 @@
-import { Star, BedDouble, Utensils, ShieldCheck, MapPin } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { Star, BedDouble, Utensils, ShieldCheck, MapPin, ImageOff, ArrowRight } from "lucide-react";
 import { BookButton } from "@/components/ui/BookButton";
 import { cn } from "@/lib/cn";
 import type { HotelOffer } from "@/lib/tbo-hotel";
@@ -31,6 +33,8 @@ export function HotelCard({
   adults,
   childAges,
   cityLabel,
+  image,
+  detailHref,
 }: {
   offer: HotelOffer;
   stub?: HotelStub;
@@ -42,6 +46,10 @@ export function HotelCard({
   /** Ages of children per room (uniform occupancy), empty = adults only. */
   childAges?: number[];
   cityLabel: string;
+  /** Lead photo from TBO HotelDetails (absent → placeholder block). */
+  image?: string;
+  /** /hotels/[code]?dates… — the room-options page for this hotel. */
+  detailHref: string;
 }) {
   const cheapest = offer.rooms[0];
   const stars = starCount(stub?.rating);
@@ -70,11 +78,34 @@ export function HotelCard({
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
+    <div className="flex flex-col gap-4 rounded-brand-lg border border-line bg-white p-4 shadow-brand-sm sm:flex-row sm:items-center">
+      {/* photo → room options */}
+      <Link
+        href={detailHref}
+        className="relative block h-40 w-full flex-none overflow-hidden rounded-brand bg-cream sm:h-32 sm:w-44"
+        aria-label={`View rooms at ${stub?.name || `hotel ${offer.hotelCode}`}`}
+      >
+        {image ? (
+          <Image
+            src={image}
+            alt={stub?.name || "Hotel photo"}
+            fill
+            sizes="(min-width: 640px) 11rem, 100vw"
+            className="object-cover transition-transform duration-300 hover:scale-105"
+          />
+        ) : (
+          <span className="grid h-full w-full place-items-center text-muted/50">
+            <ImageOff size={26} aria-hidden />
+          </span>
+        )}
+      </Link>
+
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-[1.05rem] font-bold text-ink">
-            {stub?.name || `Hotel ${offer.hotelCode}`}
+            <Link href={detailHref} className="hover:text-red">
+              {stub?.name || `Hotel ${offer.hotelCode}`}
+            </Link>
           </h3>
           {stars > 0 && (
             <span className="flex flex-none items-center gap-0.5 text-red" aria-label={`${stars} star`}>
@@ -122,7 +153,15 @@ export function HotelCard({
             total · {nights} night{nights > 1 ? "s" : ""}
           </div>
         </div>
-        <BookButton query={query} path="/hotels/checkout" label="Book" />
+        <div className="flex items-center gap-3">
+          <Link
+            href={detailHref}
+            className="inline-flex items-center gap-1 text-[0.85rem] font-semibold text-red hover:underline"
+          >
+            View rooms <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
+          </Link>
+          <BookButton query={query} path="/hotels/checkout" label="Book" />
+        </div>
       </div>
     </div>
   );

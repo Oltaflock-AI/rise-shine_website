@@ -138,8 +138,29 @@ export default async function FlightsPage({
     directOnly,
     preferredAirlines,
   });
-  const outbound = res.outbound.slice(0, 20);
-  const inbound = res.inbound?.slice(0, 20);
+
+  // Sort (URL-driven; TBO returns cheapest-first, which stays the default).
+  const sort = sp.sort === "dur" || sp.sort === "dep" ? sp.sort : "price";
+  const bySort = (list: FlightOffer[]) =>
+    sort === "dur"
+      ? [...list].sort((a, b) => a.durationMin - b.durationMin || a.fareINR - b.fareINR)
+      : sort === "dep"
+        ? [...list].sort((a, b) => (a.segments[0]?.depTime || "").localeCompare(b.segments[0]?.depTime || "") || a.fareINR - b.fareINR)
+        : list;
+  const sortHref = (s: string) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (v) p.set(k, v);
+    if (s === "price") p.delete("sort");
+    else p.set("sort", s);
+    return `/flights?${p.toString()}`;
+  };
+  const sortChip = (active: boolean) =>
+    `rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors ${
+      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
+    }`;
+
+  const outbound = bySort(res.outbound).slice(0, 20);
+  const inbound = res.inbound ? bySort(res.inbound).slice(0, 20) : undefined;
 
   // Everything the checkout needs to price + issue the ticket with TBO. Both the
   // TraceId and its timestamp must be present — the 15-minute expiry is measured off it.
@@ -197,6 +218,13 @@ export default async function FlightsPage({
             </div>
           ) : (
             <>
+              <div className="mb-4 flex items-center gap-1.5">
+                <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
+                <Link href={sortHref("price")} className={sortChip(sort === "price")}>Cheapest</Link>
+                <Link href={sortHref("dur")} className={sortChip(sort === "dur")}>Fastest</Link>
+                <Link href={sortHref("dep")} className={sortChip(sort === "dep")}>Departure</Link>
+              </div>
+
               <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[1.15rem] font-bold text-ink">
                   {outbound.length} flight{outbound.length > 1 ? "s" : ""}{" "}

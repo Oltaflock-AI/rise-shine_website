@@ -199,3 +199,79 @@ export async function hotelDetails(
   });
   return j.HotelDetails ?? [];
 }
+
+// ── normalized hotel content (images / description / facilities) ──
+export type TboHotelInfo = {
+  code: string;
+  name: string;
+  /** 0–5; TBO sends an int here (the code-list sends words like "FourStar"). */
+  rating: number;
+  description: string;
+  facilities: string[];
+  /** Absolute image URLs (tboholidays.com) — often 50–90 per hotel. */
+  images: string[];
+  address: string;
+  cityName?: string;
+  lat?: string;
+  lng?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+};
+
+const infoCache = new Map<string, { data: TboHotelInfo; exp: number }>();
+
+function mapInfo(raw: Record<string, unknown>): TboHotelInfo {
+  const s = (v: unknown) => (typeof v === "string" ? v : "");
+  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  // Map arrives as "lat|long".
+  const [lat, lng] = s(raw.Map).split("|");
+  return {
+    code: String(raw.HotelCode ?? ""),
+    name: s(raw.HotelName),
+    rating: Math.max(0, Math.min(5, Number(raw.HotelRating) || 0)),
+    description: s(raw.Description),
+    facilities: arr(raw.HotelFacilities),
+    images: arr(raw.Images),
+    address: s(raw.Address),
+    cityName: s(raw.CityName) || undefined,
+    lat: lat || undefined,
+    lng: lng || undefined,
+    checkInTime: s(raw.CheckInTime) || undefined,
+    checkOutTime: s(raw.CheckOutTime) || undefined,
+  };
+}
+
+/**
+ * Normalized content for many hotels in ONE HotelDetails call (comma-joined),
+ * hard-cached per code — this is what puts images/stars on result cards without
+ * hammering TBO. Codes that TBO returns nothing for are simply absent.
+ */
+export async function hotelInfoBatch(codes: string[]): Promise<Map<string, TboHotelInfo>> {
+  const out = new Map<string, TboHotelInfo>();
+  const missing: string[] = [];
+  const now = Date.now();
+  for (const code of codes) {
+    const hit = infoCache.get(code);
+    if (hit && hit.exp > now) out.set(code, hit.data);
+    else missing.push(code);
+  }
+  if (missing.length) {
+    try {
+      const raws = await hotelDetails(missing, { withRooms: false });
+      for (const raw of raws) {
+        const info = mapInfo(raw);
+        if (!info.code) continue;
+        infoCache.set(info.code, { data: info, exp: now + DAY });
+        out.set(info.code, info);
+      }
+    } catch {
+      // Content is cosmetic — cards degrade to no-image rather than failing search.
+    }
+  }
+  return out;
+}
+
+/** Single-hotel convenience for the detail page. */
+export async function hotelInfo(code: string): Promise<TboHotelInfo | undefined> {
+  return (await hotelInfoBatch([code])).get(code);
+}
