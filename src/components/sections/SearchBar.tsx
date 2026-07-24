@@ -30,6 +30,7 @@ import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format-date";
 import { saveRecentSearch } from "@/lib/recent-searches";
+import { track } from "@vercel/analytics";
 
 const CABINS = ["Economy", "Premium Economy", "Business", "First"] as const;
 const FARE_TYPES = ["Regular", "Student", "Senior citizen", "Defence"] as const;

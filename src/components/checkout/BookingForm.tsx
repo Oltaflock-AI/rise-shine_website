@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { track } from "@vercel/analytics";
 import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format-date";
@@ -299,7 +300,9 @@ export function BookingForm({
             : undefined,
         }),
       });
-      setBooked((await r.json()) as Booked);
+      const parsed = (await r.json()) as Booked;
+      if (parsed.ok) track("booking_confirmed", { kind: "flight" });
+      setBooked(parsed);
     } catch {
       setBooked({ ok: false, error: "Network error — please try again." });
     } finally {
@@ -353,6 +356,7 @@ export function BookingForm({
       return;
     }
 
+    track("payment_started", { kind: "flight" });
     const ready = await loadRazorpay();
     if (!ready || !window.Razorpay) {
       setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });

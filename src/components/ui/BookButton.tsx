@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { track } from "@vercel/analytics";
 import { ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
@@ -28,6 +29,7 @@ export function BookButton({
   const checkout = `${path}?${new URLSearchParams(query).toString()}`;
 
   const onClick = () => {
+    track("checkout_opened", { kind: path.includes("hotel") ? "hotel" : "flight" });
     if (user) router.push(checkout);
     else router.push(`/login?redirect=${encodeURIComponent(checkout)}`);
   };
