@@ -7,6 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
 import { FlightResultsClient } from "@/components/ui/FlightResultsClient";
+import { RecentSearches } from "@/components/ui/RecentSearches";
 import { searchFlights, defaultDates } from "@/lib/tbo";
 import { resolveAirport } from "@/data/airports";
 import { site } from "@/data/site";
@@ -94,6 +95,7 @@ export default async function FlightsPage({
               <p className="text-muted">
                 Enter a destination above to see live fares from {fromA?.city ?? "Ahmedabad"}.
               </p>
+              <RecentSearches kind="flight" className="mt-6" />
             </div>
           </Container>
         </section>

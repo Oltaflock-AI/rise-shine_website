@@ -1,5 +1,6 @@
 import { Hero } from "@/components/sections/Hero";
 import { SearchBar } from "@/components/sections/SearchBar";
+import { RecentSearches } from "@/components/ui/RecentSearches";
 import { Marquee } from "@/components/sections/Marquee";
 import { ServicesOverview } from "@/components/sections/ServicesOverview";
 import { FeaturedItineraries } from "@/components/sections/FeaturedItineraries";
@@ -26,6 +27,9 @@ export default async function HomePage() {
         }
       />
       <SearchBar />
+      <div className="mx-auto -mt-2 mb-2 max-w-6xl px-4 sm:px-6">
+        <RecentSearches className="pt-4" />
+      </div>
       <Marquee />
       <ServicesOverview />
       <FeaturedItineraries />

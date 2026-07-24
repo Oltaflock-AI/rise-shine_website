@@ -21,6 +21,8 @@ export type HotelItem = {
   detailHref: string;
 };
 
+const DISPLAY_CAP = 25;
+
 const SORT_TABS: { key: SortKey; label: string; hint?: string }[] = [
   { key: "reco", label: "Recommended", hint: "Our best balance of price and star class" },
   { key: "reviews", label: "Top reviews", hint: "Highest Google review scores first" },
@@ -99,6 +101,7 @@ export function HotelResultsClient({
       : "reco",
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   // Filter domain from the raw result set.
   const domain = useMemo(() => {
@@ -325,25 +328,36 @@ export function HotelResultsClient({
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {sorted.map((i) => (
-              <HotelCard
-                key={i.offer.hotelCode}
-                offer={i.offer}
-                stub={i.stub}
-                nights={nights}
-                checkIn={checkIn}
-                checkOut={checkOut}
-                rooms={rooms}
-                adults={adults}
-                childAges={childAges}
-                cityLabel={cityLabel}
-                review={i.review}
-                image={i.image}
-                detailHref={i.detailHref}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-4">
+              {(showAll ? sorted : sorted.slice(0, DISPLAY_CAP)).map((i) => (
+                <HotelCard
+                  key={i.offer.hotelCode}
+                  offer={i.offer}
+                  stub={i.stub}
+                  nights={nights}
+                  checkIn={checkIn}
+                  checkOut={checkOut}
+                  rooms={rooms}
+                  adults={adults}
+                  childAges={childAges}
+                  cityLabel={cityLabel}
+                  review={i.review}
+                  image={i.image}
+                  detailHref={i.detailHref}
+                />
+              ))}
+            </div>
+            {sorted.length > DISPLAY_CAP && !showAll && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="mt-6 w-full rounded-full border border-line py-3 text-[0.9rem] font-semibold text-ink transition-colors hover:border-red/50"
+              >
+                Show all {sorted.length} hotels
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

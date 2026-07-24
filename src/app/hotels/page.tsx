@@ -11,6 +11,7 @@ import { searchHotels } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
+import { RecentSearches } from "@/components/ui/RecentSearches";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
 import { formatDate } from "@/lib/format-date";
@@ -111,6 +112,7 @@ export default async function HotelsPage({
                   </Link>
                 ))}
               </div>
+              <RecentSearches kind="hotel" className="mt-6" />
             </div>
           </Container>
         </section>

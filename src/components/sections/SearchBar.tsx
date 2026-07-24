@@ -29,6 +29,7 @@ import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format-date";
+import { saveRecentSearch } from "@/lib/recent-searches";
 
 const CABINS = ["Economy", "Premium Economy", "Business", "First"] as const;
 const FARE_TYPES = ["Regular", "Student", "Senior citizen", "Defence"] as const;
@@ -271,7 +272,13 @@ export function SearchBar({
     if (trip === "round" && ret) p.set("return", ret);
     if (airline) p.set("airline", airline);
     if (nonStop) p.set("nonstop", "1");
-    startSearch(() => router.push(`/flights?${p.toString()}`));
+    const url = `/flights?${p.toString()}`;
+    saveRecentSearch({
+      kind: "flight",
+      label: `${from.trim() || "Ahmedabad (AMD)"} → ${to.trim()}${depart ? ` · ${formatDate(depart)}` : ""}`,
+      url,
+    });
+    startSearch(() => router.push(url));
   };
 
   const noteColor = overlap ? "text-muted" : "text-white/85";
@@ -632,7 +639,13 @@ function HotelsPanel() {
       p.set("children", String(childCount));
       p.set("ages", childAges.join(","));
     }
-    startSearch(() => router.push(`/hotels?${p.toString()}`));
+    const url = `/hotels?${p.toString()}`;
+    saveRecentSearch({
+      kind: "hotel",
+      label: `${match ? match.label : city.trim()}${checkIn ? ` · ${formatDate(checkIn)}` : ""}`,
+      url,
+    });
+    startSearch(() => router.push(url));
   };
 
   return (
