@@ -46,10 +46,12 @@ export default async function HotelsPage({
     .slice(0, childrenPerRoom);
   const guestsPerRoom = adultsPerRoom + childAges.length;
 
-  // ── filters & sort (URL-driven, server-rendered) ──
+  // ── filters (URL-driven where TBO does the work) ──
   // Meal + refundable pass through to TBO's Search Filters (verified: MealType
-  // genuinely narrows results; Refundable picks refundable rooms). Stars and
-  // sorting are OURS — TBO ignores its documented StarRating filter.
+  // genuinely narrows results; Refundable picks refundable rooms). Stars,
+  // price, name, and sorting are client-side in HotelResultsClient — TBO
+  // ignores its documented StarRating filter anyway. Legacy ?stars= URLs
+  // pre-check the matching star classes there.
   const minStars = [3, 4, 5].includes(Number(sp.stars)) ? Number(sp.stars) : 0;
   const refundableOnly = sp.refundable === "1";
   const meal = sp.meal === "WithMeal" || sp.meal === "RoomOnly" ? sp.meal : undefined;
@@ -127,7 +129,7 @@ export default async function HotelsPage({
   // Sorting is client-side (HotelResultsClient) and never re-triggers this.
   const searchKey = [
     city.cityCode, sp.checkIn, sp.checkOut, rooms, adultsPerRoom,
-    childAges.join(","), minStars, refundableOnly ? 1 : 0, meal ?? "",
+    childAges.join(","), refundableOnly ? 1 : 0, meal ?? "",
   ].join("|");
 
   return (
@@ -138,14 +140,6 @@ export default async function HotelsPage({
           {/* Filter / sort rail — outside the Suspense boundary so it paints
               instantly and stays clickable while a (re)search streams in. */}
           <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Stars</span>
-              {[0, 3, 4, 5].map((s) => (
-                <Link key={s} href={qs({ stars: s ? String(s) : "" })} className={chip(minStars === s)}>
-                  {s === 0 ? "Any" : `${s}★+`}
-                </Link>
-              ))}
-            </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Link href={qs({ refundable: refundableOnly ? "" : "1" })} className={chip(refundableOnly)}>
                 Free cancellation
@@ -167,7 +161,7 @@ export default async function HotelsPage({
               adultsPerRoom={adultsPerRoom}
               childAges={childAges}
               nights={nights}
-              minStars={minStars}
+              initialMinStars={minStars}
               refundableOnly={refundableOnly}
               meal={meal}
               clearFiltersHref={qs({ stars: "", refundable: "", meal: "" })}
@@ -191,7 +185,7 @@ async function HotelResults({
   adultsPerRoom,
   childAges,
   nights,
-  minStars,
+  initialMinStars,
   refundableOnly,
   meal,
   clearFiltersHref,
@@ -202,7 +196,7 @@ async function HotelResults({
   adultsPerRoom: number;
   childAges: number[];
   nights: number;
-  minStars: number;
+  initialMinStars: number;
   refundableOnly: boolean;
   meal?: "WithMeal" | "RoomOnly";
   clearFiltersHref: string;
@@ -248,14 +242,14 @@ async function HotelResults({
       ])
     : [new Map<string, never>(), new Map<string, never>()];
 
-  // Stars filter is applied here, after TBO's own meal/refundable pass.
-  // Sorting is client-side in HotelResultsClient.
+  // Stars, price, name filtering + sorting are all client-side in
+  // HotelResultsClient — the full offer set goes to the browser.
   const starsOf = (code: string) =>
     infoMap.get(code)?.rating ||
     ({ onestar: 1, twostar: 2, threestar: 3, fourstar: 4, fivestar: 5 }[
       (stubByCode.get(code)?.rating ?? "").toLowerCase().replace(/[^a-z]/g, "")
     ] ?? 0);
-  const offers = res.ok ? res.offers.filter((o) => !minStars || starsOf(o.hotelCode) >= minStars) : [];
+  const offers = res.ok ? res.offers : [];
 
   const occupancyQS = [
     `checkIn=${sp.checkIn}`,
@@ -303,12 +297,12 @@ async function HotelResults({
                   <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
                   <h2 className="h-sm mb-2">No hotels match</h2>
                   <p className="mb-6 text-muted">
-                    {minStars || refundableOnly || meal
+                    {refundableOnly || meal
                       ? "No hotels match these filters for your dates — try relaxing a filter."
                       : `We couldn't find availability in ${city.label} for these dates. Try different dates, or send us your stay and we'll price it by hand.`}
                   </p>
                   <div className="flex flex-wrap justify-center gap-3">
-                    {(minStars || refundableOnly || meal) ? (
+                    {(refundableOnly || meal) ? (
                       <Button href={clearFiltersHref} arrow>
                         Clear filters
                       </Button>
@@ -340,6 +334,7 @@ async function HotelResults({
                   childAges={childAges}
                   cityLabel={city.label}
                   initialSort={sp.sort}
+                  initialMinStars={initialMinStars}
                 />
               )}
 
