@@ -156,7 +156,6 @@ export function BookingForm({
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
   /** Captured once — reading the clock during render is impure. */
-  const [now] = useState(() => Date.now());
 
   // Ask TBO what this fare needs BEFORE collecting details (FareQuote flags).
   useEffect(() => {
@@ -205,14 +204,15 @@ export function BookingForm({
       if (needPassport && (!p.PassportNo.trim() || !p.PassportExpiry)) return false;
       if (needFullPassport && !p.PassportIssueDate) return false;
       if (needPan) {
-        const age = p.DateOfBirth ? (now - new Date(p.DateOfBirth).getTime()) / 31557600000 : 30;
-        // Adults 18+ need their own PAN; a child/infant needs a guardian's.
-        if (p.PaxType === 1 && age >= 18) return Boolean(p.PAN.trim());
-        return Boolean(p.PAN.trim() || p.GuardianPAN.trim());
+        // Adult pax type enters their own PAN (the form has no guardian fields
+        // for adults — TBO rejects guardian PAN for 18+ anyway); child/infant
+        // bookings carry a guardian's.
+        if (p.PaxType === 1) return Boolean(p.PAN.trim());
+        return Boolean(p.GuardianPAN.trim());
       }
       return true;
     });
-  }, [quote, booking, contact, gst, pax, needPassport, needFullPassport, needPan, needGst, now]);
+  }, [quote, booking, contact, gst, pax, needPassport, needFullPassport, needPan, needGst]);
 
   /** Shape passengers into TBO's Pax objects from the current form state. */
   function buildPassengers() {
