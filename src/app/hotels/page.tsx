@@ -9,6 +9,7 @@ import { SearchBar } from "@/components/sections/SearchBar";
 import { HotelResultsClient, type HotelItem } from "@/components/ui/HotelResultsClient";
 import { searchHotels } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
+import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
@@ -232,11 +233,20 @@ async function HotelResults({
       })
     : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn!, checkOutISO: sp.checkOut!, offers: [], error: "no-hotel-codes" };
 
-  // Photos + authoritative star ratings for the returned hotels — one batched,
-  // cached static call. Cosmetic: failure just means no images on cards.
-  const infoMap = res.ok && res.offers.length
-    ? await hotelInfoBatch(res.offers.map((o) => o.hotelCode))
-    : new Map<string, never>();
+  // Photos + authoritative star ratings (TBO static) and Google review scores,
+  // fetched together. Both cosmetic: a failure just means a barer card.
+  const [infoMap, ratingsMap] = res.ok && res.offers.length
+    ? await Promise.all([
+        hotelInfoBatch(res.offers.map((o) => o.hotelCode)),
+        hotelRatingsBatch(
+          res.offers.map((o) => ({
+            code: o.hotelCode,
+            name: stubByCode.get(o.hotelCode)?.name,
+            city: city.label,
+          })),
+        ),
+      ])
+    : [new Map<string, never>(), new Map<string, never>()];
 
   // Stars filter is applied here, after TBO's own meal/refundable pass.
   // Sorting is client-side in HotelResultsClient.
@@ -318,6 +328,7 @@ async function HotelResults({
                     offer: o,
                     stub: { ...stubByCode.get(o.hotelCode), rating: String(starsOf(o.hotelCode) || "") },
                     stars: starsOf(o.hotelCode),
+                    review: ratingsMap.get(o.hotelCode),
                     image: infoMap.get(o.hotelCode)?.images?.[0],
                     detailHref: `/hotels/${o.hotelCode}?${occupancyQS}`,
                   }))}

@@ -33,6 +33,7 @@ export function HotelCard({
   adults,
   childAges,
   cityLabel,
+  review,
   image,
   detailHref,
 }: {
@@ -46,6 +47,8 @@ export function HotelCard({
   /** Ages of children per room (uniform occupancy), empty = adults only. */
   childAges?: number[];
   cityLabel: string;
+  /** Google review score (absent → no badge). */
+  review?: { rating: number; count: number };
   /** Lead photo from TBO HotelDetails (absent → placeholder block). */
   image?: string;
   /** /hotels/[code]?dates… — the room-options page for this hotel. */
@@ -115,6 +118,20 @@ export function HotelCard({
             </span>
           )}
         </div>
+
+        {review && (
+          <p className="mt-1 flex items-center gap-1.5 text-[0.82rem]">
+            <span className="inline-flex flex-none items-center gap-1 rounded-md bg-navy px-1.5 py-0.5 text-[0.78rem] font-bold text-white">
+              {review.rating.toFixed(1)}
+              <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
+            </span>
+            <span className="truncate text-muted">
+              {review.count > 0
+                ? `${new Intl.NumberFormat("en-IN").format(review.count)} Google review${review.count > 1 ? "s" : ""}`
+                : "Google rating"}
+            </span>
+          </p>
+        )}
 
         {stub?.address && (
           <p className="mt-1 flex items-center gap-1.5 truncate text-[0.85rem] text-muted">

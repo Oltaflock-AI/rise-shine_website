@@ -6,18 +6,21 @@ import { HotelCard, type HotelStub } from "./HotelCard";
 import type { HotelOffer } from "@/lib/tbo-hotel";
 import { cn } from "@/lib/cn";
 
-type SortKey = "reco" | "price" | "price-desc" | "stars";
+type SortKey = "reco" | "reviews" | "price" | "price-desc" | "stars";
 
 export type HotelItem = {
   offer: HotelOffer;
   stub: HotelStub;
   stars: number;
+  /** Google review score for this property (absent when the lookup missed). */
+  review?: { rating: number; count: number };
   image?: string;
   detailHref: string;
 };
 
 const SORT_TABS: { key: SortKey; label: string; hint?: string }[] = [
   { key: "reco", label: "Recommended", hint: "Our best balance of price and star class" },
+  { key: "reviews", label: "Top reviews", hint: "Highest Google review scores first" },
   { key: "price", label: "Lowest price" },
   { key: "price-desc", label: "Highest price" },
   { key: "stars", label: "Most stars" },
@@ -33,6 +36,14 @@ function bySort(list: HotelItem[], key: SortKey): HotelItem[] {
   if (key === "stars")
     return [...list].sort(
       (a, b) => b.stars - a.stars || a.offer.cheapestFare - b.offer.cheapestFare,
+    );
+  if (key === "reviews")
+    // Rating first, review volume as the tiebreak; unrated hotels sink to the end.
+    return [...list].sort(
+      (a, b) =>
+        (b.review?.rating ?? 0) - (a.review?.rating ?? 0) ||
+        (b.review?.count ?? 0) - (a.review?.count ?? 0) ||
+        a.offer.cheapestFare - b.offer.cheapestFare,
     );
   const fares = list.map((i) => i.offer.cheapestFare);
   const fLo = Math.min(...fares);
@@ -72,12 +83,15 @@ export function HotelResultsClient({
   );
 
   const sorted = useMemo(() => bySort(items, sort), [items, sort]);
+  // Hide the reviews tab entirely when no hotel got a Google score (key missing).
+  const anyReviews = useMemo(() => items.some((i) => i.review), [items]);
+  const tabs = anyReviews ? SORT_TABS : SORT_TABS.filter((t) => t.key !== "reviews");
 
   return (
     <>
       <div className="mb-6 overflow-x-auto rounded-brand-lg border border-line bg-white shadow-brand-sm">
         <div className="flex min-w-max" role="tablist" aria-label="Sort hotels">
-          {SORT_TABS.map((t) => {
+          {tabs.map((t) => {
             const active = sort === t.key;
             return (
               <button
@@ -127,6 +141,7 @@ export function HotelResultsClient({
             adults={adults}
             childAges={childAges}
             cityLabel={cityLabel}
+            review={i.review}
             image={i.image}
             detailHref={i.detailHref}
           />
