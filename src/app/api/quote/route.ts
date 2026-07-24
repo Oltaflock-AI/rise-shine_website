@@ -1,4 +1,5 @@
 import { quoteFare } from "@/lib/tbo-book";
+import { tooMany } from "@/lib/rate-limit";
 
 // Live TBO pricing — never cached.
 export const dynamic = "force-dynamic";
@@ -12,6 +13,9 @@ export const runtime = "nodejs";
  * of guessing — this is TBO's PAN & Passport validation checkpoint.
  */
 export async function POST(req: Request) {
+  const limited = tooMany(req, "quote", 15);
+  if (limited) return limited;
+
   let body: { traceId?: string; searchedAt?: number; resultIndex?: string };
   try {
     body = await req.json();

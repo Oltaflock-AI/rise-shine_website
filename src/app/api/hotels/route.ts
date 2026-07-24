@@ -1,5 +1,6 @@
 import { searchHotels, type RoomOccupancy } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
+import { tooMany } from "@/lib/rate-limit";
 
 // Live TBO hotel search — never statically cached.
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * via the static-data API and price the first 100 (TBO's per-request ceiling).
  */
 export async function POST(req: Request) {
+  const limited = tooMany(req, "hotels", 15);
+  if (limited) return limited;
+
   let body: {
     checkIn?: string;
     checkOut?: string;

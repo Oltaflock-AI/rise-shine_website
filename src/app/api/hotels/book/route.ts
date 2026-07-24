@@ -9,6 +9,7 @@ import {
   hotelConfirmationEmail,
   refundNoticeEmail,
 } from "@/lib/email";
+import { alertOps } from "@/lib/alerts";
 import {
   razorpayConfigured,
   verifyPaymentSignature,
@@ -106,6 +107,14 @@ export async function POST(req: Request) {
       await refundPayment(payment.paymentId, {
         notes: { reason: "hotel_book_failed", bookingCode: request.bookingCode, orderId: payment.orderId },
       });
+      await alertOps("Hotel booking failed after capture — auto-refunded", {
+        hotel: body.stay?.hotelName,
+        city: body.stay?.city,
+        bookingCode: request.bookingCode,
+        paymentId: payment.paymentId,
+        amountInr: Math.round(request.netAmount),
+        error: result.error,
+      });
       // Tell the guest their money is coming back. Best-effort — the refund
       // above already succeeded and must be reported regardless.
       const to = hotelLeadEmail(request);
@@ -128,10 +137,14 @@ export async function POST(req: Request) {
         { status: result.rule ? 422 : 502 },
       );
     } catch (e) {
-      console.error("[api/hotels/book] REFUND FAILED after book failure — settle manually:", {
+      await alertOps("URGENT: hotel refund FAILED — settle manually", {
+        hotel: body.stay?.hotelName,
+        bookingCode: request.bookingCode,
         paymentId: payment.paymentId,
         orderId: payment.orderId,
-        error: e,
+        amountInr: Math.round(request.netAmount),
+        bookError: result.error,
+        refundError: e instanceof Error ? e.message : String(e),
       });
       return Response.json(
         {

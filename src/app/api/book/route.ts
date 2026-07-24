@@ -9,6 +9,7 @@ import {
   flightConfirmationEmail,
   refundNoticeEmail,
 } from "@/lib/email";
+import { alertOps } from "@/lib/alerts";
 import {
   razorpayConfigured,
   verifyPaymentSignature,
@@ -94,6 +95,14 @@ export async function POST(req: Request) {
       await refundPayment(payment.paymentId, {
         notes: { reason: "ticketing_failed", traceId: bookingReq.traceId, orderId: payment.orderId },
       });
+      await alertOps("Flight ticketing failed after capture — auto-refunded", {
+        route: `${bookingReq.origin} → ${bookingReq.destination}`,
+        departDate: bookingReq.departDate,
+        traceId: bookingReq.traceId,
+        paymentId: payment.paymentId,
+        amountInr: payment.amountInr,
+        error: result.error,
+      });
       // Tell the customer their money is coming back. Best-effort — the refund
       // above already succeeded and must be reported regardless.
       const to = flightLeadEmail(bookingReq);
@@ -113,10 +122,13 @@ export async function POST(req: Request) {
       );
     } catch (e) {
       // A failed refund must be loud — it needs manual settlement.
-      console.error("[api/book] REFUND FAILED after ticketing failure — settle manually:", {
+      await alertOps("URGENT: flight refund FAILED — settle manually", {
+        route: `${bookingReq.origin} → ${bookingReq.destination}`,
         paymentId: payment.paymentId,
         orderId: payment.orderId,
-        error: e,
+        amountInr: payment.amountInr,
+        ticketError: result.error,
+        refundError: e instanceof Error ? e.message : String(e),
       });
       return Response.json(
         {

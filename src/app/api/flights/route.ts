@@ -1,5 +1,6 @@
 import { searchFlights, defaultDates } from "@/lib/tbo";
 import { resolveAirport } from "@/data/airports";
+import { tooMany } from "@/lib/rate-limit";
 
 // Live TBO calls — never statically cached.
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ export const runtime = "nodejs";
  * With no `depart`, defaults to ~30 days out (used by package "from" fares).
  */
 export async function GET(req: Request) {
+  const limited = tooMany(req, "flights", 20);
+  if (limited) return limited;
+
   const q = new URL(req.url).searchParams;
 
   const from = resolveAirport(q.get("from") || "AMD")?.code || "AMD";

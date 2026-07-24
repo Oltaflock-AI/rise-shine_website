@@ -1,4 +1,5 @@
 import { preBookHotel } from "@/lib/tbo-hotel";
+import { tooMany } from "@/lib/rate-limit";
 
 // Live TBO re-price — never cached.
 export const dynamic = "force-dynamic";
@@ -14,6 +15,9 @@ export const runtime = "nodejs";
  * Body: { bookingCode, paymentMode? }
  */
 export async function POST(req: Request) {
+  const limited = tooMany(req, "hotels-quote", 15);
+  if (limited) return limited;
+
   let body: { bookingCode?: string; paymentMode?: string };
   try {
     body = await req.json();
