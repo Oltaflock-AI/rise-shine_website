@@ -1,7 +1,8 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* Demo dashboard — no special config needed. */
+  outputFileTracingRoot: path.join(process.cwd()),
 };
 
 export default nextConfig;

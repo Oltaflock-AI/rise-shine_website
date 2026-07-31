@@ -7,8 +7,8 @@ export interface TranscriptTurn {
   secs: number | null;
 }
 
-// The fields Priya asks for on every call. These drive the trip chips, the call
-// detail view, and the WhatsApp message preview.
+// The fields Priya asks for on every call. These drive the trip chips and call
+// detail view.
 export interface TripFields {
   destination: string | null;
   num_travelers: string | null;

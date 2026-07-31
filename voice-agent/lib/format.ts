@@ -48,42 +48,11 @@ const FIELD_LABELS: [keyof TripFields, string][] = [
   ["num_travelers", "Travelers"],
   ["travel_month", "Travel month"],
   ["special_requests", "Special requests"],
-  ["whatsapp_number", "WhatsApp"],
+  ["whatsapp_number", "Contact"],
   ["callback_time", "Callback"],
 ];
 
 export function tripChips(c: CallRecord): { label: string; value: string }[] {
   return FIELD_LABELS.map(([key, label]) => ({ label, value: c.fields[key] }))
     .filter((x): x is { label: string; value: string } => !!x.value);
-}
-
-// Build the WhatsApp message(s) Rise & Shine would auto-send the buyer after the
-// call — ONLY the things Priya asked for (no sentiment, score, or internal data).
-// Returns one or more chat bubbles.
-export function buildWhatsAppMessages(c: CallRecord): string[] {
-  const name = c.name?.trim() || "there";
-  const f = c.fields;
-
-  const lines: string[] = [];
-  if (f.destination) lines.push(`✈️ *Destination* — ${f.destination}`);
-  if (f.num_travelers) lines.push(`👥 *Travelers* — ${f.num_travelers}`);
-  if (f.travel_month) lines.push(`🗓️ *Travel month* — ${f.travel_month}`);
-  if (f.special_requests) lines.push(`✨ *Special requests* — ${f.special_requests}`);
-
-  const summary =
-    `Namaste ${name}! 🙏\n\n` +
-    `Thank you for speaking with *Priya* from *Rise & Shine Travel*. ` +
-    `Here's a quick summary of your travel enquiry:` +
-    (lines.length ? `\n\n${lines.join("\n")}` : "");
-
-  const callbackLine = f.callback_time
-    ? `📞 Our travel expert will call you back *${f.callback_time}* with a custom itinerary and quote.`
-    : `📞 Our travel expert will call you back soon with a custom itinerary and quote.`;
-
-  const next =
-    `${callbackLine}\n\n` +
-    `We'll share your personalised itinerary link right here on WhatsApp. ` +
-    `See you soon! 🌅`;
-
-  return [summary, next];
 }

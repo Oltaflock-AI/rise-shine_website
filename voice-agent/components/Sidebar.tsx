@@ -6,25 +6,21 @@ import { useCalls } from "@/lib/useCalls";
 import { fmtWhen } from "@/lib/format";
 import {
   IconOverview,
-  IconPhonePlus,
   IconPhone,
   IconPlane,
-  IconWhatsApp,
   IconSun,
 } from "@/components/icons";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { calls, lastSync } = useCalls();
+  const { calls, error, lastSync } = useCalls();
 
   const qualified = calls.filter((c) => c.qualified === true).length;
 
   const items = [
     { href: "/", label: "Overview", Icon: IconOverview, exact: true },
-    { href: "/submit", label: "Submit Form", Icon: IconPhonePlus },
     { href: "/calls", label: "Voice Calls", Icon: IconPhone, count: calls.length },
     { href: "/leads", label: "Trips & Leads", Icon: IconPlane, count: qualified },
-    { href: "/whatsapp", label: "WhatsApp", Icon: IconWhatsApp, count: calls.length },
   ];
 
   const isActive = (href: string, exact?: boolean) =>
@@ -57,10 +53,10 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-foot">
-        <div className="sync-mini">
-          <span className="dot" /> Live · {fmtWhen(Math.floor(lastSync.getTime() / 1000))}
+        <div className={`sync-mini${error ? " sync-error-text" : ""}`} title={error ?? undefined}>
+          <span className="dot" /> {error ? "Data unavailable" : `Live · ${fmtWhen(Math.floor(lastSync.getTime() / 1000))}`}
         </div>
-        <div className="sidebar-org">Oltaflock · v1.0</div>
+        <div className="sidebar-org">Powered by Oltaflock · v1.1</div>
       </div>
     </aside>
   );

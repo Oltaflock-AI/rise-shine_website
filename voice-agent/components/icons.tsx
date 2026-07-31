@@ -13,17 +13,11 @@ const base = {
 export const IconOverview = (p: P) => (
   <svg {...base} {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
 );
-export const IconPhonePlus = (p: P) => (
-  <svg {...base} {...p}><path d="M5 4.5c0 8.3 5.2 13.5 13.5 13.5l1.4-3.2-3.8-1.6-1.6 1.6a10.5 10.5 0 0 1-4.8-4.8l1.6-1.6L9.7 4.6 5 4.5Z" /><path d="M17 2.5v5M14.5 5h5" /></svg>
-);
 export const IconPhone = (p: P) => (
   <svg {...base} {...p}><path d="M5 4.5c0 8.3 5.2 13.5 13.5 13.5l1.4-3.2-3.8-1.6-1.6 1.6a10.5 10.5 0 0 1-4.8-4.8l1.6-1.6L9.7 4.6 5 4.5Z" /></svg>
 );
 export const IconUsers = (p: P) => (
   <svg {...base} {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 19a5.5 5.5 0 0 0-3-4.9" /></svg>
-);
-export const IconWhatsApp = (p: P) => (
-  <svg {...base} {...p}><path d="M3.5 20.5l1.3-4.2A8 8 0 1 1 8 19.2l-4.5 1.3Z" /><path d="M9 9c0 4 2 6 6 6 .6 0 1-.6 1-1.2 0-.3-.2-.6-.5-.7l-1.6-.6c-.3-.1-.6 0-.8.2l-.4.5c-1-.4-1.8-1.2-2.2-2.2l.5-.4c.2-.2.3-.5.2-.8L10.3 8c-.1-.3-.4-.5-.7-.5C9 7.5 9 8.4 9 9Z" /></svg>
 );
 export const IconPlane = (p: P) => (
   <svg {...base} {...p}><path d="M10.5 13.5 3 11l1-2 6 .8 4-5.3a2 2 0 0 1 3.2 2.3L13.8 12l.7 6-2 1-2-5.5Z" /></svg>

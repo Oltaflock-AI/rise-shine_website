@@ -1,14 +1,10 @@
-# Rise & Shine Travel — AI Voice Sales Engine (Demo)
+# Rise & Shine Travel — AI Voice Sales Dashboard
 
-A one-page dashboard for **Rise & Shine Travel**. Fill in a lead's **full name** and
-**WhatsApp number**, hit **Call this lead**, and the ElevenLabs voice agent (*Priya*)
-places an outbound call over the VoBiz SIP trunk. When the call ends, the qualified
-summary and the details Priya collected (destination, travelers, month, requests,
-callback time) land in the feed as a message card.
+A private operations dashboard for **Rise & Shine Travel**. It reads conversations
+from the ElevenLabs voice agent (*Priya*) and surfaces call summaries, qualified
+travel intent, collected trip details, and callback windows for the sales team.
 
-Built by [Oltaflock](https://oltaflock.ai). Adapted from the `sarthak-singapore`
-sales engine — the iPhone-style dialer is replaced by a name + WhatsApp form, and
-each call's outcome is surfaced as a message.
+Built by [Oltaflock](https://oltaflock.ai).
 
 ## Stack
 
@@ -19,18 +15,14 @@ each call's outcome is surfaced as a message.
 ## How it works
 
 ```
-Form (name + WhatsApp number)
-        │  POST /api/call
-        ▼
-ElevenLabs places outbound call  ──► dynamic vars: callee_name, mobile_number
+ElevenLabs voice agent handles a call
         │
-        │  while live: GET /api/status  (ringing → connected → ended)
         ▼
 Call ends → ElevenLabs runs post-call analysis
         │
         │  GET /api/conversations  (polled every 6s)
         ▼
-Dashboard feed: summary "message" + collected detail chips + transcript
+Dashboard: summary + collected detail chips + transcript
 ```
 
 Unlike the reference (which used Supabase + a post-call webhook), this demo reads
@@ -42,8 +34,8 @@ post-call webhook the same way `sarthak-singapore` does.
 
 - **Agent**: `Rise & Shine Travel` (`agent_6901kth2msjxf0wtnxwwgpp9an03`)
 - **Persona**: *Priya*, a Hindi-speaking travel consultant (Ahmedabad office)
-- **Goal**: qualify the lead (destination, travelers, month, special requests),
-  confirm the WhatsApp number, and lock a 1–4 PM callback.
+- **Goal**: qualify the lead (destination, travelers, month, special requests)
+  and lock a 1–4 PM callback.
 - **Collected fields** (configured on the agent, surfaced as chips): `destination`,
   `num_travelers`, `travel_month`, `special_requests`, `whatsapp_number`,
   `callback_time`, `lead_qualified`.

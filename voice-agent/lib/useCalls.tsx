@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import type { CallRecord } from "./types";
 
 // Shared live-data layer for the whole dashboard. One poller feeds every tab so
-// navigating between Overview / Voice Calls / Leads / WhatsApp doesn't re-fetch
+// navigating between Overview / Voice Calls / Leads doesn't re-fetch
 // or flash empty. Reads from /api/conversations (ElevenLabs is the source).
 
 const POLL_MS = 8000;
@@ -16,6 +16,7 @@ let cache: CallRecord[] = [];
 interface CallsCtx {
   calls: CallRecord[];
   loading: boolean;
+  error: string | null;
   lastSync: Date;
   refetch: () => Promise<void>;
 }
@@ -23,6 +24,7 @@ interface CallsCtx {
 const Ctx = createContext<CallsCtx>({
   calls: [],
   loading: true,
+  error: null,
   lastSync: new Date(0),
   refetch: async () => {},
 });
@@ -30,18 +32,22 @@ const Ctx = createContext<CallsCtx>({
 export function CallsProvider({ children }: { children: React.ReactNode }) {
   const [calls, setCalls] = useState<CallRecord[]>(() => cache);
   const [loading, setLoading] = useState(cache.length === 0);
+  const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date>(new Date());
 
   const refetch = useCallback(async () => {
     try {
       const r = await fetch("/api/conversations", { cache: "no-store" });
       const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Call data is unavailable.");
       if (Array.isArray(j.calls)) {
         cache = j.calls;
         setCalls(j.calls);
       }
-    } catch {
+      setError(null);
+    } catch (caught) {
       /* keep last good data */
+      setError(caught instanceof Error ? caught.message : "Call data is unavailable.");
     }
     setLastSync(new Date());
     setLoading(false);
@@ -53,7 +59,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [refetch]);
 
-  return <Ctx.Provider value={{ calls, loading, lastSync, refetch }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ calls, loading, error, lastSync, refetch }}>{children}</Ctx.Provider>;
 }
 
 export const useCalls = () => useContext(Ctx);
