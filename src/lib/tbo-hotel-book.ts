@@ -70,6 +70,8 @@ export type HotelBookResult = {
 };
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+/** TBO Book allows plain letters (spaces between parts) — no ., / ( ) etc. */
+const NAME_RE = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
 
 /**
  * Enforce TBO's hotel booking rules BEFORE calling Book, so a bad request is
@@ -93,8 +95,13 @@ export function validateHotelPax(req: HotelBookRequest): string | null {
       if (!p.firstName?.trim() || !p.lastName?.trim()) return `Every guest needs a first and last name.`;
       if (p.paxType === 2 && (p.age == null || p.age < 0 || p.age > 12))
         return `Child guests need an age of 0–12.`;
+      // TBO Book rejects special characters in names — letters only, single
+      // spaces between parts — and caps each field at 2–25 chars unless the
+      // rate's ValidationInfo says otherwise.
+      if (!NAME_RE.test(p.firstName.trim()) || !NAME_RE.test(p.lastName.trim()))
+        return `Guest names can only contain letters and spaces.`;
       const min = v?.paxNameMinLength ?? 2;
-      const max = v?.paxNameMaxLength ?? 50;
+      const max = v?.paxNameMaxLength ?? 25;
       if (p.firstName.trim().length < min || p.firstName.trim().length > max || p.lastName.trim().length < min || p.lastName.trim().length > max)
         return `Guest names must be ${min}–${max} characters.`;
     }
@@ -156,6 +163,17 @@ async function recoverBookByReference(clientReferenceNo: string): Promise<HotelB
 }
 
 /**
+ * The hotel API accepts ONLY "Mr", "Mrs" and "Ms" as guest titles (TBO logs
+ * observation) — "Mstr"/"Miss", valid on the flight API, fail hotel Book.
+ */
+function hotelTitle(raw: string): "Mr" | "Mrs" | "Ms" {
+  const t = (raw || "").trim().replace(/\.+$/, "").toUpperCase();
+  if (t === "MRS") return "Mrs";
+  if (t === "MS" || t === "MISS") return "Ms";
+  return "Mr"; // MR, MSTR/MASTER and anything unrecognized
+}
+
+/**
  * Book — commit the reserved room. Validates first (422-style), then calls TBO
  * once. On timeout it recovers via GetBookingDetail rather than re-booking.
  */
@@ -180,7 +198,7 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
 
   const HotelRoomsDetails = roomsWithPan.map((room) => ({
     HotelPassenger: room.passengers.map((p) => ({
-      Title: p.title,
+      Title: hotelTitle(p.title),
       FirstName: p.firstName.trim(),
       LastName: p.lastName.trim(),
       PaxType: p.paxType,
@@ -200,6 +218,8 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
     BookingCode: req.bookingCode,
     GuestNationality: req.nationality.toUpperCase(),
     IsVoucherBooking: req.isVoucherBooking ?? true,
+    // 5 = API booking — TBO certification requires this hardcoded on Book.
+    RequestedBookingMode: 5,
     NetAmount: req.netAmount,
     HotelRoomsDetails,
     ...(req.clientReferenceId ? { ClientReferenceId: req.clientReferenceId } : {}),

@@ -239,7 +239,10 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     HotelCodes: args.hotelCodes.join(","),
     GuestNationality: args.nationality.toUpperCase(),
     PaxRooms,
-    ResponseTime: 23.0,
+    // TBO wants ResponseTime scaled to the request size (allowed 5–23s):
+    // a single-hotel reprice shouldn't ask for the full 23s a 100-code
+    // city sweep needs.
+    ResponseTime: Math.min(23, Math.max(5, Math.ceil(args.hotelCodes.length / 5))),
     IsDetailedResponse: false,
     Filters: filters,
   };
@@ -301,6 +304,14 @@ export type HotelValidationInfo = {
   panCountRequired?: number;
 };
 
+/** A charge payable at the hotel (PreBook `Supplements`) — local currency. */
+export type HotelSupplement = {
+  type?: string;
+  description?: string;
+  price?: number;
+  currency?: string;
+};
+
 export type PreBookResult = {
   ok: boolean;
   bookingCode: string;
@@ -311,6 +322,13 @@ export type PreBookResult = {
   isPriceChanged?: boolean;
   isCancellationPolicyChanged?: boolean;
   cancelPolicies?: CancelPolicy[];
+  // TBO certification: Inclusion, RateConditions and RoomPromotion from the
+  // PreBook RS MUST be shown to the user before Book (TBO takes no liability
+  // otherwise). Same for mandatory Supplements, which are paid at the hotel.
+  inclusion?: string;
+  rateConditions?: string[];
+  roomPromotions?: string[];
+  supplements?: HotelSupplement[];
   validation?: HotelValidationInfo;
   error?: string;
 };
@@ -335,8 +353,18 @@ export async function preBookHotel(args: {
     PaxNameMaxLength?: number;
     PanCountRequired?: number;
   };
+  type RawSupplement = {
+    Type?: string;
+    Description?: string;
+    Price?: number;
+    Currency?: string;
+  };
   type RawRoomPB = RawRoom & {
     NetAmount?: number;
+    RateConditions?: string[];
+    RoomPromotion?: string[];
+    // TBO nests supplements per room as an array of arrays.
+    Supplements?: RawSupplement[][];
     ValidationInfo?: RawVI;
   };
   type Resp = {
@@ -378,6 +406,15 @@ export async function preBookHotel(args: {
       fromDate: p.FromDate ?? "",
       chargeType: p.ChargeType,
       charge: p.CancellationCharge ?? 0,
+    })),
+    inclusion: room.Inclusion,
+    rateConditions: (room.RateConditions ?? []).filter(Boolean),
+    roomPromotions: (room.RoomPromotion ?? []).filter(Boolean),
+    supplements: (room.Supplements ?? []).flat().map((s) => ({
+      type: s.Type,
+      description: s.Description,
+      price: s.Price,
+      currency: s.Currency,
     })),
     validation: {
       panMandatory: Boolean(vi.PanMandatory),
