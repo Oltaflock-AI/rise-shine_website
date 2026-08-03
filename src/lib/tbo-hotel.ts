@@ -156,18 +156,24 @@ type RawRoom = {
   IsRefundable?: boolean;
   TotalFare?: number;
   TotalTax?: number;
+  /** B2C feeds return a floor price (field name varies across TBO docs). */
+  RecommendedSellingRate?: number;
+  RecommendedSellingPrice?: number;
   CancelPolicies?: Array<{ FromDate?: string; ChargeType?: string | number; CancellationCharge?: number }>;
 };
 type RawHotelResult = { HotelCode?: string | number; Currency?: string; Rooms?: RawRoom[] };
 
 function mapRoom(r: RawRoom): HotelRoomOffer {
+  // B2C rule (TBO): the price shown/charged may never be below the
+  // RecommendedSellingRate — floor the display fare at RSP when present.
+  const rsp = r.RecommendedSellingRate ?? r.RecommendedSellingPrice ?? 0;
   return {
     bookingCode: r.BookingCode ?? "",
     name: Array.isArray(r.Name) ? r.Name.join(", ") : (r.Name ?? ""),
     mealType: r.MealType,
     inclusion: r.Inclusion,
     isRefundable: Boolean(r.IsRefundable),
-    totalFare: Math.round(r.TotalFare ?? 0),
+    totalFare: Math.round(Math.max(r.TotalFare ?? 0, rsp)),
     totalTax: Math.round(r.TotalTax ?? 0),
     cancelPolicies: (r.CancelPolicies ?? []).map((p) => ({
       fromDate: p.FromDate ?? "",
@@ -393,12 +399,15 @@ export async function preBookHotel(args: {
   if (!room) return fail("PreBook returned no room — the rate is no longer available.");
   const vi = room.ValidationInfo ?? {};
 
+  // B2C floor: the customer-facing PreBook price may never sit below RSP.
+  // NetAmount stays raw — it is what Book must carry and what TBO charges us.
+  const rsp = room.RecommendedSellingRate ?? room.RecommendedSellingPrice ?? 0;
   return {
     ok: true,
     bookingCode: room.BookingCode ?? args.bookingCode,
     currency: hr?.Currency,
     netAmount: room.NetAmount,
-    totalFare: room.TotalFare,
+    totalFare: room.TotalFare != null || rsp ? Math.max(room.TotalFare ?? 0, rsp) : undefined,
     totalTax: room.TotalTax,
     isPriceChanged: Boolean(hr?.IsPriceChanged),
     isCancellationPolicyChanged: Boolean(hr?.IsCancellationPolicyChanged),

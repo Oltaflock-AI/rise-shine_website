@@ -1,7 +1,8 @@
 /**
- * TBO portal verification (Jul 2026) requires the sign-in flow to be disabled:
- * booking must work without an account while their team validates the site.
- * Flip to false to restore the login gate, the header auth UI and the
- * /login + /signup screens — no other code changes needed.
+ * Flight portal verification (Jul 2026) wanted the sign-in flow disabled;
+ * HOTEL portal verification (Aug 2026) requires the opposite — TBO does an
+ * end-to-end run with a demo login, and the account view is where booking
+ * management (hotel cancellation) lives. Auth is therefore back ON.
+ * Flip to true to hide the login gate, header auth UI and /login + /signup.
  */
-export const AUTH_DISABLED = true;
+export const AUTH_DISABLED = false;

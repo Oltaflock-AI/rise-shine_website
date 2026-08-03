@@ -37,7 +37,9 @@ export async function POST(req: Request) {
   // Authoritative re-price. This also returns the validation rules for the rate.
   const pb = await preBookHotel({ bookingCode: body.bookingCode });
   if (!pb.ok) return Response.json({ ok: false, error: pb.error || "This rate is no longer available." }, { status: 502 });
-  const amountInr = pb.netAmount ?? pb.totalFare ?? 0;
+  // Charge the SELLING price (RSP-floored TotalFare) — B2C may never charge
+  // below TBO's recommended selling rate. NetAmount is TBO's cost to us.
+  const amountInr = pb.totalFare ?? pb.netAmount ?? 0;
   if (!amountInr) return Response.json({ ok: false, error: "This rate is no longer available." }, { status: 502 });
 
   // Validate guests against the RATE's rules (not the client's claim) before charging.

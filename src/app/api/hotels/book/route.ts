@@ -64,6 +64,9 @@ export async function POST(req: Request) {
   // server-side (/api/hotels/payment/order); the order's amount — not any client
   // number — is what we accept.
   let payment: ConfirmedPayment | null = null;
+  // What the customer actually paid (order is server-priced at the RSP-floored
+  // selling fare; body.netAmount is TBO's net and no longer matches it).
+  let paidInr: number | null = null;
   if (razorpayConfigured) {
     const p = body.payment;
     if (!p?.orderId || !p?.paymentId || !p?.signature) {
@@ -79,6 +82,7 @@ export async function POST(req: Request) {
         return Response.json({ ok: false, error: "Payment has not been captured." }, { status: 402 });
       }
       payment = { paymentId: pay.id, orderId: order.id };
+      paidInr = order.amount / 100; // paise → INR
     } catch (e) {
       console.error("[api/hotels/book] payment verification failed:", e);
       return Response.json(
@@ -112,7 +116,7 @@ export async function POST(req: Request) {
         city: body.stay?.city,
         bookingCode: request.bookingCode,
         paymentId: payment.paymentId,
-        amountInr: Math.round(request.netAmount),
+        amountInr: Math.round(paidInr ?? request.netAmount),
         error: result.error,
       });
       // Tell the guest their money is coming back. Best-effort — the refund
@@ -124,7 +128,7 @@ export async function POST(req: Request) {
             to,
             ...refundNoticeEmail({
               kind: "hotel",
-              amountInr: Math.round(request.netAmount),
+              amountInr: Math.round(paidInr ?? request.netAmount),
               reference: payment.paymentId,
             }),
           });
@@ -142,7 +146,7 @@ export async function POST(req: Request) {
         bookingCode: request.bookingCode,
         paymentId: payment.paymentId,
         orderId: payment.orderId,
-        amountInr: Math.round(request.netAmount),
+        amountInr: Math.round(paidInr ?? request.netAmount),
         bookError: result.error,
         refundError: e instanceof Error ? e.message : String(e),
       });
@@ -169,7 +173,7 @@ export async function POST(req: Request) {
           request,
           body.stay ?? {},
           result,
-          payment ? { ...payment, amountInr: Math.round(request.netAmount) } : undefined,
+          payment ? { ...payment, amountInr: Math.round(paidInr ?? request.netAmount) } : undefined,
         );
       }
     } catch (e) {
@@ -182,7 +186,7 @@ export async function POST(req: Request) {
       try {
         await sendEmail({
           to,
-          ...hotelConfirmationEmail(request, body.stay ?? {}, result, Math.round(request.netAmount)),
+          ...hotelConfirmationEmail(request, body.stay ?? {}, result, Math.round(paidInr ?? request.netAmount)),
         });
       } catch (e) {
         console.error("[api/hotels/book] confirmation email failed (booking unaffected):", e);

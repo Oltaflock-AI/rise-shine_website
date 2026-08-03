@@ -168,7 +168,10 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       }),
     [quote?.currency, b.currency],
   );
-  const amountInr = quote?.netAmount ?? quote?.totalFare ?? Number(b.fare || 0);
+  // What the CUSTOMER pays: the PreBook selling price (RSP-floored TotalFare).
+  // quote.netAmount is TBO's charge to the agency and rides only in the Book
+  // payload — B2C must never sell below the recommended selling rate.
+  const amountInr = quote?.totalFare ?? quote?.netAmount ?? Number(b.fare || 0);
 
   const setGuest = (i: number, patch: Partial<Guest>) =>
     setGuests((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
@@ -200,7 +203,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     return {
       bookingCode: b.bookingCode,
       nationality: "IN",
-      netAmount: amountInr,
+      netAmount: quote?.netAmount ?? amountInr,
       isVoucherBooking: true,
       rooms: buildRooms(),
       validation: v,

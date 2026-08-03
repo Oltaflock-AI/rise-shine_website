@@ -21,7 +21,11 @@ import { TboHotelError } from "./tbo-hotel-static";
 import { bookingCall, type HotelValidationInfo } from "./tbo-hotel";
 import { hotelBookingDetail } from "./tbo-hotel-post";
 
-const TIMEOUT_BOOK = 300_000; // Book may run long — never cut it short.
+// TBO's recommended booking cut-off. After it, status comes from
+// GetBookingDetail (first poll a further 120s later, per TBO validation
+// sheet) — the whole flow must fit the route's maxDuration (300s).
+const TIMEOUT_BOOK = 120_000;
+const RECOVERY_DELAY = 120_000;
 
 /** Book's host — the HotelBE service base, same one the post-booking family uses. */
 const BOOK_BASE = (process.env.TBO_HOTEL_BE_URL || "https://HotelBE.tektravels.com/hotelservice.svc/rest").replace(/\/+$/, "");
@@ -114,6 +118,15 @@ export function validateHotelPax(req: HotelBookRequest): string | null {
     }
   }
 
+  // TBO portal checkpoint: two guests may not share the identical name — the
+  // supplier side rejects duplicate CustomerNames across the booking.
+  const seenNames = new Set<string>();
+  for (const p of req.rooms.flatMap((r) => r.passengers)) {
+    const key = `${(p.firstName ?? "").trim().toUpperCase()} ${(p.lastName ?? "").trim().toUpperCase()}`;
+    if (seenNames.has(key)) return `Two guests can't share the same name (${key.trim()}) — please use each guest's full name.`;
+    seenNames.add(key);
+  }
+
   if (v?.panMandatory) {
     const need = v.panCountRequired ?? 1;
     const pans = req.rooms.flatMap((r) => r.passengers).map((p) => p.pan?.trim().toUpperCase()).filter(Boolean) as string[];
@@ -143,7 +156,10 @@ function ip(): string {
  */
 async function recoverBookByReference(clientReferenceNo: string): Promise<HotelBookResult | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 10_000));
+    // TBO validation sheet: after a failed/timed-out Book, call
+    // GetBookingDetail only after 120s (their systems need that long to settle
+    // on a final status) — never immediately. Later polls re-check at 10s.
+    await new Promise((r) => setTimeout(r, attempt === 0 ? RECOVERY_DELAY : 10_000));
     const d = await hotelBookingDetail({ clientReferenceNo });
     if (!d.ok) continue;
     if (d.status === 1) {
