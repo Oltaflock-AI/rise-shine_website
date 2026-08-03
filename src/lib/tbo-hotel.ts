@@ -399,15 +399,18 @@ export async function preBookHotel(args: {
   if (!room) return fail("PreBook returned no room — the rate is no longer available.");
   const vi = room.ValidationInfo ?? {};
 
-  // B2C floor: the customer-facing PreBook price may never sit below RSP.
-  // NetAmount stays raw — it is what Book must carry and what TBO charges us.
+  // B2C floor: the customer-facing PreBook price may never sit below RSP —
+  // nor below NetAmount (staging returns TotalFare ₹1 UNDER net; selling at
+  // "fare" there would be selling below cost). NetAmount itself stays raw —
+  // it is what Book must carry and what TBO charges us.
   const rsp = room.RecommendedSellingRate ?? room.RecommendedSellingPrice ?? 0;
+  const fareFloor = Math.max(room.TotalFare ?? 0, rsp, room.NetAmount ?? 0);
   return {
     ok: true,
     bookingCode: room.BookingCode ?? args.bookingCode,
     currency: hr?.Currency,
     netAmount: room.NetAmount,
-    totalFare: room.TotalFare != null || rsp ? Math.max(room.TotalFare ?? 0, rsp) : undefined,
+    totalFare: fareFloor > 0 ? Math.ceil(fareFloor) : undefined,
     totalTax: room.TotalTax,
     isPriceChanged: Boolean(hr?.IsPriceChanged),
     isCancellationPolicyChanged: Boolean(hr?.IsCancellationPolicyChanged),
