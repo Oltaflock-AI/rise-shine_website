@@ -331,6 +331,7 @@ export type PreBookResult = {
   // TBO certification: Inclusion, RateConditions and RoomPromotion from the
   // PreBook RS MUST be shown to the user before Book (TBO takes no liability
   // otherwise). Same for mandatory Supplements, which are paid at the hotel.
+  mealType?: string;
   inclusion?: string;
   rateConditions?: string[];
   roomPromotions?: string[];
@@ -419,6 +420,7 @@ export async function preBookHotel(args: {
       chargeType: p.ChargeType,
       charge: p.CancellationCharge ?? 0,
     })),
+    mealType: room.MealType,
     inclusion: room.Inclusion,
     rateConditions: (room.RateConditions ?? []).filter(Boolean),
     roomPromotions: (room.RoomPromotion ?? []).filter(Boolean),

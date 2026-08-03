@@ -63,6 +63,7 @@ type Quote = {
   isPriceChanged?: boolean;
   isCancellationPolicyChanged?: boolean;
   cancelPolicies?: { fromDate: string; chargeType?: string | number; charge: number }[];
+  mealType?: string;
   inclusion?: string;
   rateConditions?: string[];
   roomPromotions?: string[];
@@ -582,13 +583,19 @@ function RateTerms({ quote }: { quote: Quote }) {
   const supplements = quote.supplements ?? [];
   const policies = quote.cancelPolicies ?? [];
   const [showAll, setShowAll] = useState(false);
-  if (!quote.inclusion && !conditions.length && !promos.length && !supplements.length && !policies.length) return null;
+  if (!quote.mealType && !quote.inclusion && !conditions.length && !promos.length && !supplements.length && !policies.length)
+    return null;
   const shown = showAll ? conditions : conditions.slice(0, 3);
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
       <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Room &amp; rate terms</h3>
       <div className="space-y-3 text-[0.83rem] text-ink">
+        {quote.mealType && (
+          <p>
+            <span className="font-semibold">Meal plan:</span> {quote.mealType.replace(/_/g, " ")}
+          </p>
+        )}
         {quote.inclusion && (
           <p>
             <span className="font-semibold">Includes:</span> {quote.inclusion}
