@@ -5,7 +5,8 @@ import { tooMany } from "@/lib/rate-limit";
 // Live TBO hotel search — never statically cached.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Parallel city chunks can wait out a full 60s supplier timeout — leave headroom.
+export const maxDuration = 120;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -55,7 +56,10 @@ export async function POST(req: Request) {
   if (!hotelCodes.length && body.cityCode) {
     try {
       const stubs = await hotelCodesByCity(body.cityCode);
-      hotelCodes = stubs.slice(0, 100).map((s) => s.code);
+      // TBO caps one Search RQ at 100 HotelCodes; bigger cities are covered
+      // with parallel ≤100-code requests (their recommendation) rather than
+      // truncating to the first hundred. 300 keeps latency + load bounded.
+      hotelCodes = stubs.slice(0, 300).map((s) => s.code);
     } catch {
       return Response.json({ ok: false, error: "Could not resolve hotels for that city." }, { status: 502 });
     }
@@ -64,15 +68,28 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: 'Provide "hotelCodes" or a "cityCode".' }, { status: 400 });
   }
 
-  const result = await searchHotels({
-    checkInISO: body.checkIn,
-    checkOutISO: body.checkOut,
-    hotelCodes,
-    nationality: body.nationality || "IN",
-    rooms,
-    refundableOnly: body.refundableOnly,
-    mealType: body.mealType,
-  });
+  const chunks: string[][] = [];
+  for (let i = 0; i < hotelCodes.length; i += 100) chunks.push(hotelCodes.slice(i, i + 100));
+  const settled = await Promise.all(
+    chunks.map((codes) =>
+      searchHotels({
+        checkInISO: body.checkIn!,
+        checkOutISO: body.checkOut!,
+        hotelCodes: codes,
+        nationality: body.nationality || "IN",
+        rooms,
+        refundableOnly: body.refundableOnly,
+        mealType: body.mealType,
+      }),
+    ),
+  );
+
+  // "No availability" chunks are normal for a city sweep — merge whatever
+  // priced, cheapest hotel first; only fail when every chunk failed.
+  const live = settled.filter((r) => r.ok);
+  const result = live.length
+    ? { ...live[0], offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare) }
+    : settled[0];
 
   return Response.json(result, { status: result.ok ? 200 : 502 });
 }

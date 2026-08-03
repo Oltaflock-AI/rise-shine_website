@@ -61,6 +61,12 @@ type Quote = {
   totalFare?: number;
   currency?: string;
   isPriceChanged?: boolean;
+  isCancellationPolicyChanged?: boolean;
+  cancelPolicies?: { fromDate: string; chargeType?: string | number; charge: number }[];
+  inclusion?: string;
+  rateConditions?: string[];
+  roomPromotions?: string[];
+  supplements?: { type?: string; description?: string; price?: number; currency?: string }[];
   validation?: Validation;
   error?: string;
 };
@@ -75,7 +81,14 @@ type Booked = {
   error?: string;
 };
 
-const TITLES = ["Mr", "Mrs", "Ms", "Miss"];
+// TBO's hotel API accepts only these three guest titles (no Miss/Mstr).
+const TITLES = ["Mr", "Mrs", "Ms"];
+
+// TBO Book rejects special characters in names and caps length (default 25,
+// or the rate's ValidationInfo range) — enforce while typing, server re-checks.
+function cleanName(raw: string, v?: Validation): string {
+  return raw.replace(/[^A-Za-z ]/g, "").replace(/ {2,}/g, " ").slice(0, v?.paxNameMaxLength ?? 25);
+}
 
 type Guest = {
   roomIndex: number;
@@ -109,7 +122,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       roomIndex,
       lead,
       childAge,
-      title: childAge != null ? "Miss" : "Mr",
+      title: childAge != null ? "Ms" : "Mr",
       first: "",
       last: "",
       email: roomIndex === 0 && lead ? contactEmail : "",
@@ -357,6 +370,16 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
             The hotel re-priced this rate. The total shown is the confirmed price.
           </p>
         )}
+        {quote.isCancellationPolicyChanged && (
+          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
+            The cancellation policy for this rate was updated — please review it below before paying.
+          </p>
+        )}
+
+        {/* TBO certification: the PreBook RS terms (inclusions, promotions, rate
+            conditions, pay-at-hotel supplements, final cancellation policy) must
+            be shown to the guest BEFORE they book. */}
+        <RateTerms quote={quote} />
 
         {Array.from({ length: rooms }).map((_, r) => (
           <div key={r} className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
@@ -383,14 +406,14 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                       </select>
                       <input
                         value={g.first}
-                        onChange={(e) => setGuest(i, { first: e.target.value })}
+                        onChange={(e) => setGuest(i, { first: cleanName(e.target.value, v) })}
                         placeholder="First name"
                         className="rounded-brand border border-line px-3 py-2.5 text-base"
                         aria-label="First name"
                       />
                       <input
                         value={g.last}
-                        onChange={(e) => setGuest(i, { last: e.target.value })}
+                        onChange={(e) => setGuest(i, { last: cleanName(e.target.value, v) })}
                         placeholder="Last name"
                         className="rounded-brand border border-line px-3 py-2.5 text-base"
                         aria-label="Last name"
@@ -525,6 +548,107 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
             <>Pay &amp; Book</>
           )}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** TBO cancel-policy dates arrive as "DD-MM-YYYY hh:mm:ss" → ISO for formatDate. */
+function tboDateToISO(s: string): string {
+  const m = /^(\d{2})-(\d{2})-(\d{4})/.exec(s || "");
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+}
+
+function cancelCharge(p: NonNullable<Quote["cancelPolicies"]>[number], currency: string): string {
+  const t = String(p.chargeType ?? "").toLowerCase();
+  if (p.charge <= 0) return "Free cancellation";
+  if (t === "2" || t === "percentage") return `${p.charge}% of the fare`;
+  if (t === "3" || t === "nights") return `${p.charge} night${p.charge > 1 ? "s" : ""}' charge`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(p.charge);
+}
+
+/**
+ * PreBook RS terms the guest must see before paying (TBO certification):
+ * inclusions, room promotions, rate conditions, pay-at-hotel supplements
+ * (often in the hotel's local currency) and the final cancellation policy.
+ */
+function RateTerms({ quote }: { quote: Quote }) {
+  const currency = quote.currency || "INR";
+  const conditions = quote.rateConditions ?? [];
+  const promos = quote.roomPromotions ?? [];
+  const supplements = quote.supplements ?? [];
+  const policies = quote.cancelPolicies ?? [];
+  const [showAll, setShowAll] = useState(false);
+  if (!quote.inclusion && !conditions.length && !promos.length && !supplements.length && !policies.length) return null;
+  const shown = showAll ? conditions : conditions.slice(0, 3);
+
+  return (
+    <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+      <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Room &amp; rate terms</h3>
+      <div className="space-y-3 text-[0.83rem] text-ink">
+        {quote.inclusion && (
+          <p>
+            <span className="font-semibold">Includes:</span> {quote.inclusion}
+          </p>
+        )}
+        {promos.length > 0 && (
+          <p>
+            <span className="font-semibold">Promotion:</span> {promos.join(" · ")}
+          </p>
+        )}
+        {supplements.length > 0 && (
+          <div className="rounded-brand border border-red/30 bg-red/5 px-3 py-2">
+            <p className="font-semibold">Payable at the hotel (not included in this total):</p>
+            <ul className="mt-1 list-disc pl-5">
+              {supplements.map((s, i) => (
+                <li key={i}>
+                  {s.description || s.type || "Mandatory supplement"}
+                  {s.price != null && s.price > 0 && (
+                    <>
+                      {" — "}
+                      {new Intl.NumberFormat("en-IN", {
+                        style: "currency",
+                        currency: s.currency || currency,
+                        maximumFractionDigits: 2,
+                      }).format(s.price)}
+                      {s.currency && s.currency !== "INR" && " (hotel's local currency)"}
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {policies.length > 0 && (
+          <div>
+            <p className="font-semibold">Cancellation policy:</p>
+            <ul className="mt-1 list-disc pl-5">
+              {policies.map((p, i) => {
+                const iso = tboDateToISO(p.fromDate);
+                return (
+                  <li key={i}>
+                    From {iso ? formatDate(iso) : p.fromDate}: {cancelCharge(p, currency)}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {conditions.length > 0 && (
+          <div>
+            <p className="font-semibold">Rate conditions:</p>
+            <ul className="mt-1 list-disc pl-5 text-muted">
+              {shown.map((c, i) => (
+                <li key={i}>{c}</li>
+              ))}
+            </ul>
+            {conditions.length > 3 && (
+              <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 font-semibold text-red">
+                {showAll ? "Show fewer conditions" : `Show all ${conditions.length} conditions`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
