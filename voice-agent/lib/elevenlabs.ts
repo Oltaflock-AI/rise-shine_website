@@ -9,11 +9,29 @@ import type { CallRecord, TranscriptTurn, TripFields } from "./types";
 
 const API_BASE = "https://api.elevenlabs.io/v1/convai";
 
-export const AGENT_ID =
-  process.env.ELEVENLABS_AGENT_ID || "agent_6901kth2msjxf0wtnxwwgpp9an03";
+/**
+ * Config IDs — deliberately with NO hardcoded fallback.
+ *
+ * These used to default to a literal agent/phone id. When the agent was recreated
+ * the defaults silently pointed at something that no longer existed, and this
+ * dashboard showed an empty call list for weeks while looking perfectly healthy.
+ * A wrong answer delivered confidently is worse than an error, so missing config
+ * now throws. Read lazily (not at module scope) so a build without credentials
+ * still succeeds — the failure belongs at call time, not at compile time.
+ */
+function required(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} is not set — add it to voice-agent/.env.local`);
+  return v;
+}
 
-export const PHONE_NUMBER_ID =
-  process.env.ELEVENLABS_PHONE_NUMBER_ID || "phnum_9601kt8sme2pfvbtgw01j78kfgkn";
+export function agentId(): string {
+  return required("ELEVENLABS_AGENT_ID");
+}
+
+export function phoneNumberId(): string {
+  return required("ELEVENLABS_PHONE_NUMBER_ID");
+}
 
 function apiKey(): string {
   // ELEVENLABS_API_KEY is preferred; ELEVEN_API (the original .env name) works too.
@@ -54,8 +72,8 @@ export async function placeOutboundCall(opts: {
   };
 
   const body = {
-    agent_id: AGENT_ID,
-    agent_phone_number_id: PHONE_NUMBER_ID,
+    agent_id: agentId(),
+    agent_phone_number_id: phoneNumberId(),
     to_number: to,
     conversation_initiation_client_data: { dynamic_variables },
   };
@@ -213,14 +231,15 @@ async function getConversationDetail(id: string): Promise<CallRecord | null> {
 // row whose agent_id isn't ours. Result: this dashboard can never show another
 // agent's calls, regardless of which API key is used.
 export async function listCalls(limit = 30): Promise<CallRecord[]> {
+  const agent = agentId();
   const res = await fetch(
-    `${API_BASE}/conversations?agent_id=${AGENT_ID}&page_size=${limit}`,
+    `${API_BASE}/conversations?agent_id=${agent}&page_size=${limit}`,
     { headers: { "xi-api-key": apiKey() }, cache: "no-store" },
   );
   if (!res.ok) throw new Error(`conversations ${res.status}`);
   const data = await res.json();
   const list: Record<string, any>[] = (data?.conversations ?? []).filter(
-    (c: Record<string, any>) => c?.agent_id === AGENT_ID,
+    (c: Record<string, any>) => c?.agent_id === agent,
   );
   const details = await Promise.all(
     list.map((c) => getConversationDetail(c.conversation_id).catch(() => null)),

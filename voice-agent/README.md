@@ -32,7 +32,10 @@ post-call webhook the same way `sarthak-singapore` does.
 
 ## The agent
 
-- **Agent**: `Rise & Shine Travel` (`agent_6901kth2msjxf0wtnxwwgpp9an03`)
+- **Agent**: `Rise & Shine Travel` — id comes from `ELEVENLABS_AGENT_ID`, which is
+  required (no default). The id changes whenever the agent is recreated, so read the
+  current one from ElevenLabs → Conversational AI → Agents rather than from a doc.
+  As of 2026-08-04 it is `agent_7001kxp06rsbeaw974gvww4w2c5r`.
 - **Persona**: *Priya*, a Hindi-speaking travel consultant (Ahmedabad office)
 - **Goal**: qualify the lead (destination, travelers, month, special requests)
   and lock a 1–4 PM callback.

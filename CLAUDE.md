@@ -80,7 +80,32 @@ allows one outstanding callback per number, and the dispatcher claims rows
 compare-and-swap style so overlapping drains cannot both take a lead.
 
 `ELEVENLABS_AGENT_ID` serves both halves — it selects the agent to dial with, and
-filters the workspace-wide webhook down to our agent's events.
+filters the workspace-wide webhook down to our agent's events. **It has no default
+anywhere, on purpose.** A stale hardcoded id previously broke outbound (`Document with
+id … not found`) *and* silently made the webhook drop every real event as
+`other-agent` while returning 200. Read the current id from ElevenLabs; never trust a
+checked-in one.
+
+#### Telephony sits outside this repo
+
+Nothing here configures the phone network. The code sends only `agent_id`,
+`agent_phone_number_id` and `to_number`; ElevenLabs resolves the SIP trunk from the
+phone number id at call time. So **changing trunk settings needs no redeploy**, and no
+code change can fix a telephony fault.
+
+The trunk is Vobiz. Two separate trunks live in that account and their SIP domains are
+easy to confuse, because each is the trunk's own uuid prefix:
+
+| Trunk | SIP domain | Credential |
+|---|---|---|
+| Rise-Shine | `f5151e00.sip.vobiz.ai` | `rise-shine` |
+| Sarthak-Singapore | `81804573.sip.vobiz.ai` | `sarthakmiracle` |
+
+Pointing ElevenLabs at the wrong one authenticates a valid username against a trunk
+that has never heard of it, producing an endless `407 Proxy Authentication Required`
+loop and a conversation that fails with `max auth retry attempts reached for SIP
+invite` — zero duration, zero credits, no SIP Call SID. That exact misconfiguration
+cost a day on 2026-08-04. Full diagnosis in `platform_docs/elevenlabs.md`.
 
 ### Payments (`src/lib/razorpay.ts` + `/api/payment/*`)
 
