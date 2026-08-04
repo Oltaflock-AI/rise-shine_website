@@ -74,9 +74,5 @@ you add to the workspace.
 
 ## Reference IDs
 - Sarthak agent: `agent_7701kt6yb510f5hrpm1tsmjx61w4`
-- Rise & Shine Travel agent (to exclude): `agent_7001kxp06rsbeaw974gvww4w2c5r`
-  — **updated 2026-08-04.** The agent was recreated at some point; the old id
-  `agent_6901kth2msjxf0wtnxwwgpp9an03` (still quoted in the SQL above, which is kept
-  as a record of what was actually run) no longer exists. If you re-run any exclusion
-  logic, read the current id from ElevenLabs rather than copying either of these.
+- Rise & Shine Travel agent (to exclude): `agent_6901kth2msjxf0wtnxwwgpp9an03`
 - Supabase project ref: `yhwoqmhnvzpfgacfaidg`
