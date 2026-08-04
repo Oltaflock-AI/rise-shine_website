@@ -43,6 +43,36 @@ post-call webhook the same way `sarthak-singapore` does.
   `num_travelers`, `travel_month`, `special_requests`, `whatsapp_number`,
   `callback_time`, `lead_qualified`.
 
+## Team access (`/access`)
+
+An admin-managed list of who may open the dashboard, and at what level:
+
+| Role | Can do |
+|---|---|
+| **Viewer** | Read calls, transcripts and leads. |
+| **Editor** | Everything a viewer can, plus lead actions once those ship. |
+| **Admin** | Everything an editor can, plus adding, re-roling and removing people. |
+
+**Sign-in is not built yet** — management deferred the production
+authentication/database design on 2026-07-31. So the permission model is real and
+enforced server-side, but the *identity* lookup is stubbed: with
+`DASHBOARD_AUTH_ENABLED` unset, anyone who can open the page is treated as an
+admin, and the page says so in a banner. Building the list now means access works
+the day sign-in is switched on.
+
+To switch it on, implement `emailFromSession()` in `lib/session.ts` (read the
+session cookie / Supabase user and return a **verified** email) and set
+`DASHBOARD_AUTH_ENABLED=true`. Nothing else changes — the routes already return
+401/403 through `requireCapability()`, which you can confirm today by setting that
+variable and watching every request get refused.
+
+The list lives in `.data/access.json` (git-ignored), not a database, because this
+app is excluded from the Vercel deploy and runs locally. Swap the four functions in
+`lib/access-store.ts` for queries when a database arrives. On a read-only
+filesystem writes fall back to memory and the page warns that changes won't survive
+a restart. Seed the first admin with `DASHBOARD_ADMIN_EMAILS`, otherwise nobody can
+grant access to anybody. The store refuses to remove or demote the last admin.
+
 ## Environment
 
 `.env.local` (already populated for the demo):
@@ -51,6 +81,8 @@ post-call webhook the same way `sarthak-singapore` does.
 ELEVENLABS_API_KEY=sk_…                 # ElevenLabs API key (also reads ELEVEN_API from .env)
 ELEVENLABS_AGENT_ID=agent_6901kth2…     # Rise & Shine Travel agent
 ELEVENLABS_PHONE_NUMBER_ID=phnum_9601…  # VoBiz SIP trunk number for the outbound leg
+DASHBOARD_ADMIN_EMAILS=you@oltaflock.ai # comma-separated bootstrap admins for /access
+# DASHBOARD_AUTH_ENABLED=true           # only once emailFromSession() is implemented
 ```
 
 ## Run

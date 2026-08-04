@@ -43,3 +43,9 @@ export const IconClock = (p: P) => (
 export const IconSun = (p: P) => (
   <svg {...base} {...p}><circle cx="12" cy="14" r="4" /><path d="M12 3v2M4.5 7.5l1 1M19.5 7.5l-1 1M3 14h2M19 14h2M3 19h18" /></svg>
 );
+export const IconTrash = (p: P) => (
+  <svg {...base} {...p}><path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13M10.5 10v6M13.5 10v6" /></svg>
+);
+export const IconInfo = (p: P) => (
+  <svg {...base} {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.8v.6" /></svg>
+);

@@ -145,6 +145,57 @@ export async function getLiveCallStatus(conversationId: string): Promise<LiveCal
 }
 
 // ── Read calls back for the dashboard ───────────────────────────────────────
+
+/**
+ * The shape of an ElevenLabs conversation, narrowed to the fields this dashboard
+ * actually reads. Every field is optional on purpose: the API omits most of them
+ * until post-call analysis finishes, so a call fetched mid-flight is a legitimate
+ * near-empty object rather than an error. Extra fields we don't model are ignored.
+ */
+interface ApiPhoneCall {
+  external_number?: string | null;
+  to_number?: string | null;
+}
+
+interface ApiMetadata {
+  call_duration_secs?: number | null;
+  start_time_unix_secs?: number | null;
+  main_language?: string | null;
+  accepted_time_unix_secs?: number | null;
+  phone_call?: ApiPhoneCall;
+}
+
+interface ApiAnalysis {
+  call_successful?: string | null;
+  call_summary_title?: string | null;
+  transcript_summary?: string | null;
+  data_collection_results?: Record<string, unknown>;
+}
+
+interface ApiTranscriptTurn {
+  role?: string;
+  message?: string;
+  time_in_call_secs?: number | null;
+}
+
+interface ApiConversation {
+  conversation_id?: string;
+  agent_id?: string;
+  status?: string;
+  metadata?: ApiMetadata;
+  analysis?: ApiAnalysis;
+  transcript?: ApiTranscriptTurn[];
+  conversation_initiation_client_data?: {
+    dynamic_variables?: Record<string, unknown>;
+  };
+}
+
+// The list endpoint returns summaries, not full conversations.
+interface ApiConversationSummary {
+  conversation_id?: string;
+  agent_id?: string;
+}
+
 function dcValue(dcr: Record<string, unknown>, key: string): string | null {
   const entry = dcr?.[key] as Record<string, unknown> | undefined;
   if (!entry) return null;
@@ -153,12 +204,15 @@ function dcValue(dcr: Record<string, unknown>, key: string): string | null {
   return String(v);
 }
 
-function mapConversation(d: Record<string, any>): CallRecord {
-  const m = d?.metadata ?? {};
-  const a = d?.analysis ?? {};
-  const dcr = (a?.data_collection_results ?? {}) as Record<string, unknown>;
-  const dyn = d?.conversation_initiation_client_data?.dynamic_variables ?? {};
-  const phoneCall = m?.phone_call ?? {};
+// `fallbackId` is the id we asked for. The payload normally echoes it back, but
+// the record is useless without one, so the caller's id stands in if it doesn't.
+function mapConversation(d: ApiConversation, fallbackId: string): CallRecord {
+  const m: ApiMetadata = d.metadata ?? {};
+  const a: ApiAnalysis = d.analysis ?? {};
+  const dcr: Record<string, unknown> = a.data_collection_results ?? {};
+  const dyn: Record<string, unknown> =
+    d.conversation_initiation_client_data?.dynamic_variables ?? {};
+  const phoneCall: ApiPhoneCall = m.phone_call ?? {};
 
   const fields: TripFields = {
     destination: dcValue(dcr, "destination"),
@@ -169,10 +223,13 @@ function mapConversation(d: Record<string, any>): CallRecord {
     callback_time: dcValue(dcr, "callback_time"),
   };
 
-  const name =
-    (dyn.callee_name && String(dyn.callee_name).trim()) || dcValue(dcr, "lead_name") || null;
+  // Dynamic variables are caller-supplied and untyped, so read them defensively.
+  const dynStr = (key: string): string =>
+    typeof dyn[key] === "string" ? (dyn[key] as string).trim() : "";
+
+  const name = dynStr("callee_name") || dcValue(dcr, "lead_name") || null;
   const phone =
-    (dyn.mobile_number && String(dyn.mobile_number).trim()) ||
+    dynStr("mobile_number") ||
     phoneCall.external_number ||
     phoneCall.to_number ||
     fields.whatsapp_number ||
@@ -184,27 +241,26 @@ function mapConversation(d: Record<string, any>): CallRecord {
       ? (qualifiedRaw.value as boolean)
       : null;
 
-  const transcript: TranscriptTurn[] = Array.isArray(d?.transcript)
-    ? d.transcript
-        .map((t: Record<string, any>) => ({
-          role: String(t?.role ?? "agent"),
-          text: String(t?.message ?? ""),
-          secs: t?.time_in_call_secs ?? null,
-        }))
-        .filter((t: TranscriptTurn) => t.text.trim() !== "")
-    : [];
+  const turns: ApiTranscriptTurn[] = Array.isArray(d.transcript) ? d.transcript : [];
+  const transcript: TranscriptTurn[] = turns
+    .map((t) => ({
+      role: String(t?.role ?? "agent"),
+      text: String(t?.message ?? ""),
+      secs: t?.time_in_call_secs ?? null,
+    }))
+    .filter((t) => t.text.trim() !== "");
 
   return {
-    conversation_id: d?.conversation_id,
+    conversation_id: d.conversation_id ?? fallbackId,
     name,
     phone,
-    status: d?.status ?? "unknown",
-    call_successful: a?.call_successful ?? null,
-    title: a?.call_summary_title ?? null,
-    summary: a?.transcript_summary ?? null,
-    duration_secs: m?.call_duration_secs ?? null,
-    started_at_unix: m?.start_time_unix_secs ?? null,
-    language: m?.main_language ?? null,
+    status: d.status ?? "unknown",
+    call_successful: a.call_successful ?? null,
+    title: a.call_summary_title ?? null,
+    summary: a.transcript_summary ?? null,
+    duration_secs: m.call_duration_secs ?? null,
+    started_at_unix: m.start_time_unix_secs ?? null,
+    language: m.main_language ?? null,
     qualified,
     fields,
     transcript,
@@ -217,9 +273,9 @@ async function getConversationDetail(id: string): Promise<CallRecord | null> {
     cache: "no-store",
   });
   if (!res.ok) return null;
-  const d = await res.json().catch(() => null);
+  const d: ApiConversation | null = await res.json().catch(() => null);
   if (!d) return null;
-  return mapConversation(d);
+  return mapConversation(d, id);
 }
 
 // List recent conversations for our agent, then hydrate each with its full
@@ -237,12 +293,13 @@ export async function listCalls(limit = 30): Promise<CallRecord[]> {
     { headers: { "xi-api-key": apiKey() }, cache: "no-store" },
   );
   if (!res.ok) throw new Error(`conversations ${res.status}`);
-  const data = await res.json();
-  const list: Record<string, any>[] = (data?.conversations ?? []).filter(
-    (c: Record<string, any>) => c?.agent_id === agent,
-  );
+  const data: { conversations?: ApiConversationSummary[] } = await res.json();
+  const ids = (data.conversations ?? [])
+    .filter((c) => c?.agent_id === agent)
+    .map((c) => c?.conversation_id)
+    .filter((id): id is string => typeof id === "string");
   const details = await Promise.all(
-    list.map((c) => getConversationDetail(c.conversation_id).catch(() => null)),
+    ids.map((id) => getConversationDetail(id).catch(() => null)),
   );
   return details.filter((c): c is CallRecord => c !== null);
 }

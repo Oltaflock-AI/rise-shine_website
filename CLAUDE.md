@@ -20,11 +20,17 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
 - **`supabase/migrations/`** — account, passenger, payment-ledger, hotel-booking,
   voice-call-log (`0005`) and callback-queue (`0006`) schema. TBO remains canonical;
   Supabase is an account-facing mirror.
-- **`voice-agent/`** — separate Next.js 15 app: a **read-only** dashboard over the
-  ElevenLabs conversation API. Its own package manifest; run it from that directory.
-  It is excluded from this project's deploy by `.vercelignore`, so it never ships with
-  the website. The submit form, WhatsApp preview and outbound-call route were removed
-  from it — placing calls now belongs to `/request-a-call` (see **Voice** below).
+- **`voice-agent/`** — separate Next.js 15 app: a dashboard over the ElevenLabs
+  conversation API. Its own package manifest; run it from that directory. It is
+  excluded from this project's deploy by `.vercelignore`, so it never ships with
+  the website. The call data is read-only — the submit form, WhatsApp preview and
+  outbound-call route were removed, and placing calls now belongs to
+  `/request-a-call` (see **Voice** below). Its one write surface is `/access`, the
+  team list (`lib/access.ts` · `access-store.ts` · `session.ts`). Sign-in is not
+  built, so `getViewer()` stands in as an admin and the page says so; the
+  capability checks behind it are real and already return 401/403. Do not add a
+  header- or query-supplied email to `emailFromSession()` — that is an
+  impersonation hole wearing a login's clothes.
 
 ### The TBO booking layer (`src/lib/`) — server only
 

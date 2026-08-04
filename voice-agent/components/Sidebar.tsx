@@ -9,6 +9,7 @@ import {
   IconPhone,
   IconPlane,
   IconSun,
+  IconUsers,
 } from "@/components/icons";
 
 export function Sidebar() {
@@ -22,6 +23,8 @@ export function Sidebar() {
     { href: "/calls", label: "Voice Calls", Icon: IconPhone, count: calls.length },
     { href: "/leads", label: "Trips & Leads", Icon: IconPlane, count: qualified },
   ];
+
+  const adminItems = [{ href: "/access", label: "Team Access", Icon: IconUsers }];
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
@@ -48,6 +51,19 @@ export function Sidebar() {
             <Icon className="nav-icon" />
             <span className="nav-label">{label}</span>
             {count != null && count > 0 && <span className="nav-count">{count}</span>}
+          </Link>
+        ))}
+
+        <div className="nav-group-label">Settings</div>
+        {adminItems.map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={`nav-item${isActive(href) ? " active" : ""}`}
+            aria-current={isActive(href) ? "page" : undefined}
+          >
+            <Icon className="nav-icon" />
+            <span className="nav-label">{label}</span>
           </Link>
         ))}
       </nav>

@@ -54,9 +54,16 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refetch();
-    const id = setInterval(refetch, POLL_MS);
-    return () => clearInterval(id);
+    // Both the first fetch and the poll are scheduled, never called inline.
+    // React 19 rejects a synchronous state update inside an effect body because
+    // it cascades an extra render before paint; a timer hands the update back
+    // through the normal callback path instead.
+    const first = setTimeout(refetch, 0);
+    const poll = setInterval(refetch, POLL_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(poll);
+    };
   }, [refetch]);
 
   return <Ctx.Provider value={{ calls, loading, error, lastSync, refetch }}>{children}</Ctx.Provider>;
