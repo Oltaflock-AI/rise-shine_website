@@ -103,6 +103,18 @@ export async function claimDueCallbacks(limit = 10): Promise<QueuedCallback[]> {
     .lt("attempts", MAX_ATTEMPTS);
   if (reapError) console.error("[callback-queue] reaping stale claims failed:", reapError.message);
 
+  // A claim that died on its final attempt can't go back to 'pending' — the
+  // dispatch query skips exhausted rows, so it would sit there forever while the
+  // active-phone unique index blocks that customer from ever re-requesting. Park
+  // it as 'failed' for a human to chase, same as a dial that failed outright.
+  const { error: parkError } = await admin
+    .from("callback_queue")
+    .update({ status: "failed", last_error: "Claim expired before a dial result was recorded." })
+    .eq("status", "calling")
+    .lt("updated_at", staleBefore)
+    .gte("attempts", MAX_ATTEMPTS);
+  if (parkError) console.error("[callback-queue] parking exhausted claims failed:", parkError.message);
+
   const { data: due, error } = await admin
     .from("callback_queue")
     .select("id, name, phone, attempts")
