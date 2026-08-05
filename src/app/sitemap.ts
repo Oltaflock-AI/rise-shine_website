@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/services",
     "/contact",
     "/plan-my-trip",
+    "/request-a-call",
     "/terms",
     "/refund-policy",
   ];

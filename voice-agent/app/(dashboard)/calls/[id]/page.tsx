@@ -8,7 +8,6 @@ import {
   fmtAbsolute,
   fmtDuration,
   initial,
-  buildWhatsAppMessages,
 } from "@/lib/format";
 import {
   IconArrowLeft,
@@ -16,7 +15,7 @@ import {
   IconPlane,
   IconUsers,
   IconCalendar,
-  IconWhatsApp,
+  IconPhone,
   IconClock,
   IconCheck,
 } from "@/components/icons";
@@ -27,7 +26,7 @@ const DETAIL_FIELDS = [
   { key: "travel_month", label: "Travel month", Icon: IconCalendar },
   { key: "special_requests", label: "Special requests", Icon: IconStar },
   { key: "callback_time", label: "Callback locked", Icon: IconClock },
-  { key: "whatsapp_number", label: "WhatsApp number", Icon: IconWhatsApp },
+  { key: "whatsapp_number", label: "Contact number", Icon: IconPhone },
 ] as const;
 
 export default function CallDetail() {
@@ -48,7 +47,6 @@ export default function CallDetail() {
 
   const processing = call.status === "processing" || call.status === "in-progress";
   const failed = call.status === "failed" || call.call_successful === "failure";
-  const waMessages = buildWhatsAppMessages(call);
   const filledFields = DETAIL_FIELDS.filter((f) => call.fields[f.key]);
 
   return (
@@ -81,7 +79,7 @@ export default function CallDetail() {
       <div className="panel">
         <div className="panel-head">
           <div className="panel-title">Trip Details · what Priya collected</div>
-          <Link href="/whatsapp" className="panel-link">WhatsApp recap →</Link>
+          <span className="panel-sub">{filledFields.length} captured fields</span>
         </div>
         <div className="panel-body">
           {filledFields.length === 0 ? (
@@ -105,42 +103,20 @@ export default function CallDetail() {
       </div>
 
       <div className="detail-cols">
-        {/* Summary + WhatsApp preview */}
-        <div className="stack">
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title">Call Summary</div></div>
-            <div className="panel-body">
-              {call.summary || call.title ? (
-                <div className="bubble">
-                  {call.title && <div className="bubble-title">{call.title}</div>}
-                  <span className="bubble-text">{call.summary ?? "Call completed."}</span>
-                </div>
-              ) : (
-                <div className="bubble muted">{processing ? "Summary pending — call still processing." : "No summary available."}</div>
-              )}
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-head">
-              <div className="panel-title">WhatsApp recap preview</div>
-              <span className="panel-sub">auto-send</span>
-            </div>
-            <div className="panel-body">
-              <div className="wa-preview">
-                {waMessages.map((msg, i) => (
-                  <div className="wa-bubble in" key={i}>
-                    <span className="wa-text">{msg}</span>
-                    <span className="wa-time">12:30{i === 0 ? "" : " "}</span>
-                  </div>
-                ))}
+        <div className="panel">
+          <div className="panel-head"><div className="panel-title">Call Summary</div></div>
+          <div className="panel-body">
+            {call.summary || call.title ? (
+              <div className="bubble">
+                {call.title && <div className="bubble-title">{call.title}</div>}
+                <span className="bubble-text">{call.summary ?? "Call completed."}</span>
               </div>
-              <div className="wa-note">Demo preview · WhatsApp delivery can be connected later.</div>
-            </div>
+            ) : (
+              <div className="bubble muted">{processing ? "Summary pending — call still processing." : "No summary available."}</div>
+            )}
           </div>
         </div>
 
-        {/* Transcript */}
         <div className="panel">
           <div className="panel-head">
             <div className="panel-title">Transcript</div>

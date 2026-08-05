@@ -66,7 +66,7 @@ export default function VoiceCalls() {
         <div className="panel">
           <div className="panel-empty">
             {calls.length === 0
-              ? "No calls yet. Place your first call from the Submit Form tab."
+              ? "No calls have reached the voice pipeline yet."
               : "No calls match your search."}
           </div>
         </div>

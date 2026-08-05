@@ -65,7 +65,7 @@ export default function Overview() {
       <PageHeader title="Overview" subtitle="AI voice sales engine · live travel pipeline" />
 
       <div className="kpis">
-        <Kpi label="Total Enquiries" value={m.total} sub={`${m.connected} connected`} icon={<IconPhone className="i" />} />
+        <Kpi label="Voice Calls" value={m.total} sub={`${m.connected} connected`} icon={<IconPhone className="i" />} />
         <Kpi label="Qualified Leads" value={m.qualified} sub={m.total ? `${Math.round((m.qualified / m.total) * 100)}% qualification rate` : "—"} icon={<IconCheck className="i" />} />
         <Kpi label="Callbacks Booked" value={m.callbacks} sub="1–4 PM slots locked" icon={<IconCalendar className="i" />} />
         <Kpi label="Avg Call Time" value={fmtDuration(m.avg)} sub="per connected call" icon={<IconClock className="i" />} />
@@ -160,12 +160,12 @@ export default function Overview() {
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">Recent Enquiries</div>
+          <div className="panel-title">Recent Calls</div>
           <Link href="/calls" className="panel-link">All calls →</Link>
         </div>
         <div className="panel-body flush">
           {calls.length === 0 ? (
-            <div className="panel-empty">No calls yet. Head to Submit Form to place your first call.</div>
+            <div className="panel-empty">No calls have reached the voice pipeline yet.</div>
           ) : (
             <div className="row-stripe">
               {calls.slice(0, 5).map((c) => (
