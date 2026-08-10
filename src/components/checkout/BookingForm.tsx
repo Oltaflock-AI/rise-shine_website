@@ -328,6 +328,8 @@ export function BookingForm({
       keyId?: string;
       error?: string;
       rule?: string;
+      /** Server's explicit "payment is deliberately off" signal — see the 503 branch. */
+      paymentsDisabled?: boolean;
     };
     try {
       // The order endpoint runs the FULL pre-ticket validation before creating an
@@ -337,12 +339,23 @@ export function BookingForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(commonPayload(passengers)),
       });
+      order = await r.json().catch(() => ({ ok: false }));
       if (r.status === 503) {
-        // Payments not configured — legacy direct-ticket path.
-        await sendToBook(passengers, null);
+        // ONLY an explicit server-issued `paymentsDisabled` unlocks the unpaid
+        // direct-ticket path. A bare 503 is not proof payments are off — Vercel
+        // returns 503 for platform faults too, and treating one of those as
+        // "payments not configured" would issue a real ticket for free.
+        if (order.paymentsDisabled === true) {
+          await sendToBook(passengers, null);
+          return;
+        }
+        setBooked({
+          ok: false,
+          error: order.error ?? "Payment is unavailable right now. Please try again shortly.",
+        });
+        setBooking(false);
         return;
       }
-      order = await r.json();
     } catch {
       setBooked({ ok: false, error: "Could not start payment. Please try again." });
       setBooking(false);

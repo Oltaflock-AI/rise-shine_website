@@ -120,11 +120,24 @@ a Razorpay-shaped prototype: order creation, signature helpers, capture checks,
 refund branches, a webhook, and ledger migrations. Treat these as dummy/dormant code,
 not as evidence that checkout has been integrated or validated end to end.
 
-With Razorpay keys absent, `/api/payment/order` returns `503` and the client deliberately
-falls back to `/api/book` without a payment. Therefore the current usable path can book
-against TBO staging/agency credit without charging a customer. Do not add Razorpay keys
-or enable this scaffold without explicit owner approval, sandbox testing, failure-path
-testing, webhook verification, and financial reconciliation sign-off.
+With Razorpay keys absent, `/api/payment/order` returns `503` and the client falls back to
+`/api/book` without a payment. Therefore the current usable path can book against TBO
+staging/agency credit without charging a customer. Do not add Razorpay keys or enable this
+scaffold without explicit owner approval, sandbox testing, failure-path testing, webhook
+verification, and financial reconciliation sign-off.
+
+**That fallback is gated, and the gate is the only thing standing between live TBO
+credentials and free tickets.** Two rules:
+
+- **`PAYMENTS_REQUIRED` decides whether payment is mandatory** (`lib/razorpay.ts`)
+  — not the presence of `RAZORPAY_*`. Unset = follow the keys (historical behaviour);
+  `true` = mandatory, and `paymentsMisconfigured()` makes `/api/book` and
+  `/api/hotels/book` refuse outright when the keys are missing or half-set, rather than
+  degrading to a free ticket. It must be `true` wherever live TBO creds are set.
+- **The client's unpaid path is unlocked by an explicit `paymentsDisabled: true` in the
+  order route's body, never by the `503` status alone.** Vercel emits 503 for platform
+  faults too, so status-sniffing would turn an infrastructure blip into a free ticket.
+  Keep the flag and the status together if you touch either checkout form.
 
 ### Auth (`src/lib/supabase/` + `src/lib/auth.tsx`)
 

@@ -11,7 +11,8 @@ import {
 } from "@/lib/email";
 import { alertOps } from "@/lib/alerts";
 import {
-  razorpayConfigured,
+  paymentsRequired,
+  paymentsMisconfigured,
   verifyPaymentSignature,
   fetchPayment,
   fetchOrder,
@@ -29,10 +30,12 @@ type ConfirmedPayment = { paymentId: string; orderId: string };
 /**
  * POST /api/hotels/book — collect payment (when configured) then run TBO's Book.
  *
- * When Razorpay is configured a captured, signature-verified payment is REQUIRED
- * before Book is called — and if Book then fails, the payment is refunded
- * automatically (money must never be held for a stay the guest never got). With no
- * keys, the flow degrades to the legacy direct-book path so dev/staging still demo.
+ * When payment is required (see lib/razorpay.paymentsRequired) a captured,
+ * signature-verified payment is REQUIRED before Book is called — and if Book then
+ * fails, the payment is refunded automatically (money must never be held for a stay
+ * the guest never got). Otherwise the flow degrades to the legacy direct-book path
+ * so dev/staging still demo — a declared choice (PAYMENTS_REQUIRED), not an
+ * accident of absent keys.
  *
  * Body: { bookingCode, nationality?, netAmount, isVoucherBooking?, rooms, validation?, payment? }
  */
@@ -63,11 +66,21 @@ export async function POST(req: Request) {
   // Confirm money is actually captured BEFORE touching TBO. The order was priced
   // server-side (/api/hotels/payment/order); the order's amount — not any client
   // number — is what we accept.
+  // Payment required but unchargeable (keys missing/cleared) → refuse rather than
+  // fall through to a free confirmed hotel booking on live agency credit.
+  if (paymentsMisconfigured()) {
+    console.error("[api/hotels/book] PAYMENTS_REQUIRED is set but Razorpay is not configured — refusing to book.");
+    return Response.json(
+      { ok: false, error: "Online payment is temporarily unavailable. Please contact us to complete your booking." },
+      { status: 503 },
+    );
+  }
+
   let payment: ConfirmedPayment | null = null;
   // What the customer actually paid (order is server-priced at the RSP-floored
   // selling fare; body.netAmount is TBO's net and no longer matches it).
   let paidInr: number | null = null;
-  if (razorpayConfigured) {
+  if (paymentsRequired()) {
     const p = body.payment;
     if (!p?.orderId || !p?.paymentId || !p?.signature) {
       return Response.json({ ok: false, error: "Payment is required before booking." }, { status: 402 });

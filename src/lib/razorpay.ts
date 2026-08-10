@@ -24,10 +24,47 @@ import crypto from "node:crypto";
 
 const API = "https://api.razorpay.com/v1";
 
-/** True once both keys are present. Gates whether payment is enforced at all. */
+/** True once both keys are present. Says only that we CAN charge, not that we must. */
 export const razorpayConfigured = Boolean(
   process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET,
 );
+
+/**
+ * Whether a captured payment is REQUIRED before we hand a ticket to a customer.
+ *
+ * This used to be inferred from `razorpayConfigured` alone, which quietly ties a
+ * money decision to the presence of two strings: clear the keys in Vercel — by
+ * accident, or while rotating them — and every booking route silently reverts to
+ * issuing real tickets on real agency credit for free. On TBO staging that spends
+ * test credit; on LIVE credentials it is unpriced inventory going out of the door.
+ *
+ * So the answer is declared, not inferred:
+ *
+ *   unset          follow razorpayConfigured — exactly the historical behaviour,
+ *                  so dev/staging without keys keep their direct-ticket demo path
+ *   "true"/"1"     payment is mandatory. If the keys are missing or broken we FAIL
+ *                  CLOSED (booking refused) rather than falling through to a free
+ *                  ticket. Set this in the same change that installs live TBO creds.
+ *   "false"/"0"    explicit opt-out — unpaid ticketing is deliberate. Dev only.
+ *
+ * Read per call (not a module const) so flipping it in Vercel takes effect on the
+ * next invocation instead of waiting for a redeploy — the same property the kill
+ * switch is useful for in the first place.
+ */
+export function paymentsRequired(): boolean {
+  const v = process.env.PAYMENTS_REQUIRED?.trim().toLowerCase();
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  return razorpayConfigured;
+}
+
+/**
+ * Payment is required but we cannot actually charge — the misconfiguration that
+ * must never silently degrade into free ticketing. Callers refuse the booking.
+ */
+export function paymentsMisconfigured(): boolean {
+  return paymentsRequired() && !razorpayConfigured;
+}
 
 /** The publishable key id — safe to hand to the browser (secret never leaves the server). */
 export const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID ?? "";

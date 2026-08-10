@@ -1,6 +1,11 @@
 import { preBookHotel } from "@/lib/tbo-hotel";
 import { validateHotelPax, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
-import { createOrder, razorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/razorpay";
+import {
+  createOrder,
+  paymentsRequired,
+  paymentsMisconfigured,
+  RAZORPAY_KEY_ID,
+} from "@/lib/razorpay";
 import { getUser } from "@/lib/supabase/server";
 
 // Live re-price + order creation — never cached. Runs PreBook.
@@ -20,9 +25,23 @@ export const maxDuration = 120;
  * Body: same as /api/hotels/book minus payment: { bookingCode, nationality?, rooms }.
  */
 export async function POST(req: Request) {
-  if (!razorpayConfigured) {
-    // No keys → the client falls back to the legacy direct-book path (dev/staging).
-    return Response.json({ ok: false, error: "Online payment is not configured." }, { status: 503 });
+  // Payment required but unchargeable → refuse, and withhold the paymentsDisabled
+  // flag so the client cannot fall back to booking without paying.
+  if (paymentsMisconfigured()) {
+    console.error("[api/hotels/payment/order] PAYMENTS_REQUIRED is set but Razorpay is not configured.");
+    return Response.json(
+      { ok: false, error: "Online payment is temporarily unavailable. Please contact us to complete your booking." },
+      { status: 503 },
+    );
+  }
+
+  if (!paymentsRequired()) {
+    // Payment deliberately not required → client may use the direct-book path.
+    // Only this explicit flag authorizes it; never a bare 503 (see /api/payment/order).
+    return Response.json(
+      { ok: false, paymentsDisabled: true, error: "Online payment is not configured." },
+      { status: 503 },
+    );
   }
 
   let body: { bookingCode?: string; nationality?: string; rooms?: HotelBookRoom[] };

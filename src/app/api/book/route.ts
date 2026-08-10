@@ -11,7 +11,8 @@ import {
 } from "@/lib/email";
 import { alertOps } from "@/lib/alerts";
 import {
-  razorpayConfigured,
+  paymentsRequired,
+  paymentsMisconfigured,
   verifyPaymentSignature,
   fetchPayment,
   fetchOrder,
@@ -37,11 +38,13 @@ type ConfirmedPayment = { paymentId: string; orderId: string; amountInr: number 
 /**
  * POST /api/book — collect payment (when configured) then run TBO's booking flow.
  *
- * When Razorpay is configured a captured, signature-verified payment is REQUIRED
- * before a single TBO call is made — and if ticketing then fails, the payment is
- * refunded automatically (money must never be held for a ticket the customer never
- * got). With no keys, the flow degrades to the legacy direct-ticket path so dev/
- * staging still demo. The heavy lifting (and every TBO checklist validation) lives
+ * When payment is required (see lib/razorpay.paymentsRequired) a captured,
+ * signature-verified payment is REQUIRED before a single TBO call is made — and if
+ * ticketing then fails, the payment is refunded automatically (money must never be
+ * held for a ticket the customer never got). With payment not required, the flow
+ * degrades to the legacy direct-ticket path so dev/staging still demo; that
+ * degradation is now a declared choice (PAYMENTS_REQUIRED), never an accident of
+ * absent keys. The heavy lifting (and every TBO checklist validation) lives
  * in lib/tbo-book + lib/tbo-validate; this handler shapes the request, normalizes
  * titles (TBO rejects "Master"/"Miss"), and owns the payment lifecycle.
  */
@@ -61,8 +64,20 @@ export async function POST(req: Request) {
   // Confirm the money is actually captured BEFORE touching TBO. The order was priced
   // server-side (/api/payment/order), so the order's amount — not any client number —
   // is the amount we accept.
+  //
+  // Payment is required but unchargeable (keys missing/cleared) → refuse. Falling
+  // through here would ticket for free on live agency credit, which is precisely
+  // the failure this gate exists to prevent. No TBO call is made.
+  if (paymentsMisconfigured()) {
+    console.error("[api/book] PAYMENTS_REQUIRED is set but Razorpay is not configured — refusing to ticket.");
+    return Response.json(
+      { ok: false, error: "Online payment is temporarily unavailable. Please contact us to complete your booking." },
+      { status: 503 },
+    );
+  }
+
   let payment: ConfirmedPayment | null = null;
-  if (razorpayConfigured) {
+  if (paymentsRequired()) {
     const p = body.payment;
     if (!p?.orderId || !p?.paymentId || !p?.signature) {
       return Response.json({ ok: false, error: "Payment is required before ticketing." }, { status: 402 });

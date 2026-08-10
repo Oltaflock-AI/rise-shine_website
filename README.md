@@ -156,11 +156,22 @@ PAN/passport/GST rules, special-fare seat+meal, duplicate guard). Reference:
 ## Before production launch
 
 - **TBO:** complete production certification and switch endpoints/creds from staging.
+  Creds are `TBO_CLIENT_ID` / `TBO_USERNAME` / `TBO_PASSWORD` / `TBO_END_USER_IP`;
+  endpoints are `TBO_AUTH_URL` / `TBO_AIR_URL` (flights), `TBO_BOOK_URL`,
+  `TBO_HOTEL_URL`, `TBO_HOTEL_STATIC_URL`, `TBO_HOTEL_BE_URL` — all config, no code.
+  Production creds are IP-whitelisted and Vercel has no fixed egress IP, so
+  `TBO_PROXY_URL` must point at the static-IP forward proxy before they will work.
+- **Set `PAYMENTS_REQUIRED=true` in the same change that installs live TBO creds.**
+  Without it, an absent or half-set Razorpay key pair silently re-enables the
+  direct-ticket path — which against live credentials issues real tickets on real
+  agency credit for free. With it, the booking routes fail closed instead.
 - **Auth:** real now — Supabase Auth (email + password) with server-verified
   sessions and RLS. `useAuth()` (in `lib/auth.tsx`) is unchanged for consumers;
   add OAuth providers / password reset when needed. Persisting booking history to
   the `bookings` table (server-side, service-role key) is the next wiring step.
-- **Payments:** not integrated. Booking currently ticket on TBO's staging credit.
+- **Payments:** Razorpay is built but not switched on — no keys, so nothing charges.
+  Bookings currently ticket on TBO's staging credit. Turning it on needs keys plus
+  sandbox, failure-path and webhook testing and reconciliation sign-off.
 - **Business data:** verify `TODO`s in `src/data/site.ts` (GSTIN, socials, reviews URL, domain `url`).
 - **Images:** marketing photos load from Unsplash (allowed in `next.config.ts`).
   Localize into `public/` for full performance control.

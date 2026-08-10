@@ -248,19 +248,40 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     setBooking(true);
     setBooked(null);
 
-    let order: { ok: boolean; orderId?: string; amount?: number; currency?: string; keyId?: string; error?: string; rule?: string };
+    let order: {
+      ok: boolean;
+      orderId?: string;
+      amount?: number;
+      currency?: string;
+      keyId?: string;
+      error?: string;
+      rule?: string;
+      /** Server's explicit "payment is deliberately off" signal — see the 503 branch. */
+      paymentsDisabled?: boolean;
+    };
     try {
       const r = await fetch("/api/hotels/payment/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(commonPayload()),
       });
+      order = await r.json().catch(() => ({ ok: false }));
       if (r.status === 503) {
-        // Payments not configured — legacy direct-book path (dev/staging).
-        await sendToBook(null);
+        // ONLY an explicit server-issued `paymentsDisabled` unlocks the unpaid
+        // direct-book path — a bare 503 can equally be a Vercel platform fault,
+        // and reading one as "payments are off" would confirm a real hotel
+        // booking on live agency credit without taking money.
+        if (order.paymentsDisabled === true) {
+          await sendToBook(null);
+          return;
+        }
+        setBooked({
+          ok: false,
+          error: order.error ?? "Payment is unavailable right now. Please try again shortly.",
+        });
+        setBooking(false);
         return;
       }
-      order = await r.json();
     } catch {
       setBooked({ ok: false, error: "Could not start payment. Please try again." });
       setBooking(false);

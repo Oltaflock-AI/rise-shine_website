@@ -1,6 +1,11 @@
 import { validateBooking } from "@/lib/tbo-book";
 import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request";
-import { createOrder, razorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/razorpay";
+import {
+  createOrder,
+  paymentsRequired,
+  paymentsMisconfigured,
+  RAZORPAY_KEY_ID,
+} from "@/lib/razorpay";
 import { getUser } from "@/lib/supabase/server";
 
 // Live validation + order creation — never cached. Runs FareRule + FareQuote + SSR.
@@ -19,9 +24,28 @@ export const maxDuration = 120;
  * verified in /api/book before a single ticketing call is made.
  */
 export async function POST(req: Request) {
-  if (!razorpayConfigured) {
-    // No keys → the client falls back to the legacy direct-ticket path (dev/staging).
-    return Response.json({ ok: false, error: "Online payment is not configured." }, { status: 503 });
+  // Payment required but unchargeable → the booking cannot proceed at all. Answered
+  // BEFORE the paymentsDisabled branch so a half-configured deployment can never
+  // hand the client the flag that unlocks unpaid ticketing.
+  if (paymentsMisconfigured()) {
+    console.error("[api/payment/order] PAYMENTS_REQUIRED is set but Razorpay is not configured.");
+    return Response.json(
+      { ok: false, error: "Online payment is temporarily unavailable. Please contact us to complete your booking." },
+      { status: 503 },
+    );
+  }
+
+  if (!paymentsRequired()) {
+    // Payment deliberately not required → the client may use the direct-ticket path.
+    // `paymentsDisabled` is the ONLY thing that authorizes that fallback: the client
+    // must never infer it from a bare 503, which Vercel also emits for platform
+    // faults (paused deployment, no response from function, rate limiting). Reading
+    // a free ticket out of an infrastructure blip is not a theoretical risk once
+    // live TBO credentials are in play.
+    return Response.json(
+      { ok: false, paymentsDisabled: true, error: "Online payment is not configured." },
+      { status: 503 },
+    );
   }
 
   let body: IncomingBooking;

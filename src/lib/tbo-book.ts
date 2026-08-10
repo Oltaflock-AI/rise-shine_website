@@ -13,6 +13,7 @@
  * Reference: https://apidoc.tektravels.com/flight/apivalidation.aspx
  */
 import { tboFetch } from "./tbo-fetch";
+import { AIR_BASE, AUTH_BASE } from "./tbo";
 import {
   type FareBreakdown,
   type FareQuoteFlags,
@@ -32,9 +33,17 @@ import {
 } from "./tbo-validate";
 
 // ── Checklist: "Search and Book Url's are different so use each accordingly" ──
-const AUTH_URL = "http://Sharedapi.tektravels.com/SharedData.svc/rest";
+// Bases come from lib/tbo so the flight API has ONE definition of each host and a
+// production cutover is a config change (TBO_AUTH_URL / TBO_AIR_URL), not a code edit.
+const AUTH_URL = AUTH_BASE;
 /** Search / FareRule / FareQuote / SSR / GetCalendarFare live on the Air service. */
-const SEARCH_SVC = "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest";
+const SEARCH_SVC = AIR_BASE;
+/**
+ * The service URLs this module actually resolved to. Exported so a test can prove
+ * a production cutover reaches the BOOKING half too — a deploy that moved Search
+ * but left FareQuote/Book on staging would fail after the customer had paid.
+ */
+export const resolvedServiceUrls = () => ({ auth: AUTH_URL, air: SEARCH_SVC, book: BOOK_SVC });
 /**
  * Book / Ticket / GetBookingDetails — TBO's docs contradict themselves here:
  *

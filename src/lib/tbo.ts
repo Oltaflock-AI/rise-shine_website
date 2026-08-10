@@ -12,12 +12,23 @@
 import { TboValidationError, validateSearch } from "./tbo-validate";
 import { tboFetch } from "./tbo-fetch";
 
-const AUTH_URL =
-  "http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate";
-// Search lives on the Air service; Book/Ticket use the separate AirBook service
-// (see tbo-book.ts) — TBO requires each method to go to its own URL.
-const SEARCH_URL =
-  "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search";
+/**
+ * Service bases. Defaults are the endpoints certification ran against; both are
+ * env-overridable because TBO issues production hosts separately from production
+ * credentials, and a live cutover must not require a code change. Set
+ * TBO_AUTH_URL / TBO_AIR_URL to the base path (no trailing method, no trailing
+ * slash) — the method names are appended here. tbo-book.ts reads the same two.
+ */
+export const AUTH_BASE = (
+  process.env.TBO_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest"
+).replace(/\/+$/, "");
+/** Search lives on the Air service; Book/Ticket use their own service (see tbo-book.ts). */
+export const AIR_BASE = (
+  process.env.TBO_AIR_URL || "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest"
+).replace(/\/+$/, "");
+
+const AUTH_URL = `${AUTH_BASE}/Authenticate`;
+const SEARCH_URL = `${AIR_BASE}/Search`;
 
 function cfg() {
   return {
