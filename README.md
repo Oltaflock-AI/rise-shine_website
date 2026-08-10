@@ -155,12 +155,32 @@ PAN/passport/GST rules, special-fare seat+meal, duplicate guard). Reference:
 
 ## Before production launch
 
-- **TBO:** complete production certification and switch endpoints/creds from staging.
-  Creds are `TBO_CLIENT_ID` / `TBO_USERNAME` / `TBO_PASSWORD` / `TBO_END_USER_IP`;
-  endpoints are `TBO_AUTH_URL` / `TBO_AIR_URL` (flights), `TBO_BOOK_URL`,
-  `TBO_HOTEL_URL`, `TBO_HOTEL_STATIC_URL`, `TBO_HOTEL_BE_URL` — all config, no code.
-  Production creds are IP-whitelisted and Vercel has no fixed egress IP, so
-  `TBO_PROXY_URL` must point at the static-IP forward proxy before they will work.
+- **TBO flights: certification is complete and live credentials are issued.** The
+  cutover is entirely config — creds (`TBO_CLIENT_ID` / `TBO_USERNAME` /
+  `TBO_PASSWORD` / `TBO_END_USER_IP`) plus three endpoints:
+
+  | Variable | Production value |
+  |---|---|
+  | `TBO_AUTH_URL` | `https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest` |
+  | `TBO_AIR_URL` | `https://tboapi.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest` |
+  | `TBO_BOOK_URL` | `https://booking.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest` |
+
+  Three traps, all of which read as "bad credentials" if you hit them: production
+  uses a **different `ClientId`** from staging; production splits **Book onto its own
+  host** (staging served it from the Air service, so `TBO_BOOK_URL` is now mandatory,
+  not optional); and production creds are **IP-whitelisted** while Vercel has no fixed
+  egress IP, so `TBO_PROXY_URL` must point at the static-IP forward proxy. Verify all
+  of it before cutting over — the script is read-only and never books:
+
+  ```
+  npx tsx --conditions=react-server scripts/tbo-preflight.mts --search
+  ```
+
+  TBO's mail lists the service bases ending at `.svc`; `/rest` is the suffix the REST
+  methods hang off, as on staging. Preflight confirms it on the first call.
+- **TBO hotels:** the go-live mail above covers **flights only**. Hotel endpoints
+  (`TBO_HOTEL_URL`, `TBO_HOTEL_STATIC_URL`, `TBO_HOTEL_BE_URL`) are still staging
+  and need their own live URLs from TBO.
 - **Set `PAYMENTS_REQUIRED=true` in the same change that installs live TBO creds.**
   Without it, an absent or half-set Razorpay key pair silently re-enables the
   direct-ticket path — which against live credentials issues real tickets on real

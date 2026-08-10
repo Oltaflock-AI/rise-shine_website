@@ -58,9 +58,26 @@ export const resolvedServiceUrls = () => ({ auth: AUTH_URL, air: SEARCH_SVC, boo
  * checklist as written, keeps staging working, and needs no change if TBO enables AirBook.
  * Override with TBO_BOOK_URL.
  */
-const BOOK_SVC =
+const BOOK_SVC = (
   process.env.TBO_BOOK_URL ||
-  "http://api.tektravels.com/BookingEngineService_AirBook/AirService.svc/rest";
+  "http://api.tektravels.com/BookingEngineService_AirBook/AirService.svc/rest"
+).replace(/\/+$/, "");
+/**
+ * Whether the Air-service fallback below is allowed at all.
+ *
+ * It exists ONLY to probe a default AirBook path that staging does not serve. Once
+ * TBO_BOOK_URL names a real booking host — production hands out a dedicated one,
+ * booking.travelboutiqueonline.com, distinct from the Air/search host — falling back
+ * is not a recovery, it is a second Book against a different server. TBO's checklist
+ * is explicit that Book/Ticket are never auto-retried, because the first call may
+ * have succeeded even when the reply did not come back as JSON (a proxy or gateway
+ * error page in front of a booking TBO already accepted). Re-sending it risks a
+ * duplicate PNR and a double charge.
+ *
+ * The static-IP forward proxy makes this a live concern rather than a theoretical
+ * one: it sits in front of every production TBO call and its error pages are HTML.
+ */
+const BOOK_FALLBACK_ALLOWED = !process.env.TBO_BOOK_URL;
 /** Set once we learn AirBook isn't serving this account, so we stop re-probing it. */
 let bookSvcUnavailable = false;
 
@@ -198,9 +215,16 @@ async function call(url: string, body: Json, timeoutMs = TIMEOUT_OTHER, retries 
 
 /**
  * Book / Ticket / GetBookingDetails: address the AirBook service, falling back to the
- * Air service when AirBook isn't provisioned for this account (staging today).
+ * Air service when AirBook isn't provisioned for this account (staging default only —
+ * see BOOK_FALLBACK_ALLOWED; a configured booking host never falls back).
  */
 async function bookCall(method: string, body: Json, timeoutMs = TIMEOUT_OTHER): Promise<Json> {
+  if (!BOOK_FALLBACK_ALLOWED) {
+    // Configured booking host: one call, one destination. A non-JSON reply surfaces
+    // as an error for the caller to recover from via GetBookingDetails — never by
+    // re-sending Book somewhere else.
+    return call(`${BOOK_SVC}/${method}`, body, timeoutMs);
+  }
   if (!bookSvcUnavailable) {
     try {
       return await call(`${BOOK_SVC}/${method}`, body, timeoutMs);

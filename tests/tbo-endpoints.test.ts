@@ -70,4 +70,17 @@ describe("production overrides", () => {
       air: "https://prod-air.example.com/AirService.svc/rest",
     });
   });
+
+  it("routes Book to its own host, which production serves separately from Air", async () => {
+    // Staging served Book from the Air service; production does not. A cutover that
+    // set TBO_AIR_URL but forgot TBO_BOOK_URL would search live and book nowhere.
+    vi.resetModules();
+    process.env.TBO_AIR_URL = "https://prod-air.example.com/AirService.svc/rest";
+    process.env.TBO_BOOK_URL = "https://prod-booking.example.com/AirAPI_V10/AirService.svc/rest/";
+    const { resolvedServiceUrls } = await import("@/lib/tbo-book");
+    const urls = resolvedServiceUrls();
+    expect(urls.book).toBe("https://prod-booking.example.com/AirAPI_V10/AirService.svc/rest");
+    expect(urls.book).not.toBe(urls.air);
+    delete process.env.TBO_BOOK_URL;
+  });
 });
