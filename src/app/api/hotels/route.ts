@@ -1,4 +1,4 @@
-import { searchHotels, type RoomOccupancy } from "@/lib/tbo-hotel";
+import { searchHotels, CITY_SEARCH_CODE_CEILING, type RoomOccupancy } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
 import { tooMany } from "@/lib/rate-limit";
 
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       // TBO caps one Search RQ at 100 HotelCodes; bigger cities are covered
       // with parallel ≤100-code requests (their recommendation) rather than
       // truncating to the first hundred. 300 keeps latency + load bounded.
-      hotelCodes = stubs.slice(0, 300).map((s) => s.code);
+      hotelCodes = stubs.slice(0, CITY_SEARCH_CODE_CEILING).map((s) => s.code);
     } catch {
       return Response.json({ ok: false, error: "Could not resolve hotels for that city." }, { status: 502 });
     }

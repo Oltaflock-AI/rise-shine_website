@@ -44,10 +44,12 @@ export function HotelCheckoutView() {
 
   // A live booking needs the PreBook BookingCode. Stale links fall back to search.
   const canBook = Boolean(b.bookingCode);
+  // TBO portal checkpoint 16/30: exact TotalFare, unrounded, all the way through.
   const money = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: b.currency || "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
   const nights = Number(b.nights || 1);
 

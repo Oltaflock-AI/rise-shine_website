@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BedDouble,
   ChevronDown,
+  FileText,
   LogOut,
   MessageCircle,
   PlaneTakeoff,
@@ -315,6 +317,14 @@ export function AccountView() {
 
             {/* Manage */}
             <div className="mt-4 flex flex-wrap items-center gap-3">
+              {bk.kind === "hotel" && bk.booking_id != null && (
+                <Link
+                  href={`/hotels/voucher/${bk.booking_id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-navy/50 px-4 py-2 text-[0.8rem] font-semibold text-navy transition-colors hover:bg-navy/5"
+                >
+                  <FileText size={14} aria-hidden /> View voucher
+                </Link>
+              )}
               {bk.status !== 6 &&
                 (bk.kind === "hotel" ? (
                   bk.booking_id != null && (

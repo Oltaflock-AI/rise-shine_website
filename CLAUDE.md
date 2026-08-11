@@ -63,6 +63,28 @@ capture, and refund code is dormant scaffolding, not an implemented payment syst
 Post-booking detail, voucher, and cancellation calls live in `tbo-hotel-post.ts`.
 Never retry Hotel Book after a timeout; recover by client reference.
 
+**Rules TBO's portal verification enforces — don't "tidy" these away:**
+
+- **Show `TotalFare`, never `NetAmount`.** NetAmount is TBO's charge to the agency
+  and belongs only in the Book RQ. The one permitted adjustment is the B2C floor at
+  `RecommendedSellingRate`. Fares are displayed **unrounded** (2 dp) everywhere.
+- **`Filters.NoOfRooms` is never sent** — TBO wants the full room feed (0 behaviour).
+  The results card trims to the cheapest room on our side, after the response.
+- **A city search fans out in parallel** ≤100-code batches (`CITY_SEARCH_CODE_CEILING`),
+  never one truncated request. `/hotels` does this itself; it does not call `/api/hotels`.
+- **Guest nationality is collected, not assumed.** Any nationality for stays in India;
+  Indian nationality only for international stays (`src/data/nationalities.ts`), and
+  Book must carry the same value Search used.
+- **Search RS already carries `Supplements` and `RoomPromotion`** (verified live against
+  TBO's sample codes) — they render on the room page. `RateConditions` are PreBook-only,
+  so `RoomRateDetails` PreBooks on demand when the guest expands a rate.
+- **After a confirmed Book, GetBookingDetail is re-read 120 s later**, never sooner —
+  TBO's systems only settle by then (`BookingDetailCheck` → `/api/hotels/booking-detail`,
+  ownership-checked). The voucher page renders that response.
+- `RecommendedSellingRate` is **absent** on the current credentials, including on TBO's
+  own RSP sample codes (`scripts/tbo-hotel-rsp-probe.ts` re-checks this) — the B2C feed
+  has to be enabled on TBO's side before the floor can ever apply.
+
 ### Voice (ElevenLabs) — two halves that are easy to confuse
 
 | Direction | Trigger | Lib | Route | Table |

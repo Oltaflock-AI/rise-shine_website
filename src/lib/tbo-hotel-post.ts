@@ -64,6 +64,15 @@ async function call(method: string, fields: Json): Promise<Json> {
 }
 
 // ── GetBookingDetail ──
+export type VoucherRoom = {
+  roomTypeName?: string;
+  mealType?: string;
+  totalFare?: number;
+  currency?: string;
+  guests: string[];
+  cancelPolicies: Array<{ fromDate: string; chargeType?: string | number; charge: number }>;
+};
+
 export type HotelBookingDetail = {
   ok: boolean;
   /** TBO booking Status: 1 = Confirmed, 6 = Cancelled … */
@@ -75,6 +84,14 @@ export type HotelBookingDetail = {
   hotelName?: string;
   checkIn?: string;
   checkOut?: string;
+  /** Voucher detail — TBO portal checkpoints 39 and 41. */
+  address?: string;
+  city?: string;
+  isVoucherBooked?: boolean;
+  noOfRooms?: number;
+  invoiceAmount?: number;
+  currency?: string;
+  rooms?: VoucherRoom[];
   error?: string;
 };
 
@@ -109,6 +126,16 @@ export async function hotelBookingDetail(args: {
     return { ok: false, error: e instanceof Error ? e.message : "network" };
   }
 
+  type RawPax = { Title?: string; FirstName?: string; LastName?: string; PaxType?: number; Age?: number };
+  type RawRoomDetail = {
+    RoomTypeName?: string;
+    MealType?: string;
+    Price?: { PublishedPrice?: number; RoomPrice?: number; Tax?: number; CurrencyCode?: string };
+    TotalFare?: number;
+    Currency?: string;
+    HotelPassenger?: RawPax[];
+    CancellationPolicies?: Array<{ FromDate?: string; ChargeType?: string | number; Charge?: number; CancellationCharge?: number }>;
+  };
   type R = {
     GetBookingDetailResult?: {
       ResponseStatus?: number;
@@ -118,8 +145,15 @@ export async function hotelBookingDetail(args: {
       ConfirmationNo?: string;
       BookingRefNo?: string;
       HotelName?: string;
+      AddressLine1?: string;
+      City?: string;
       CheckInDate?: string;
       CheckOutDate?: string;
+      IsVoucherBooked?: boolean;
+      NoOfRooms?: number;
+      InvoiceAmount?: number;
+      Currency?: string;
+      HotelRoomsDetails?: RawRoomDetail[];
       Error?: { ErrorCode?: number; ErrorMessage?: string };
     };
   };
@@ -127,6 +161,24 @@ export async function hotelBookingDetail(args: {
   if (!R || R.ResponseStatus !== 1) {
     return { ok: false, error: R?.Error?.ErrorMessage || "Booking not found." };
   }
+
+  // Everything the voucher has to show: rooms, guests, per-room fare and the
+  // cancellation policy as TBO holds it (portal checkpoints 39 and 41).
+  const rooms: VoucherRoom[] = (R.HotelRoomsDetails ?? []).map((rd) => ({
+    roomTypeName: rd.RoomTypeName,
+    mealType: rd.MealType,
+    totalFare: rd.TotalFare ?? rd.Price?.PublishedPrice ?? rd.Price?.RoomPrice,
+    currency: rd.Currency ?? rd.Price?.CurrencyCode,
+    guests: (rd.HotelPassenger ?? [])
+      .map((p) => [p.Title, p.FirstName, p.LastName].filter(Boolean).join(" ").trim())
+      .filter(Boolean),
+    cancelPolicies: (rd.CancellationPolicies ?? []).map((c) => ({
+      fromDate: c.FromDate ?? "",
+      chargeType: c.ChargeType,
+      charge: c.Charge ?? c.CancellationCharge ?? 0,
+    })),
+  }));
+
   return {
     ok: true,
     status: R.Status,
@@ -135,8 +187,15 @@ export async function hotelBookingDetail(args: {
     confirmationNo: R.ConfirmationNo,
     bookingRefNo: R.BookingRefNo,
     hotelName: R.HotelName,
+    address: R.AddressLine1,
+    city: R.City,
     checkIn: R.CheckInDate,
     checkOut: R.CheckOutDate,
+    isVoucherBooked: R.IsVoucherBooked,
+    noOfRooms: R.NoOfRooms,
+    invoiceAmount: R.InvoiceAmount,
+    currency: R.Currency,
+    ...(rooms.length ? { rooms } : {}),
   };
 }
 

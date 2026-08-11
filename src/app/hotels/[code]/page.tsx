@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   TriangleAlert,
   BedDouble,
+  BadgePercent,
   Check,
   Images as ImagesIcon,
 } from "lucide-react";
@@ -18,6 +19,8 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { BookButton } from "@/components/ui/BookButton";
 import { searchHotels, type HotelRoomOffer } from "@/lib/tbo-hotel";
+import { RoomRateDetails } from "@/components/ui/RoomRateDetails";
+import { nationalityAllowed, nationalityLabel, normalizeNationality } from "@/data/nationalities";
 import { hotelInfo } from "@/lib/tbo-hotel-static";
 import { cityByCode } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
@@ -84,15 +87,20 @@ export default async function HotelDetailPage({
     .map((a) => parseInt(a, 10))
     .filter((a) => Number.isFinite(a) && a >= 1 && a <= 17)
     .slice(0, Math.min(4, Math.max(0, parseInt(sp.children || "0", 10) || 0)));
+  const nationality = normalizeNationality(sp.nat);
 
   const backToResults = sp.city
-    ? `/hotels?city=${encodeURIComponent(sp.city)}&checkIn=${sp.checkIn ?? ""}&checkOut=${sp.checkOut ?? ""}&rooms=${rooms}&adults=${adultsPerRoom}${childAges.length ? `&children=${childAges.length}&ages=${childAges.join(",")}` : ""}`
+    ? `/hotels?city=${encodeURIComponent(sp.city)}&checkIn=${sp.checkIn ?? ""}&checkOut=${sp.checkOut ?? ""}&rooms=${rooms}&adults=${adultsPerRoom}${childAges.length ? `&children=${childAges.length}&ages=${childAges.join(",")}` : ""}&nat=${nationality}`
     : "/hotels";
   const cityLabel = (sp.city && cityByCode(sp.city)?.label) || "";
 
   // Static content is independent of dates; rooms need a stay window. Only the
   // static info is awaited here — the room search streams in behind Suspense.
-  const hasStay = Boolean(sp.checkIn && sp.checkOut && sp.checkOut > sp.checkIn!);
+  // TBO sells international stays to Indian nationality only — same rule the
+  // results page applies, restated here because this page is linkable.
+  const destinationCountry = (sp.city && cityByCode(sp.city)?.countryCode) || "";
+  const natOk = nationalityAllowed(nationality, destinationCountry);
+  const hasStay = Boolean(sp.checkIn && sp.checkOut && sp.checkOut > sp.checkIn!) && natOk;
   const info = await hotelInfo(code);
   const nights = hasStay ? nightsBetween(sp.checkIn!, sp.checkOut!) : 1;
   const name = info?.name || `Hotel ${code}`;
@@ -171,13 +179,19 @@ export default async function HotelDetailPage({
                   <h2 className="mb-4 text-[1.2rem] font-bold text-ink">Room options</h2>
                   <div className="rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
                     <BedDouble className="mx-auto mb-3 text-red" aria-hidden />
-                    <p className="mb-4 text-muted">Pick your dates to see live room rates.</p>
-                    <Button href={backToResults} arrow>Choose dates</Button>
+                    <p className="mb-4 text-muted">
+                      {natOk
+                        ? "Pick your dates to see live room rates."
+                        : `Stays outside India are available to guests of Indian nationality — ${nationalityLabel(nationality)} can be booked for stays in India only.`}
+                    </p>
+                    <Button href={backToResults} arrow>
+                      {natOk ? "Choose dates" : "Back to search"}
+                    </Button>
                   </div>
                 </>
               ) : (
                 <Suspense
-                  key={[code, sp.checkIn, sp.checkOut, rooms, adultsPerRoom, childAges.join(",")].join("|")}
+                  key={[code, sp.checkIn, sp.checkOut, rooms, adultsPerRoom, childAges.join(","), nationality].join("|")}
                   fallback={
                     <>
                       <h2 className="mb-4 text-[1.2rem] font-bold text-ink">Room options</h2>
@@ -189,13 +203,14 @@ export default async function HotelDetailPage({
                     code={code}
                     name={name}
                     cityLabel={cityLabel}
-                    countryCode={(sp.city && cityByCode(sp.city)?.countryCode) || ""}
+                    countryCode={destinationCountry}
                     checkIn={sp.checkIn!}
                     checkOut={sp.checkOut!}
                     nights={nights}
                     rooms={rooms}
                     adultsPerRoom={adultsPerRoom}
                     childAges={childAges}
+                    nationality={nationality}
                   />
                 </Suspense>
               )}
@@ -265,6 +280,7 @@ async function RoomOptions({
   rooms,
   adultsPerRoom,
   childAges,
+  nationality,
 }: {
   code: string;
   name: string;
@@ -277,29 +293,31 @@ async function RoomOptions({
   rooms: number;
   adultsPerRoom: number;
   childAges: number[];
+  /** Guest nationality searched with — Book must carry the same value. */
+  nationality: string;
 }) {
-  const searchArgs = {
+  // Single hotel, so ask for the DETAILED response: room amenities and
+  // promotions ride along with the rates (portal checkpoints 18 and 24), and
+  // Filters.NoOfRooms is omitted so the FULL room feed comes back (checkpoint 11).
+  const res = await searchHotels({
     checkInISO: checkIn,
     checkOutISO: checkOut,
     hotelCodes: [code],
-    nationality: "IN",
+    nationality,
     rooms: Array.from({ length: rooms }, () => ({
       adults: adultsPerRoom,
       childrenAges: childAges.length ? childAges : undefined,
     })),
-  };
-  let res = await searchHotels({ ...searchArgs, allRoomOptions: true });
-  // TBO's staging occasionally returns an empty result transiently. Fall back to
-  // the capped search (what the results page priced) so the page stays bookable.
-  if (!res.ok || !res.offers.length) {
-    res = await searchHotels(searchArgs);
-  }
+    detailed: true,
+  });
   const offer = res.ok ? res.offers.find((o) => o.hotelCode === code) ?? res.offers[0] : undefined;
   const roomOptions = offer?.rooms ?? [];
+  // TBO portal checkpoint 16: the exact TotalFare, unrounded.
   const money = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: offer?.currency || "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 
   return (
@@ -340,11 +358,12 @@ async function RoomOptions({
                       meal: room.mealType ?? "",
                       refundable: room.isRefundable ? "1" : "0",
                       ...(countryCode ? { cc: countryCode } : {}),
+                      nat: nationality,
                     };
                     return (
                       <div
                         key={`${room.bookingCode}-${i}`}
-                        className="flex flex-col gap-3 rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-3 rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm sm:flex-row sm:items-start sm:justify-between"
                       >
                         <div className="min-w-0">
                           <h3 className="text-[0.98rem] font-bold text-ink">{room.name || "Room"}</h3>
@@ -368,10 +387,56 @@ async function RoomOptions({
                             </span>
                           </div>
                           {room.inclusion && (
-                            <p className="mt-1 truncate text-[0.78rem] text-muted/90">
+                            <p className="mt-1 text-[0.78rem] text-muted/90">
                               {room.inclusion.toLowerCase().replace(/,/g, " · ")}
                             </p>
                           )}
+                          {/* Detailed Search RS extras — TBO portal checkpoints 18, 24. */}
+                          {(room.roomPromotions?.length ?? 0) > 0 && (
+                            <ul className="mt-1.5 space-y-0.5">
+                              {room.roomPromotions!.map((p, k) => (
+                                <li key={k} className="flex items-start gap-1.5 text-[0.78rem] font-medium text-green-700">
+                                  <BadgePercent size={13} className="mt-0.5 flex-none" aria-hidden /> {p}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {(room.amenities?.length ?? 0) > 0 && (
+                            <p className="mt-1.5 flex items-start gap-1.5 text-[0.78rem] text-muted">
+                              <Check size={13} className="mt-0.5 flex-none text-red" aria-hidden />
+                              <span>{room.amenities!.slice(0, 8).join(" · ")}</span>
+                            </p>
+                          )}
+                          {/* Mandatory charges collected BY THE HOTEL, usually in
+                              its local currency — TBO portal checkpoint 19. */}
+                          {(room.supplements?.length ?? 0) > 0 && (
+                            <div className="mt-2 rounded-brand border border-amber-300 bg-amber-50 px-3 py-2 text-[0.78rem] text-amber-900">
+                              <span className="font-semibold">Payable at the hotel</span> — not included in the total:
+                              <ul className="mt-0.5 list-disc pl-4">
+                                {room.supplements!.map((sup, k) => (
+                                  <li key={k}>
+                                    {(sup.description || sup.type || "Mandatory supplement").replace(/_/g, " ")}
+                                    {sup.price != null
+                                      ? ` — ${new Intl.NumberFormat("en-IN", {
+                                          style: "currency",
+                                          currency: sup.currency || offer?.currency || "INR",
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }).format(sup.price)}${
+                                          sup.currency && sup.currency !== (offer?.currency || "INR")
+                                            ? " (hotel's local currency)"
+                                            : ""
+                                        }`
+                                      : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {room.beddingNote && (
+                            <p className="mt-1.5 text-[0.76rem] italic text-muted/90">{room.beddingNote}</p>
+                          )}
+                          <RoomRateDetails bookingCode={room.bookingCode} destinationCountry={countryCode} />
                         </div>
                         <div className="flex flex-none items-end justify-between gap-4 sm:flex-col sm:items-end">
                           <div className="text-right">

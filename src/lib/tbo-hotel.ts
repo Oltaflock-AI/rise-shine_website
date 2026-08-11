@@ -109,9 +109,20 @@ export type HotelSearchArgs = {
   rooms: RoomOccupancy[];
   refundableOnly?: boolean;
   mealType?: "All" | "WithMeal" | "RoomOnly";
-  /** Return EVERY room option per hotel (detail page), not just the cheapest. */
-  allRoomOptions?: boolean;
+  /**
+   * Ask TBO for the detailed Search RS (room amenities, promotions, richer
+   * inclusions). Heavier payload — used on the single-hotel room page, not on
+   * a 100-code city sweep.
+   */
+  detailed?: boolean;
 };
+
+/**
+ * How many of a city's hotels we price per search. TBO caps ONE Search RQ at
+ * 100 HotelCodes, so this is covered by parallel ≤100-code requests; the
+ * ceiling only keeps a mega-city's fan-out (and the page's latency) bounded.
+ */
+export const CITY_SEARCH_CODE_CEILING = 500;
 
 export type CancelPolicy = {
   fromDate: string;
@@ -128,6 +139,21 @@ export type HotelRoomOffer = {
   totalFare: number;
   totalTax: number;
   cancelPolicies: CancelPolicy[];
+  /** Shown on the room page — TBO portal checkpoints 18, 19, 24. */
+  amenities?: string[];
+  roomPromotions?: string[];
+  /** Mandatory charges the guest pays AT the hotel, in the hotel's currency. */
+  supplements?: HotelSupplement[];
+  /** TBO's bedding caveat, when the rate carries one. */
+  beddingNote?: string;
+};
+
+/** A charge payable at the hotel (Search/PreBook `Supplements`) — local currency. */
+export type HotelSupplement = {
+  type?: string;
+  description?: string;
+  price?: number;
+  currency?: string;
 };
 
 export type HotelOffer = {
@@ -159,27 +185,67 @@ type RawRoom = {
   /** B2C feeds return a floor price (field name varies across TBO docs). */
   RecommendedSellingRate?: number;
   RecommendedSellingPrice?: number;
+  /** Detailed Search RS extras. */
+  Amenities?: string[] | string;
+  Amenity?: string[] | string;
+  RoomPromotion?: string[] | string;
+  BeddingGroup?: string;
+  /** TBO nests supplements per room as an array of arrays. */
+  Supplements?: Array<Array<{ Type?: string; Description?: string; Price?: number; Currency?: string }>>;
   CancelPolicies?: Array<{ FromDate?: string; ChargeType?: string | number; CancellationCharge?: number }>;
 };
 type RawHotelResult = { HotelCode?: string | number; Currency?: string; Rooms?: RawRoom[] };
 
-function mapRoom(r: RawRoom): HotelRoomOffer {
-  // B2C rule (TBO): the price shown/charged may never be below the
-  // RecommendedSellingRate — floor the display fare at RSP when present.
+/** TBO returns these as either a string or a string[] depending on the method. */
+function strList(v: string[] | string | undefined): string[] {
+  if (!v) return [];
+  return (Array.isArray(v) ? v : [v]).map((s) => String(s).trim()).filter(Boolean);
+}
+
+/**
+ * The customer-facing selling price for a room.
+ *
+ * TBO portal rule: the page must show **TotalFare** — never NetAmount, which is
+ * TBO's charge to the agency and belongs only in the Book RQ. The one permitted
+ * adjustment is the B2C floor: a selling price may never sit below the
+ * RecommendedSellingRate. No rounding — TBO checks the exact fare.
+ */
+function sellingFare(r: { TotalFare?: number; RecommendedSellingRate?: number; RecommendedSellingPrice?: number }): number {
   const rsp = r.RecommendedSellingRate ?? r.RecommendedSellingPrice ?? 0;
+  return Math.max(r.TotalFare ?? 0, rsp);
+}
+
+function mapRoom(r: RawRoom): HotelRoomOffer {
+  const amenities = [...strList(r.Amenities), ...strList(r.Amenity)];
   return {
     bookingCode: r.BookingCode ?? "",
     name: Array.isArray(r.Name) ? r.Name.join(", ") : (r.Name ?? ""),
     mealType: r.MealType,
     inclusion: r.Inclusion,
     isRefundable: Boolean(r.IsRefundable),
-    totalFare: Math.round(Math.max(r.TotalFare ?? 0, rsp)),
-    totalTax: Math.round(r.TotalTax ?? 0),
+    totalFare: sellingFare(r),
+    totalTax: r.TotalTax ?? 0,
     cancelPolicies: (r.CancelPolicies ?? []).map((p) => ({
       fromDate: p.FromDate ?? "",
       chargeType: p.ChargeType,
       charge: p.CancellationCharge ?? 0,
     })),
+    ...(amenities.length ? { amenities: [...new Set(amenities)] } : {}),
+    ...(strList(r.RoomPromotion).length ? { roomPromotions: strList(r.RoomPromotion) } : {}),
+    ...(r.BeddingGroup ? { beddingNote: r.BeddingGroup } : {}),
+    // Verified live against TBO's own sample HotelCodes: Search (not just
+    // PreBook) returns mandatory Supplements, so the guest can see the
+    // pay-at-hotel charges on the room page — portal checkpoint 19.
+    ...((r.Supplements ?? []).flat().length
+      ? {
+          supplements: (r.Supplements ?? []).flat().map((sp) => ({
+            type: sp.Type,
+            description: sp.Description,
+            price: sp.Price,
+            currency: sp.Currency,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -217,7 +283,7 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     args.rooms,
     args.refundableOnly,
     args.mealType,
-    args.allRoomOptions,
+    args.detailed,
   ]);
   const hit = searchCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
@@ -233,9 +299,10 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
 
   // Filters.NoOfRooms caps how many ROOM OPTIONS TBO returns per hotel
   // (verified live: with it = 1 room/hotel, without = full list, e.g. 13).
-  // Results pages want the cap (cheapest only); the detail page wants them all.
+  // TBO portal checkpoint 11: it must be 0 — i.e. omitted — so the full room
+  // feed comes back for every hotel. The results page still *renders* the
+  // cheapest room per hotel; that trim happens on our side, not in the RQ.
   const filters: Record<string, unknown> = {};
-  if (!args.allRoomOptions) filters.NoOfRooms = args.rooms.length;
   if (args.refundableOnly) filters.Refundable = true;
   if (args.mealType) filters.MealType = args.mealType;
 
@@ -249,7 +316,9 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     // a single-hotel reprice shouldn't ask for the full 23s a 100-code
     // city sweep needs.
     ResponseTime: Math.min(23, Math.max(5, Math.ceil(args.hotelCodes.length / 5))),
-    IsDetailedResponse: false,
+    // Detailed only where we render the extra content (single-hotel room page)
+    // — a 100-code city sweep would pay for detail it never shows.
+    IsDetailedResponse: Boolean(args.detailed),
     Filters: filters,
   };
 
@@ -280,7 +349,7 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
       const deduped = rooms
         .sort((a, b) => a.totalFare - b.totalFare)
         .filter((r) => {
-          const key = `${r.name}|${r.mealType ?? ""}|${r.inclusion ?? ""}|${Math.round(r.totalFare)}`;
+          const key = `${r.name}|${r.mealType ?? ""}|${r.inclusion ?? ""}|${r.totalFare}`;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -308,14 +377,6 @@ export type HotelValidationInfo = {
   paxNameMinLength?: number;
   paxNameMaxLength?: number;
   panCountRequired?: number;
-};
-
-/** A charge payable at the hotel (PreBook `Supplements`) — local currency. */
-export type HotelSupplement = {
-  type?: string;
-  description?: string;
-  price?: number;
-  currency?: string;
 };
 
 export type PreBookResult = {
@@ -400,18 +461,17 @@ export async function preBookHotel(args: {
   if (!room) return fail("PreBook returned no room — the rate is no longer available.");
   const vi = room.ValidationInfo ?? {};
 
-  // B2C floor: the customer-facing PreBook price may never sit below RSP —
-  // nor below NetAmount (staging returns TotalFare ₹1 UNDER net; selling at
-  // "fare" there would be selling below cost). NetAmount itself stays raw —
-  // it is what Book must carry and what TBO charges us.
-  const rsp = room.RecommendedSellingRate ?? room.RecommendedSellingPrice ?? 0;
-  const fareFloor = Math.max(room.TotalFare ?? 0, rsp, room.NetAmount ?? 0);
+  // TBO portal checkpoint 30: the portal must show TotalFare throughout the
+  // booking — NetAmount is TBO's charge to the agency and rides ONLY in the
+  // Book RQ (checkpoint 31). The single permitted adjustment is the B2C floor
+  // at RecommendedSellingRate. Exact, unrounded — checkpoints 12 and 16.
+  const fare = sellingFare(room);
   return {
     ok: true,
     bookingCode: room.BookingCode ?? args.bookingCode,
     currency: hr?.Currency,
     netAmount: room.NetAmount,
-    totalFare: fareFloor > 0 ? Math.ceil(fareFloor) : undefined,
+    totalFare: fare > 0 ? fare : undefined,
     totalTax: room.TotalTax,
     isPriceChanged: Boolean(hr?.IsPriceChanged),
     isCancellationPolicyChanged: Boolean(hr?.IsCancellationPolicyChanged),

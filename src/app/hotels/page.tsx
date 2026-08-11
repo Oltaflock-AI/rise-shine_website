@@ -7,12 +7,13 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
 import { HotelResultsClient, type HotelItem } from "@/components/ui/HotelResultsClient";
-import { searchHotels } from "@/lib/tbo-hotel";
+import { searchHotels, CITY_SEARCH_CODE_CEILING } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { RecentSearches } from "@/components/ui/RecentSearches";
 import { resolveCity } from "@/lib/hotel-city-search";
+import { nationalityAllowed, nationalityLabel, normalizeNationality } from "@/data/nationalities";
 import { site } from "@/data/site";
 import { formatDate } from "@/lib/format-date";
 
@@ -46,6 +47,7 @@ export default async function HotelsPage({
     .filter((a) => Number.isFinite(a) && a >= 1 && a <= 17)
     .slice(0, childrenPerRoom);
   const guestsPerRoom = adultsPerRoom + childAges.length;
+  const nationality = normalizeNationality(sp.nat);
 
   // ── filters (URL-driven where TBO does the work) ──
   // Meal + refundable pass through to TBO's Search Filters (verified: MealType
@@ -122,6 +124,38 @@ export default async function HotelsPage({
 
   const nights = nightsBetween(sp.checkIn, sp.checkOut);
 
+  // TBO rule: international stays are sold to Indian nationality only — their
+  // API returns no availability otherwise, so we stop here and say why rather
+  // than showing an empty result set.
+  if (!nationalityAllowed(nationality, city.countryCode)) {
+    return (
+      <>
+        {header}
+        <section className="py-20">
+          <Container>
+            <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
+              <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
+              <h2 className="h-sm mb-2">Indian nationality only for this destination</h2>
+              <p className="mb-6 text-muted">
+                Stays outside India are available to guests of Indian nationality. You
+                selected {nationalityLabel(nationality)} — please switch the guest
+                nationality to India, or pick a destination within India.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button href={qs({ nat: "IN" })} arrow>
+                  Search as Indian national
+                </Button>
+                <Button href={site.phone.whatsappHref} variant="light">
+                  WhatsApp Us
+                </Button>
+              </div>
+            </div>
+          </Container>
+        </section>
+      </>
+    );
+  }
+
   const chip = (active: boolean) =>
     `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
       active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
@@ -131,7 +165,7 @@ export default async function HotelsPage({
   // Sorting is client-side (HotelResultsClient) and never re-triggers this.
   const searchKey = [
     city.cityCode, sp.checkIn, sp.checkOut, rooms, adultsPerRoom,
-    childAges.join(","), refundableOnly ? 1 : 0, meal ?? "",
+    childAges.join(","), refundableOnly ? 1 : 0, meal ?? "", nationality,
   ].join("|");
 
   return (
@@ -163,6 +197,7 @@ export default async function HotelsPage({
               adultsPerRoom={adultsPerRoom}
               childAges={childAges}
               nights={nights}
+              nationality={nationality}
               initialMinStars={minStars}
               refundableOnly={refundableOnly}
               meal={meal}
@@ -187,6 +222,7 @@ async function HotelResults({
   adultsPerRoom,
   childAges,
   nights,
+  nationality,
   initialMinStars,
   refundableOnly,
   meal,
@@ -198,13 +234,17 @@ async function HotelResults({
   adultsPerRoom: number;
   childAges: number[];
   nights: number;
+  nationality: string;
   initialMinStars: number;
   refundableOnly: boolean;
   meal?: "WithMeal" | "RoomOnly";
   clearFiltersHref: string;
 }) {
-  // Resolve this city's hotels (static data), price the first 100 (TBO's ceiling),
-  // then join the priced offers back to their names/ratings for display.
+  // Resolve this city's hotels (static data) and price them ALL — TBO caps one
+  // Search RQ at 100 HotelCodes, so the city is covered by **parallel** ≤100-code
+  // requests (their recommendation; portal checkpoints 0 and 10), never by
+  // truncating the feed to the first hundred. Then join the priced offers back
+  // to their names/ratings for display.
   let stubs: Awaited<ReturnType<typeof hotelCodesByCity>> = [];
   try {
     stubs = await hotelCodesByCity(city.cityCode);
@@ -212,22 +252,38 @@ async function HotelResults({
     /* fall through to the unavailable state below */
   }
   const stubByCode = new Map(stubs.map((s) => [s.code, s]));
-  const codes = stubs.slice(0, 100).map((s) => s.code);
+  const codes = stubs.map((s) => s.code).slice(0, CITY_SEARCH_CODE_CEILING);
 
-  const res = codes.length
-    ? await searchHotels({
+  const chunks: string[][] = [];
+  for (let i = 0; i < codes.length; i += 100) chunks.push(codes.slice(i, i + 100));
+
+  const paxRooms = Array.from({ length: rooms }, () => ({
+    adults: adultsPerRoom,
+    childrenAges: childAges.length ? childAges : undefined,
+  }));
+
+  const settled = await Promise.all(
+    chunks.map((hotelCodes) =>
+      searchHotels({
         checkInISO: sp.checkIn!,
         checkOutISO: sp.checkOut!,
-        hotelCodes: codes,
-        nationality: "IN",
-        rooms: Array.from({ length: rooms }, () => ({
-          adults: adultsPerRoom,
-          childrenAges: childAges.length ? childAges : undefined,
-        })),
+        hotelCodes,
+        nationality,
+        rooms: paxRooms,
         refundableOnly,
         mealType: meal,
-      })
-    : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn!, checkOutISO: sp.checkOut!, offers: [], error: "no-hotel-codes" };
+      }),
+    ),
+  );
+
+  // A chunk with no availability is normal on a city sweep — merge everything
+  // that priced, cheapest hotel first, and only fail when every chunk failed.
+  const live = settled.filter((r) => r.ok);
+  const res = !chunks.length
+    ? { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn!, checkOutISO: sp.checkOut!, offers: [], error: "no-hotel-codes" }
+    : live.length
+      ? { ...live[0], offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare) }
+      : settled[0];
 
   // Photos + authoritative star ratings (TBO static) and Google review scores,
   // fetched together. Both cosmetic: a failure just means a barer card.
@@ -260,6 +316,7 @@ async function HotelResults({
     `adults=${adultsPerRoom}`,
     ...(childAges.length ? [`children=${childAges.length}`, `ages=${childAges.join(",")}`] : []),
     `city=${encodeURIComponent(city.cityCode)}`,
+    `nat=${nationality}`,
   ].join("&");
 
   if (!res.ok) {
@@ -321,7 +378,10 @@ async function HotelResults({
               ) : (
                 <HotelResultsClient
                   items={offers.map((o): HotelItem => ({
-                    offer: o,
+                    // The RQ asks TBO for the full room feed (NoOfRooms omitted);
+                    // the card only ever shows the cheapest, so the rest of the
+                    // rooms stay on the server instead of bloating the payload.
+                    offer: { ...o, rooms: o.rooms.slice(0, 1) },
                     stub: { ...stubByCode.get(o.hotelCode), rating: String(starsOf(o.hotelCode) || "") },
                     stars: starsOf(o.hotelCode),
                     review: ratingsMap.get(o.hotelCode),

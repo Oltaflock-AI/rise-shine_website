@@ -1,4 +1,5 @@
 import { bookHotel, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
+import { generateHotelVoucher } from "@/lib/tbo-hotel-post";
 import type { HotelValidationInfo } from "@/lib/tbo-hotel";
 import { getUser } from "@/lib/supabase/server";
 import { saveHotelBookingHistory, type HotelStay } from "@/lib/booking-history";
@@ -178,6 +179,18 @@ export async function POST(req: Request) {
   // awaited BEFORE responding (serverless may freeze after return); a failure
   // here must never fail a paid booking. Guests (no session) aren't persisted.
   if (result.ok) {
+    // GenerateVoucher — TBO portal checkpoint 36. An IsVoucherBooking=true
+    // booking is already vouchered at Book, so this is confirmation rather than
+    // creation: TBO answering "already generated" is fine and the guest's
+    // booking must never fail because the voucher call did.
+    if (result.bookingId) {
+      try {
+        const v = await generateHotelVoucher(result.bookingId);
+        if (!v.ok) console.warn("[api/hotels/book] GenerateVoucher:", v.error);
+      } catch (e) {
+        console.warn("[api/hotels/book] GenerateVoucher threw (booking unaffected):", e);
+      }
+    }
     try {
       const user = await getUser();
       if (user) {

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star, BedDouble, Utensils, ShieldCheck, MapPin, ImageOff, ArrowRight } from "lucide-react";
+import { Star, BedDouble, Utensils, ShieldCheck, MapPin, ImageOff, ArrowRight, Check } from "lucide-react";
 import { BookButton } from "@/components/ui/BookButton";
 import { cn } from "@/lib/cn";
 import type { HotelOffer } from "@/lib/tbo-hotel";
@@ -34,6 +34,7 @@ export function HotelCard({
   childAges,
   cityLabel,
   countryCode,
+  nationality,
   review,
   image,
   detailHref,
@@ -50,6 +51,8 @@ export function HotelCard({
   cityLabel: string;
   /** Destination country (ISO-2) — carried to checkout to drive PAN rules. */
   countryCode?: string;
+  /** Guest nationality searched with — Book must carry the same value. */
+  nationality?: string;
   /** Google review score (absent → no badge). */
   review?: { rating: number; count: number };
   /** Lead photo from TBO HotelDetails (absent → placeholder block). */
@@ -59,10 +62,12 @@ export function HotelCard({
 }) {
   const cheapest = offer.rooms[0];
   const stars = starCount(stub?.rating);
+  // TBO portal checkpoint 12: show the EXACT TotalFare — no rounding.
   const money = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: offer.currency || "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 
   // Everything the hotel checkout needs to PreBook + Book this room.
@@ -82,6 +87,7 @@ export function HotelCard({
     meal: cheapest?.mealType ?? "",
     refundable: cheapest?.isRefundable ? "1" : "0",
     ...(countryCode ? { cc: countryCode } : {}),
+    nat: nationality || "IN",
   };
 
   return (
@@ -165,6 +171,14 @@ export function HotelCard({
             {cheapest?.isRefundable ? "Refundable" : "Non-refundable"}
           </span>
         </div>
+
+        {/* Inclusions from the Search RS — TBO portal checkpoint 14. */}
+        {cheapest?.inclusion && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[0.8rem] text-muted">
+            <Check size={13} className="mt-0.5 flex-none text-red" aria-hidden />
+            <span className="line-clamp-2">{cheapest.inclusion.replace(/,/g, " · ")}</span>
+          </p>
+        )}
       </div>
 
       <div className="flex flex-none items-end justify-between gap-4 sm:flex-col sm:items-end">

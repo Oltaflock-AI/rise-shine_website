@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { AIRPORTS } from "@/data/airports";
 import { POPULAR_CITIES, type HotelCity } from "@/data/hotel-cities";
+import { NATIONALITIES } from "@/data/nationalities";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
@@ -560,6 +561,9 @@ function HotelsPanel() {
   const [adults, setAdults] = useState(2);
   const [childCount, setChildCount] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
+  // TBO prices some rates by guest nationality and requires it on Search AND
+  // Book — collected here and carried unchanged all the way to the Book RQ.
+  const [nationality, setNationality] = useState("IN");
   const [paxOpen, setPaxOpen] = useState(false);
   const paxRef = useRef<HTMLDivElement>(null);
 
@@ -646,6 +650,7 @@ function HotelsPanel() {
       p.set("children", String(childCount));
       p.set("ages", childAges.join(","));
     }
+    p.set("nat", nationality);
     const url = `/hotels?${p.toString()}`;
     saveRecentSearch({
       kind: "hotel",
@@ -778,6 +783,29 @@ function HotelsPanel() {
                   </div>
                 </div>
               )}
+              {/* Guest nationality — priced differently by some hotels, and TBO
+                  allows international stays for Indian nationality only. */}
+              <div className="mt-3 border-t border-line pt-3">
+                <label className="mb-2 block text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  Guest nationality
+                </label>
+                <select
+                  value={nationality}
+                  onChange={(e) => setNationality(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-white px-2 py-2 text-[0.85rem] font-semibold text-ink"
+                >
+                  {NATIONALITIES.map((n) => (
+                    <option key={n.code} value={n.code}>
+                      {n.label}
+                    </option>
+                  ))}
+                </select>
+                {nationality !== "IN" && (
+                  <p className="mt-2 text-[0.75rem] leading-snug text-muted">
+                    Non-Indian nationalities can be booked for stays in India only.
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { BookingDetailCheck } from "./BookingDetailCheck";
 import { formatDate } from "@/lib/format-date";
 
 // ── Razorpay hosted checkout ──
@@ -165,14 +166,16 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: quote?.currency || b.currency || "INR",
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }),
     [quote?.currency, b.currency],
   );
-  // What the CUSTOMER pays: the PreBook selling price (RSP-floored TotalFare).
-  // quote.netAmount is TBO's charge to the agency and rides only in the Book
-  // payload — B2C must never sell below the recommended selling rate.
-  const amountInr = quote?.totalFare ?? quote?.netAmount ?? Number(b.fare || 0);
+  // What the CUSTOMER pays and what the page shows: the PreBook TotalFare
+  // (floored at the B2C RecommendedSellingRate). TBO portal checkpoint 30 —
+  // NetAmount is TBO's charge to the agency, is never displayed, and rides only
+  // in the Book RQ (checkpoint 31).
+  const amountInr = quote?.totalFare ?? Number(b.fare || 0);
 
   const setGuest = (i: number, patch: Partial<Guest>) =>
     setGuests((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
@@ -203,7 +206,8 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
   function commonPayload() {
     return {
       bookingCode: b.bookingCode,
-      nationality: "IN",
+      // The nationality searched with — Book must match Search (checkpoint 27).
+      nationality: b.nat || "IN",
       netAmount: quote?.netAmount ?? amountInr,
       isVoucherBooking: true,
       rooms: buildRooms(),
@@ -365,9 +369,19 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
             </dd>
           </div>
         </dl>
-        <Button href="/account" arrow>
-          View my bookings
-        </Button>
+        {/* TBO checkpoint 38: re-read the booking from GetBookingDetail 120s
+            after Book and show the guest that settled status. */}
+        {booked.bookingId ? <BookingDetailCheck bookingId={booked.bookingId} /> : null}
+        <div className="flex flex-wrap justify-center gap-3">
+          {booked.bookingId ? (
+            <Button href={`/hotels/voucher/${booked.bookingId}`} arrow>
+              View voucher
+            </Button>
+          ) : null}
+          <Button href="/account" variant="light">
+            My bookings
+          </Button>
+        </div>
       </div>
     );
   }
@@ -575,7 +589,12 @@ function cancelCharge(p: NonNullable<Quote["cancelPolicies"]>[number], currency:
   if (p.charge <= 0) return "Free cancellation";
   if (t === "2" || t === "percentage") return `${p.charge}% of the fare`;
   if (t === "3" || t === "nights") return `${p.charge} night${p.charge > 1 ? "s" : ""}' charge`;
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(p.charge);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(p.charge);
 }
 
 /**

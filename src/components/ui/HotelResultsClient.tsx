@@ -81,6 +81,7 @@ export function HotelResultsClient({
   childAges,
   cityLabel,
   countryCode,
+  nationality,
   initialSort,
   initialMinStars,
 }: {
@@ -94,6 +95,8 @@ export function HotelResultsClient({
   cityLabel: string;
   /** Destination country (ISO-2) — carried to checkout to drive PAN rules. */
   countryCode?: string;
+  /** Guest nationality searched with — Book must carry the same value. */
+  nationality?: string;
   initialSort?: string;
   /** Legacy ?stars=N URLs → pre-check those star classes. */
   initialMinStars?: number;
@@ -346,6 +349,7 @@ export function HotelResultsClient({
                   childAges={childAges}
                   cityLabel={cityLabel}
                   countryCode={countryCode}
+                  nationality={nationality}
                   review={i.review}
                   image={i.image}
                   detailHref={i.detailHref}
