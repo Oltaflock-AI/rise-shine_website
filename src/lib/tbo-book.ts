@@ -32,9 +32,16 @@ import {
 } from "./tbo-validate";
 
 // ── Checklist: "Search and Book Url's are different so use each accordingly" ──
-const AUTH_URL = "http://Sharedapi.tektravels.com/SharedData.svc/rest";
+// Staging and live are different hosts entirely — see tbo.ts for the live values.
+const trimSlash = (u: string) => u.replace(/\/+$/, "");
+const AUTH_URL = trimSlash(
+  process.env.TBO_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest",
+);
 /** Search / FareRule / FareQuote / SSR / GetCalendarFare live on the Air service. */
-const SEARCH_SVC = "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest";
+const SEARCH_SVC = trimSlash(
+  process.env.TBO_SEARCH_URL ||
+    "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest",
+);
 /**
  * Book / Ticket / GetBookingDetails — TBO's docs contradict themselves here:
  *
@@ -49,9 +56,16 @@ const SEARCH_SVC = "http://api.tektravels.com/BookingEngineService_Air/AirServic
  * checklist as written, keeps staging working, and needs no change if TBO enables AirBook.
  * Override with TBO_BOOK_URL.
  */
-const BOOK_SVC =
+const BOOK_SVC = trimSlash(
   process.env.TBO_BOOK_URL ||
-  "http://api.tektravels.com/BookingEngineService_AirBook/AirService.svc/rest";
+    "http://api.tektravels.com/BookingEngineService_AirBook/AirService.svc/rest",
+);
+/**
+ * The Air-service fallback below is a staging-only accommodation. When TBO_BOOK_URL is set
+ * explicitly (live gives Book its own host, booking.travelboutiqueonline.com), a failure
+ * must surface — silently re-posting Book to the search host is how you lose a ticket.
+ */
+const BOOK_URL_EXPLICIT = Boolean(process.env.TBO_BOOK_URL?.trim());
 /** Set once we learn AirBook isn't serving this account, so we stop re-probing it. */
 let bookSvcUnavailable = false;
 
@@ -197,6 +211,7 @@ async function bookCall(method: string, body: Json, timeoutMs = TIMEOUT_OTHER): 
       return await call(`${BOOK_SVC}/${method}`, body, timeoutMs);
     } catch (e) {
       if (!(e instanceof TboNotJsonError)) throw e; // a timeout here must NOT trigger a retry
+      if (BOOK_URL_EXPLICIT) throw e; // configured host is authoritative — never re-route Book
       bookSvcUnavailable = true;
       console.warn(
         `[TBO] AirBook service unavailable (${e.body.trim().slice(0, 40)}) — falling back to the Air service for ${method}.`,

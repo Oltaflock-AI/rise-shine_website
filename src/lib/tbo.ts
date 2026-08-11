@@ -12,12 +12,21 @@
 import { TboValidationError, validateSearch } from "./tbo-validate";
 import { tboFetch } from "./tbo-fetch";
 
-const AUTH_URL =
-  "http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate";
+// Live and staging are wholly different hosts, not just different credentials, so
+// both bases are env-driven. Unset = staging. Live (issued 2026-08-11):
+//   TBO_AUTH_URL    https://api.travelboutiqueonline.com/SharedAPI/SharedData.svc/rest
+//   TBO_SEARCH_URL  https://tboapi.travelboutiqueonline.com/AirAPI_V10/AirService.svc/rest
+const trimSlash = (u: string) => u.replace(/\/+$/, "");
+
+const AUTH_URL = `${trimSlash(
+  process.env.TBO_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest",
+)}/Authenticate`;
 // Search lives on the Air service; Book/Ticket use the separate AirBook service
 // (see tbo-book.ts) — TBO requires each method to go to its own URL.
-const SEARCH_URL =
-  "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest/Search";
+const SEARCH_URL = `${trimSlash(
+  process.env.TBO_SEARCH_URL ||
+    "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest",
+)}/Search`;
 
 function cfg() {
   return {
