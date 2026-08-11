@@ -312,8 +312,12 @@ export function BookingForm({
 
   /**
    * Collect payment (Razorpay), then ticket. Money is captured BEFORE we call TBO;
-   * the server refunds automatically if ticketing then fails. If online payment isn't
-   * configured (503), fall back to ticketing directly — dev/staging without keys.
+   * the server refunds automatically if ticketing then fails.
+   *
+   * There is deliberately NO unpaid path. A 503 from the order route means payment is
+   * unavailable, so booking stops — it must never degrade into ticketing for free. This
+   * previously fell through to sendToBook(passengers, null), which against live TBO
+   * credentials would issue a real ticket on agency credit with no money collected.
    */
   async function submit() {
     setBooking(true);
@@ -338,8 +342,12 @@ export function BookingForm({
         body: JSON.stringify(commonPayload(passengers)),
       });
       if (r.status === 503) {
-        // Payments not configured — legacy direct-ticket path.
-        await sendToBook(passengers, null);
+        setBooked({
+          ok: false,
+          error:
+            "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll ticket it for you.",
+        });
+        setBooking(false);
         return;
       }
       order = await r.json();

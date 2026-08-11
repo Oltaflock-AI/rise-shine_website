@@ -17,6 +17,7 @@ import {
   fetchOrder,
   refundPayment,
 } from "@/lib/razorpay";
+import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
 
 // Live TBO booking calls — never cached, and Book/Ticket can run to 300s.
 export const dynamic = "force-dynamic";
@@ -40,8 +41,9 @@ type ConfirmedPayment = { paymentId: string; orderId: string; amountInr: number 
  * When Razorpay is configured a captured, signature-verified payment is REQUIRED
  * before a single TBO call is made — and if ticketing then fails, the payment is
  * refunded automatically (money must never be held for a ticket the customer never
- * got). With no keys, the flow degrades to the legacy direct-ticket path so dev/
- * staging still demo. The heavy lifting (and every TBO checklist validation) lives
+ * got). With no keys the flow degrades to a direct-ticket path so dev/staging can still
+ * demo — but ONLY against staging TBO: `bookingBlockedForMissingPayments` refuses the
+ * request outright when the live hosts are configured. The heavy lifting (and every TBO checklist validation) lives
  * in lib/tbo-book + lib/tbo-validate; this handler shapes the request, normalizes
  * titles (TBO rejects "Master"/"Miss"), and owns the payment lifecycle.
  */
@@ -56,6 +58,18 @@ export async function POST(req: Request) {
   const parsed = parseBookingRequest(body);
   if (!parsed.ok) return Response.json({ ok: false, error: parsed.error }, { status: parsed.status });
   const bookingReq = parsed.req;
+
+  // ── Fail closed on live ──
+  // Payment is only enforced below when Razorpay is configured, which was right for
+  // staging certification. Against LIVE TBO credentials that same branch would ticket
+  // for free, so refuse outright rather than book unpaid.
+  if (bookingBlockedForMissingPayments(razorpayConfigured)) {
+    console.error("[api/book] refused: live TBO credentials with no Razorpay configuration.");
+    return Response.json(
+      { ok: false, error: "Online booking is temporarily unavailable. Please call us to book." },
+      { status: 503 },
+    );
+  }
 
   // ── Payment gate ──
   // Confirm the money is actually captured BEFORE touching TBO. The order was priced

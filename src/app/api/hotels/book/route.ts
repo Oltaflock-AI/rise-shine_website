@@ -17,6 +17,7 @@ import {
   fetchOrder,
   refundPayment,
 } from "@/lib/razorpay";
+import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
 
 // Live TBO hotel booking — never cached; Book can run long.
 export const dynamic = "force-dynamic";
@@ -31,8 +32,9 @@ type ConfirmedPayment = { paymentId: string; orderId: string };
  *
  * When Razorpay is configured a captured, signature-verified payment is REQUIRED
  * before Book is called — and if Book then fails, the payment is refunded
- * automatically (money must never be held for a stay the guest never got). With no
- * keys, the flow degrades to the legacy direct-book path so dev/staging still demo.
+ * automatically (money must never be held for a stay the guest never got). With no keys
+ * the flow degrades to a direct-book path so dev/staging can still demo — but ONLY
+ * against staging TBO; live hosts with no Razorpay are refused outright.
  *
  * Body: { bookingCode, nationality?, netAmount, isVoucherBooking?, rooms, validation?, payment? }
  */
@@ -58,6 +60,17 @@ export async function POST(req: Request) {
   if (!body.bookingCode) return Response.json({ ok: false, error: 'Missing "bookingCode".' }, { status: 400 });
   if (body.netAmount == null) return Response.json({ ok: false, error: 'Missing "netAmount".' }, { status: 400 });
   if (!body.rooms?.length) return Response.json({ ok: false, error: "At least one room is required." }, { status: 400 });
+
+  // ── Fail closed on live ──
+  // See the matching guard in /api/book: live TBO credentials with no Razorpay would
+  // otherwise hold real rooms on agency credit without collecting any money.
+  if (bookingBlockedForMissingPayments(razorpayConfigured)) {
+    console.error("[api/hotels/book] refused: live TBO credentials with no Razorpay configuration.");
+    return Response.json(
+      { ok: false, error: "Online booking is temporarily unavailable. Please call us to book." },
+      { status: 503 },
+    );
+  }
 
   // ── Payment gate ──
   // Confirm money is actually captured BEFORE touching TBO. The order was priced

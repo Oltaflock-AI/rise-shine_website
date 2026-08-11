@@ -255,9 +255,16 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(commonPayload()),
       });
+      // No unpaid path: a 503 stops the booking rather than booking for free. See the
+      // matching note in BookingForm — with live TBO creds this branch would otherwise
+      // hold a real room against agency credit with no money collected.
       if (r.status === 503) {
-        // Payments not configured — legacy direct-book path (dev/staging).
-        await sendToBook(null);
+        setBooked({
+          ok: false,
+          error:
+            "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll book it for you.",
+        });
+        setBooking(false);
         return;
       }
       order = await r.json();
