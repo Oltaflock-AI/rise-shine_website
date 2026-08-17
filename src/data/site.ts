@@ -81,5 +81,12 @@ export const navItems: NavItem[] = [
     ],
   },
   { label: "Services", href: "/services" },
-  { label: "Contact", href: "/contact" },
+  {
+    label: "Contact",
+    href: "/contact",
+    children: [
+      { label: "General Enquiries", href: "/contact" },
+      { label: "Request a Callback", href: "/request-a-call" },
+    ],
+  },
 ];

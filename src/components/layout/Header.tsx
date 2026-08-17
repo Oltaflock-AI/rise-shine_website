@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
-import { navItems, site } from "@/data/site";
+import { navItems, site, type NavItem } from "@/data/site";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { HeaderAuth, HeaderAuthMobile } from "./HeaderAuth";
@@ -37,6 +37,13 @@ export function Header() {
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  // A parent is also active when the open page is one of its children. Packages'
+  // children live under /packages so the prefix match already covers them, but
+  // Contact's callback page shares none of its path and would leave the nav with
+  // nothing highlighted.
+  const itemActive = (item: NavItem) =>
+    isActive(item.href) || (item.children?.some((child) => isActive(child.href)) ?? false);
 
   // Pages that render a LIGHT background at the very top (no dark hero) need
   // dark header text even before scrolling, or the nav is invisible.
@@ -95,7 +102,7 @@ export function Header() {
                     "relative inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[0.95rem] font-medium transition-colors",
                     "after:absolute after:inset-x-4 after:bottom-1.5 after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:bg-red after:transition-transform after:duration-300 hover:after:scale-x-100",
                     navText,
-                    isActive(item.href) && "after:scale-x-100",
+                    itemActive(item) && "after:scale-x-100",
                   )}
                 >
                   {item.label}
