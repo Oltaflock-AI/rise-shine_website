@@ -18,7 +18,7 @@ import {
   fetchOrder,
   refundPayment,
 } from "@/lib/razorpay";
-import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
+import { hotelBookingBlockedForMissingPayments } from "@/lib/tbo-env";
 
 // Live TBO hotel booking — never cached; Book can run long.
 export const dynamic = "force-dynamic";
@@ -63,10 +63,12 @@ export async function POST(req: Request) {
   if (!body.rooms?.length) return Response.json({ ok: false, error: "At least one room is required." }, { status: 400 });
 
   // ── Fail closed on live ──
-  // See the matching guard in /api/book: live TBO credentials with no Razorpay would
-  // otherwise hold real rooms on agency credit without collecting any money.
-  if (bookingBlockedForMissingPayments(razorpayConfigured)) {
-    console.error("[api/hotels/book] refused: live TBO credentials with no Razorpay configuration.");
+  // Live HOTEL credentials with no Razorpay would hold real rooms on agency credit
+  // without collecting any money. Judged on the hotel hosts specifically: the flight
+  // stack going live must not block hotel certification, which by design books without
+  // a payment gateway.
+  if (hotelBookingBlockedForMissingPayments(razorpayConfigured)) {
+    console.error("[api/hotels/book] refused: live TBO hotel credentials with no Razorpay configuration.");
     return Response.json(
       { ok: false, error: "Online booking is temporarily unavailable. Please call us to book." },
       { status: 503 },

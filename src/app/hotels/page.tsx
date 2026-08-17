@@ -7,7 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
 import { HotelResultsClient, type HotelItem } from "@/components/ui/HotelResultsClient";
-import { searchHotels, CITY_SEARCH_CODE_CEILING } from "@/lib/tbo-hotel";
+import { searchCityHotels, CITY_SEARCH_CODE_CEILING } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
@@ -254,36 +254,19 @@ async function HotelResults({
   const stubByCode = new Map(stubs.map((s) => [s.code, s]));
   const codes = stubs.map((s) => s.code).slice(0, CITY_SEARCH_CODE_CEILING);
 
-  const chunks: string[][] = [];
-  for (let i = 0; i < codes.length; i += 100) chunks.push(codes.slice(i, i + 100));
-
-  const paxRooms = Array.from({ length: rooms }, () => ({
-    adults: adultsPerRoom,
-    childrenAges: childAges.length ? childAges : undefined,
-  }));
-
-  const settled = await Promise.all(
-    chunks.map((hotelCodes) =>
-      searchHotels({
-        checkInISO: sp.checkIn!,
-        checkOutISO: sp.checkOut!,
-        hotelCodes,
-        nationality,
-        rooms: paxRooms,
-        refundableOnly,
-        mealType: meal,
-      }),
-    ),
-  );
-
-  // A chunk with no availability is normal on a city sweep — merge everything
-  // that priced, cheapest hotel first, and only fail when every chunk failed.
-  const live = settled.filter((r) => r.ok);
-  const res = !chunks.length
-    ? { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn!, checkOutISO: sp.checkOut!, offers: [], error: "no-hotel-codes" }
-    : live.length
-      ? { ...live[0], offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare) }
-      : settled[0];
+  // One Search RQ per ≤100 codes, all in flight at once (see searchCityHotels).
+  const res = await searchCityHotels({
+    checkInISO: sp.checkIn!,
+    checkOutISO: sp.checkOut!,
+    hotelCodes: codes,
+    nationality,
+    rooms: Array.from({ length: rooms }, () => ({
+      adults: adultsPerRoom,
+      childrenAges: childAges.length ? childAges : undefined,
+    })),
+    refundableOnly,
+    mealType: meal,
+  });
 
   // Photos + authoritative star ratings (TBO static) and Google review scores,
   // fetched together. Both cosmetic: a failure just means a barer card.

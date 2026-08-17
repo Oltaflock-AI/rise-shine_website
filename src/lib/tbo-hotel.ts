@@ -369,6 +369,58 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
   return data;
 }
 
+/**
+ * Price a whole city: ONE Search RQ per ≤100 HotelCodes, all dispatched together.
+ *
+ * TBO caps a Search at 100 codes and asks for parallel requests rather than a
+ * truncated one (portal checkpoints 0 and 10). The per-batch timings are logged
+ * because TBO twice read our fan-out as sequential — "sent at +0ms" for every
+ * batch is the evidence, and it costs one log line.
+ *
+ * Batches that return nothing are normal on a city sweep: the merged result is
+ * every hotel that priced, cheapest first, and only an all-batches failure is a
+ * failure.
+ */
+export async function searchCityHotels(
+  args: Omit<HotelSearchArgs, "hotelCodes"> & { hotelCodes: string[] },
+): Promise<HotelSearchResult> {
+  const { hotelCodes, ...rest } = args;
+  const chunks: string[][] = [];
+  for (let i = 0; i < hotelCodes.length; i += 100) chunks.push(hotelCodes.slice(i, i + 100));
+
+  if (!chunks.length) {
+    return {
+      ok: false,
+      source: "unavailable",
+      checkInISO: args.checkInISO,
+      checkOutISO: args.checkOutISO,
+      offers: [],
+      error: "no-hotel-codes",
+    };
+  }
+
+  const t0 = Date.now();
+  const settled = await Promise.all(
+    chunks.map((codes, i) => {
+      const sentAt = Date.now() - t0;
+      return searchHotels({ ...rest, hotelCodes: codes }).then((r) => {
+        console.info(
+          `[tbo-hotel] batch ${i + 1}/${chunks.length} · ${codes.length} codes · sent +${sentAt}ms · done +${Date.now() - t0}ms · ${r.ok ? `${r.offers.length} hotels` : r.error}`,
+        );
+        return r;
+      });
+    }),
+  );
+  console.info(`[tbo-hotel] ${chunks.length} parallel batches finished in ${Date.now() - t0}ms`);
+
+  const live = settled.filter((r) => r.ok);
+  if (!live.length) return settled[0];
+  return {
+    ...live[0],
+    offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare),
+  };
+}
+
 // ── PreBook: re-price one room + learn what Book requires ──
 export type HotelValidationInfo = {
   panMandatory: boolean;
@@ -397,6 +449,10 @@ export type PreBookResult = {
   rateConditions?: string[];
   roomPromotions?: string[];
   supplements?: HotelSupplement[];
+  /** Room-level amenities — PreBook carries these even when Search does not. */
+  amenities?: string[];
+  /** TBO's "book by" deadline for the rate, as returned ("DD-MM-YYYY hh:mm:ss", UTC). */
+  lastCancellationDeadline?: string;
   validation?: HotelValidationInfo;
   error?: string;
 };
@@ -431,6 +487,7 @@ export async function preBookHotel(args: {
     NetAmount?: number;
     RateConditions?: string[];
     RoomPromotion?: string[];
+    LastCancellationDeadline?: string;
     // TBO nests supplements per room as an array of arrays.
     Supplements?: RawSupplement[][];
     ValidationInfo?: RawVI;
@@ -483,7 +540,11 @@ export async function preBookHotel(args: {
     mealType: room.MealType,
     inclusion: room.Inclusion,
     rateConditions: (room.RateConditions ?? []).filter(Boolean),
-    roomPromotions: (room.RoomPromotion ?? []).filter(Boolean),
+    roomPromotions: strList(room.RoomPromotion),
+    // Verified live: PreBook returns a room-level Amenities list (Search does not),
+    // which is what TBO's portal checkpoint 24 looks for on the room/book pages.
+    amenities: strList(room.Amenities).length ? strList(room.Amenities) : undefined,
+    lastCancellationDeadline: room.LastCancellationDeadline,
     supplements: (room.Supplements ?? []).flat().map((s) => ({
       type: s.Type,
       description: s.Description,

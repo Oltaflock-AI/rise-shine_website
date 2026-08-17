@@ -69,6 +69,8 @@ type Quote = {
   rateConditions?: string[];
   roomPromotions?: string[];
   supplements?: { type?: string; description?: string; price?: number; currency?: string }[];
+  amenities?: string[];
+  lastCancellationDeadline?: string;
   validation?: Validation;
   error?: string;
 };
@@ -252,17 +254,32 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     setBooking(true);
     setBooked(null);
 
-    let order: { ok: boolean; orderId?: string; amount?: number; currency?: string; keyId?: string; error?: string; rule?: string };
+    let order: {
+      ok: boolean;
+      orderId?: string;
+      amount?: number;
+      currency?: string;
+      keyId?: string;
+      error?: string;
+      rule?: string;
+      unpaidBookingAllowed?: boolean;
+    };
     try {
       const r = await fetch("/api/hotels/payment/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(commonPayload()),
       });
-      // No unpaid path: a 503 stops the booking rather than booking for free. See the
-      // matching note in BookingForm — with live TBO creds this branch would otherwise
-      // hold a real room against agency credit with no money collected.
       if (r.status === 503) {
+        // No payment gateway. The SERVER decides whether booking may still proceed:
+        // on TBO's certification hosts an unpaid booking is the intended flow, while
+        // against live credentials it would hold a real room on agency credit with no
+        // money collected — so there the booking stops here.
+        const j = (await r.json().catch(() => ({}))) as { unpaidBookingAllowed?: boolean };
+        if (j.unpaidBookingAllowed) {
+          await sendToBook(null);
+          return;
+        }
         setBooked({
           ok: false,
           error:
@@ -608,9 +625,10 @@ function RateTerms({ quote }: { quote: Quote }) {
   const promos = quote.roomPromotions ?? [];
   const supplements = quote.supplements ?? [];
   const policies = quote.cancelPolicies ?? [];
+  const amenities = quote.amenities ?? [];
   const [showAll, setShowAll] = useState(false);
-  if (!quote.mealType && !quote.inclusion && !conditions.length && !promos.length && !supplements.length && !policies.length)
-    return null;
+  // Never returns null: TBO's verifier must be able to find the rate's terms on the
+  // book page for EVERY rate, including one whose supplier sends no conditions.
   const shown = showAll ? conditions : conditions.slice(0, 3);
 
   return (
@@ -670,21 +688,35 @@ function RateTerms({ quote }: { quote: Quote }) {
             </ul>
           </div>
         )}
-        {conditions.length > 0 && (
+        {amenities.length > 0 && (
           <div>
-            <p className="font-semibold">Rate conditions:</p>
+            <p className="font-semibold">Room amenities:</p>
+            <p className="mt-1 text-muted">{amenities.join(" · ")}</p>
+          </div>
+        )}
+        {quote.lastCancellationDeadline && (
+          <p className="text-muted">
+            <span className="font-semibold text-ink">Last cancellation deadline:</span>{" "}
+            {quote.lastCancellationDeadline} (UTC)
+          </p>
+        )}
+        <div>
+          <p className="font-semibold">Rate conditions:</p>
+          {conditions.length === 0 ? (
+            <p className="mt-1 text-muted">The hotel returns no additional rate conditions for this rate.</p>
+          ) : (
             <ul className="mt-1 list-disc pl-5 text-muted">
               {shown.map((c, i) => (
                 <li key={i}>{c}</li>
               ))}
             </ul>
-            {conditions.length > 3 && (
-              <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 font-semibold text-red">
-                {showAll ? "Show fewer conditions" : `Show all ${conditions.length} conditions`}
-              </button>
-            )}
-          </div>
-        )}
+          )}
+          {conditions.length > 3 && (
+            <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 font-semibold text-red">
+              {showAll ? "Show fewer conditions" : `Show all ${conditions.length} conditions`}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

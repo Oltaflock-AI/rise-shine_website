@@ -1,4 +1,4 @@
-import { searchHotels, CITY_SEARCH_CODE_CEILING, type RoomOccupancy } from "@/lib/tbo-hotel";
+import { searchCityHotels, CITY_SEARCH_CODE_CEILING, type RoomOccupancy } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
 import { tooMany } from "@/lib/rate-limit";
 
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       const stubs = await hotelCodesByCity(body.cityCode);
       // TBO caps one Search RQ at 100 HotelCodes; bigger cities are covered
       // with parallel ≤100-code requests (their recommendation) rather than
-      // truncating to the first hundred. 300 keeps latency + load bounded.
+      // truncating to the first hundred; the ceiling bounds latency and load.
       hotelCodes = stubs.slice(0, CITY_SEARCH_CODE_CEILING).map((s) => s.code);
     } catch {
       return Response.json({ ok: false, error: "Could not resolve hotels for that city." }, { status: 502 });
@@ -68,28 +68,15 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: 'Provide "hotelCodes" or a "cityCode".' }, { status: 400 });
   }
 
-  const chunks: string[][] = [];
-  for (let i = 0; i < hotelCodes.length; i += 100) chunks.push(hotelCodes.slice(i, i + 100));
-  const settled = await Promise.all(
-    chunks.map((codes) =>
-      searchHotels({
-        checkInISO: body.checkIn!,
-        checkOutISO: body.checkOut!,
-        hotelCodes: codes,
-        nationality: body.nationality || "IN",
-        rooms,
-        refundableOnly: body.refundableOnly,
-        mealType: body.mealType,
-      }),
-    ),
-  );
-
-  // "No availability" chunks are normal for a city sweep — merge whatever
-  // priced, cheapest hotel first; only fail when every chunk failed.
-  const live = settled.filter((r) => r.ok);
-  const result = live.length
-    ? { ...live[0], offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare) }
-    : settled[0];
+  const result = await searchCityHotels({
+    checkInISO: body.checkIn,
+    checkOutISO: body.checkOut,
+    hotelCodes,
+    nationality: body.nationality || "IN",
+    rooms,
+    refundableOnly: body.refundableOnly,
+    mealType: body.mealType,
+  });
 
   return Response.json(result, { status: result.ok ? 200 : 502 });
 }

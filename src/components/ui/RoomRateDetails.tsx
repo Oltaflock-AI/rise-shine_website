@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Loader2, Check, BadgePercent, Wallet, FileText, ShieldCheck } from "lucide-react";
+import { ChevronDown, Loader2, Check, BadgePercent, Wallet, FileText, ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format-date";
 
@@ -26,6 +26,8 @@ type Quote = {
   rateConditions?: string[];
   roomPromotions?: string[];
   supplements?: { type?: string; description?: string; price?: number; currency?: string }[];
+  amenities?: string[];
+  lastCancellationDeadline?: string;
   error?: string;
 };
 
@@ -175,16 +177,36 @@ export function RoomRateDetails({
                 </div>
               )}
 
-              {(quote.rateConditions ?? []).length > 0 && (
-                <div className="flex items-start gap-1.5 text-muted">
-                  <FileText size={14} className="mt-0.5 flex-none text-red" aria-hidden />
-                  <div>
-                    <span className="font-semibold text-ink">Rate conditions</span>
+              {/* Always rendered, even when the supplier returns none — a verifier
+                  (and a guest) must be able to see WHICH conditions apply, and
+                  "none" is itself an answer. TBO portal checkpoint 23. */}
+              <div className="flex items-start gap-1.5 text-muted">
+                <FileText size={14} className="mt-0.5 flex-none text-red" aria-hidden />
+                <div>
+                  <span className="font-semibold text-ink">Rate conditions</span>
+                  {(quote.rateConditions ?? []).length > 0 ? (
                     <ul className="list-disc pl-4">
                       {quote.rateConditions!.map((c, i) => (
                         <li key={i}>{c}</li>
                       ))}
                     </ul>
+                  ) : (
+                    <p>The hotel returns no additional rate conditions for this rate.</p>
+                  )}
+                  {quote.lastCancellationDeadline && (
+                    <p className="mt-1">
+                      Last cancellation deadline: {quote.lastCancellationDeadline} (UTC)
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {(quote.amenities ?? []).length > 0 && (
+                <div className="flex items-start gap-1.5 text-muted">
+                  <Sparkles size={14} className="mt-0.5 flex-none text-red" aria-hidden />
+                  <div>
+                    <span className="font-semibold text-ink">Room amenities</span>
+                    <p>{quote.amenities!.join(" · ")}</p>
                   </div>
                 </div>
               )}

@@ -2,6 +2,7 @@ import { preBookHotel } from "@/lib/tbo-hotel";
 import { validateHotelPax, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
 import { createOrder, razorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/razorpay";
 import { getUser } from "@/lib/supabase/server";
+import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 
 // Live re-price + order creation — never cached. Runs PreBook.
 export const dynamic = "force-dynamic";
@@ -21,8 +22,19 @@ export const maxDuration = 120;
  */
 export async function POST(req: Request) {
   if (!razorpayConfigured) {
-    // No keys → the client falls back to the legacy direct-book path (dev/staging).
-    return Response.json({ ok: false, error: "Online payment is not configured." }, { status: 503 });
+    // No keys. Whether the client may still book depends on WHICH TBO stack we are
+    // pointed at, so the answer is decided here (server-side) and not by the browser:
+    // on TBO's certification hosts an unpaid booking is the intended flow — it is how
+    // portal verification is run — while on live hosts it would hold a real room on
+    // agency credit for free, and the booking must simply not happen.
+    return Response.json(
+      {
+        ok: false,
+        unpaidBookingAllowed: hotelUnpaidBookingAllowed(razorpayConfigured),
+        error: "Online payment is not configured.",
+      },
+      { status: 503 },
+    );
   }
 
   let body: { bookingCode?: string; nationality?: string; rooms?: HotelBookRoom[] };
