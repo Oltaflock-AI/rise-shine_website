@@ -118,13 +118,17 @@ export function validateHotelPax(req: HotelBookRequest): string | null {
     }
   }
 
-  // TBO portal checkpoint: two guests may not share the identical name — the
-  // supplier side rejects duplicate CustomerNames across the booking.
-  const seenNames = new Set<string>();
+  // TBO portal checkpoint 29: no two guests on one booking may share a FIRST
+  // name — not merely a full name. Confirmed with TBO on 17-Aug-2026, so this is
+  // deliberately stricter than "same person twice": "Rahul Shah" and "Rahul
+  // Mehta" cannot ride on the same booking either.
+  const seenFirstNames = new Set<string>();
   for (const p of req.rooms.flatMap((r) => r.passengers)) {
-    const key = `${(p.firstName ?? "").trim().toUpperCase()} ${(p.lastName ?? "").trim().toUpperCase()}`;
-    if (seenNames.has(key)) return `Two guests can't share the same name (${key.trim()}) — please use each guest's full name.`;
-    seenNames.add(key);
+    const first = (p.firstName ?? "").trim().toUpperCase();
+    if (!first) continue; // the empty-name check above already reports this
+    if (seenFirstNames.has(first))
+      return `Two guests can't share the first name "${(p.firstName ?? "").trim()}" — TBO needs a different first name for every guest on a booking.`;
+    seenFirstNames.add(first);
   }
 
   if (v?.panMandatory) {

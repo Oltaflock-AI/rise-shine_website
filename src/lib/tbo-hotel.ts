@@ -210,7 +210,7 @@ function strList(v: string[] | string | undefined): string[] {
  * adjustment is the B2C floor: a selling price may never sit below the
  * RecommendedSellingRate. No rounding — TBO checks the exact fare.
  */
-function sellingFare(r: { TotalFare?: number; RecommendedSellingRate?: number; RecommendedSellingPrice?: number }): number {
+export function sellingFare(r: { TotalFare?: number; RecommendedSellingRate?: number; RecommendedSellingPrice?: number }): number {
   const rsp = r.RecommendedSellingRate ?? r.RecommendedSellingPrice ?? 0;
   return Math.max(r.TotalFare ?? 0, rsp);
 }

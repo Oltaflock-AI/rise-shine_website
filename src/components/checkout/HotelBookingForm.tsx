@@ -245,10 +245,20 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
   /** Collect payment (Razorpay), then book. Money is captured BEFORE Book; the server refunds if Book fails. */
   async function submit() {
     // Light client check; the order route re-validates authoritatively before charging.
+    const firstNames = new Set<string>();
     for (const g of guests) {
       if (!g.first.trim() || !g.last.trim()) return setBooked({ ok: false, rule: true, error: "Every guest needs a first and last name." });
       if (g.lead && (!g.email.trim() || !g.phone.trim()))
         return setBooked({ ok: false, rule: true, error: "Each room's lead guest needs an email and phone." });
+      // TBO accepts only one guest per first name on a booking, whatever the surname.
+      const first = g.first.trim().toUpperCase();
+      if (firstNames.has(first))
+        return setBooked({
+          ok: false,
+          rule: true,
+          error: `Two guests can't share the first name "${g.first.trim()}" — please give each guest their own first name.`,
+        });
+      firstNames.add(first);
     }
 
     setBooking(true);
