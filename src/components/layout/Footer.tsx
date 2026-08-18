@@ -24,6 +24,7 @@ const footerCols: { heading: string; links: { label: string; href: string }[] }[
         { label: "Plan My Trip", href: "/plan-my-trip" },
         { label: "Terms & Conditions", href: "/terms" },
         { label: "Cancellation & Refund", href: "/refund-policy" },
+        { label: "Privacy Policy", href: "/privacy" },
       ],
     },
   ];
