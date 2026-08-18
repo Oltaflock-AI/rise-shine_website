@@ -16,7 +16,7 @@ const API_BASE = "https://api.elevenlabs.io/v1/convai";
 
 /**
  * Unlike the dashboard, nothing here is hardcoded: the site must build and boot
- * without ElevenLabs credentials (same rule as TBO/Razorpay/Resend), so callers
+ * without ElevenLabs credentials (same rule as TBO/Cashfree/Resend), so callers
  * check `elevenLabsConfigured` and degrade instead of throwing at import time.
  */
 export const elevenLabsConfigured = Boolean(

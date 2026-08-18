@@ -6,46 +6,7 @@ import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "l
 import { Button } from "@/components/ui/Button";
 import { BookingDetailCheck } from "./BookingDetailCheck";
 import { formatDate } from "@/lib/format-date";
-
-// ── Razorpay hosted checkout ──
-type RzpResponse = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
-type RzpOptions = {
-  key: string;
-  order_id: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description?: string;
-  prefill?: { name?: string; email?: string; contact?: string };
-  notes?: Record<string, string>;
-  theme?: { color?: string };
-  handler: (r: RzpResponse) => void;
-  modal?: { ondismiss?: () => void };
-};
-type RzpInstance = { open: () => void; on: (e: string, cb: (r: { error?: { description?: string } }) => void) => void };
-declare global {
-  interface Window {
-    Razorpay?: new (o: RzpOptions) => RzpInstance;
-  }
-}
-const RZP_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-function loadRazorpay(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${RZP_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve(true), { once: true });
-      existing.addEventListener("error", () => resolve(false), { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = RZP_SRC;
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
+import { openCashfreeCheckout, type CashfreeMode } from "@/lib/cashfree-checkout";
 
 // ── quote/booked shapes (subset of the API responses) ──
 type Validation = {
@@ -82,6 +43,8 @@ type Booked = {
   confirmationNo?: string;
   bookingRefNo?: string;
   refunded?: boolean;
+  /** Server says the order was never paid — worded as "not charged", not as a failure. */
+  unpaid?: boolean;
   error?: string;
 };
 
@@ -219,22 +182,33 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     };
   }
 
-  /** POST /api/hotels/book — `payment` present once Razorpay confirmed (else direct book). */
-  async function sendToBook(payment: RzpResponse | null) {
+  /**
+   * POST /api/hotels/book — book the room, passing the Cashfree order the guest paid
+   * (null on the certification hosts, where booking runs without a gateway).
+   *
+   * Only the order id is sent; the server re-reads the order from Cashfree and refuses
+   * to book unless it is PAID and bound to this rate. `bookingCode` is overridden with
+   * the one PreBook returned at order time, because that is what the payment is bound
+   * to — a re-PreBooked code would not match.
+   */
+  async function sendToBook(orderId: string | null, bookingCode?: string) {
     try {
       const r = await fetch("/api/hotels/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...commonPayload(),
-          payment: payment
-            ? { orderId: payment.razorpay_order_id, paymentId: payment.razorpay_payment_id, signature: payment.razorpay_signature }
-            : undefined,
+          ...(bookingCode ? { bookingCode } : {}),
+          payment: orderId ? { orderId } : undefined,
         }),
       });
       const parsed = (await r.json()) as Booked;
       if (parsed.ok) trackEvent("booking_confirmed", { kind: "hotel" });
-      setBooked(parsed);
+      setBooked(
+        parsed.unpaid
+          ? { ok: false, error: "Payment was not completed — you have not been charged." }
+          : parsed,
+      );
     } catch {
       setBooked({ ok: false, error: "Network error — please try again." });
     } finally {
@@ -242,7 +216,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     }
   }
 
-  /** Collect payment (Razorpay), then book. Money is captured BEFORE Book; the server refunds if Book fails. */
+  /** Collect payment (Cashfree), then book. Money is taken BEFORE Book; the server refunds if Book fails. */
   async function submit() {
     // Light client check; the order route re-validates authoritatively before charging.
     const firstNames = new Set<string>();
@@ -267,9 +241,9 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     let order: {
       ok: boolean;
       orderId?: string;
-      amount?: number;
-      currency?: string;
-      keyId?: string;
+      paymentSessionId?: string;
+      mode?: CashfreeMode;
+      bookingCode?: string;
       error?: string;
       rule?: string;
       unpaidBookingAllowed?: boolean;
@@ -305,7 +279,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       return;
     }
 
-    if (!order.ok || !order.orderId || !order.keyId) {
+    if (!order.ok || !order.orderId || !order.paymentSessionId) {
       // Includes a 422 pre-charge validation failure — nothing was charged.
       setBooked({ ok: false, error: order.error ?? "Could not start payment.", rule: Boolean(order.rule) });
       setBooking(false);
@@ -313,39 +287,24 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     }
 
     trackEvent("payment_started", { kind: "hotel" });
-    const ready = await loadRazorpay();
-    if (!ready || !window.Razorpay) {
+    const result = await openCashfreeCheckout({
+      mode: order.mode ?? "sandbox",
+      paymentSessionId: order.paymentSessionId,
+    });
+    if (!result) {
       setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });
       setBooking(false);
       return;
     }
+    if (result.redirect) {
+      // In-app browsers can't host the popup; Cashfree takes over the page instead.
+      setBooked({ ok: false, error: "Taking you to the payment page…" });
+      return;
+    }
 
-    const lead = guests.find((g) => g.lead);
-    const rzp = new window.Razorpay({
-      key: order.keyId,
-      order_id: order.orderId,
-      amount: order.amount ?? 0,
-      currency: order.currency ?? "INR",
-      name: "Rise & Shine Travels",
-      description: `${b.hotel ?? "Hotel"} · ${formatDate(b.checkIn)} → ${formatDate(b.checkOut)}`,
-      prefill: { email: lead?.email, contact: lead?.phone },
-      notes: { bookingCode: b.bookingCode ?? "" },
-      theme: { color: "#e11d2a" },
-      handler: (resp) => {
-        void sendToBook(resp);
-      },
-      modal: {
-        ondismiss: () => {
-          setBooking(false);
-          setBooked({ ok: false, error: "Payment was cancelled — you have not been charged." });
-        },
-      },
-    });
-    rzp.on("payment.failed", (resp) => {
-      setBooking(false);
-      setBooked({ ok: false, error: resp?.error?.description ?? "Payment failed — you have not been charged." });
-    });
-    rzp.open();
+    // Ask the SERVER whether the order is paid, whatever the popup reported — a guest
+    // who pays then closes the window still gets their room rather than a silent charge.
+    await sendToBook(order.orderId, order.bookingCode);
   }
 
   // ── states ──

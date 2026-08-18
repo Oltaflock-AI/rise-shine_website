@@ -20,8 +20,8 @@ function toDate(s?: string): string | null {
   return m ? m[1] : null;
 }
 
-/** A confirmed Razorpay payment, mirrored alongside the booking for the account view. */
-export type BookingPayment = { paymentId: string; orderId: string; amountInr: number };
+/** A confirmed Cashfree payment, mirrored alongside the booking for the account view. */
+export type BookingPayment = { cfPaymentId: string; orderId: string; amountInr: number };
 
 /**
  * Insert one `bookings` row (owned by `userId`) plus its `passengers`. Only
@@ -58,8 +58,8 @@ export async function saveBookingHistory(
       fare_inr: result.fareInr ?? null,
       invoice_no: result.invoiceNo ?? null,
       ticket_numbers: result.ticketNumbers?.length ? result.ticketNumbers : null,
-      razorpay_order_id: payment?.orderId ?? null,
-      razorpay_payment_id: payment?.paymentId ?? null,
+      cf_order_id: payment?.orderId ?? null,
+      cf_payment_id: payment?.cfPaymentId ?? null,
       amount_paid_inr: payment?.amountInr ?? null,
     })
     .select("id")
@@ -136,8 +136,8 @@ export async function saveHotelBookingHistory(
       confirmation_no: result.confirmationNo ?? null,
       booking_ref_no: result.bookingRefNo ?? null,
       fare_inr: Math.round(req.netAmount) || null,
-      razorpay_order_id: payment?.orderId ?? null,
-      razorpay_payment_id: payment?.paymentId ?? null,
+      cf_order_id: payment?.orderId ?? null,
+      cf_payment_id: payment?.cfPaymentId ?? null,
       amount_paid_inr: payment?.amountInr ?? null,
     })
     .select("id")

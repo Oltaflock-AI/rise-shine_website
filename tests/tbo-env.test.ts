@@ -64,17 +64,17 @@ describe("tboIsLive", () => {
 });
 
 describe("bookingBlockedForMissingPayments", () => {
-  it("blocks live TBO when Razorpay is not configured", async () => {
+  it("blocks live TBO when Cashfree is not configured", async () => {
     const { bookingBlockedForMissingPayments } = await load({ ...CLEARED, TBO_BOOK_URL: LIVE_BOOK });
     expect(bookingBlockedForMissingPayments(false)).toBe(true);
   });
 
-  it("allows live TBO once Razorpay is configured", async () => {
+  it("allows live TBO once Cashfree is configured", async () => {
     const { bookingBlockedForMissingPayments } = await load({ ...CLEARED, TBO_BOOK_URL: LIVE_BOOK });
     expect(bookingBlockedForMissingPayments(true)).toBe(false);
   });
 
-  it("leaves staging bookable without Razorpay, so certification demos still run", async () => {
+  it("leaves staging bookable without Cashfree, so certification demos still run", async () => {
     const { bookingBlockedForMissingPayments } = await load(CLEARED);
     expect(bookingBlockedForMissingPayments(false)).toBe(false);
   });
@@ -135,8 +135,41 @@ describe("hotel payment guards", () => {
     expect(hotelUnpaidBookingAllowed(true)).toBe(false);
   });
 
-  it("allows live hotels once Razorpay is configured", async () => {
+  it("allows live hotels once Cashfree is configured", async () => {
     const { hotelBookingBlockedForMissingPayments } = await load({ ...CLEARED, TBO_HOTEL_URL: LIVE_HOTEL });
     expect(hotelBookingBlockedForMissingPayments(true)).toBe(false);
+  });
+});
+
+/**
+ * The sandbox-keys-against-live-TBO hole.
+ *
+ * `cashfreeConfigured` is true for sandbox keys, so passing it to these guards would
+ * let a live TBO ticket be issued for play money. The guards must be fed
+ * `cashfreePaymentsLive` instead. These cases pin that distinction, because the two
+ * flags are one word apart at the call site and swapping them fails silently.
+ *
+ * The argument below is `false` precisely because it stands in for sandbox Cashfree:
+ * keys present, settling nothing.
+ */
+describe("live TBO requires LIVE payments, not merely configured ones", () => {
+  it("blocks live flights when payments are configured but only in sandbox", async () => {
+    const { bookingBlockedForMissingPayments } = await load({ ...CLEARED, TBO_SEARCH_URL: LIVE_SEARCH });
+    expect(bookingBlockedForMissingPayments(false)).toBe(true);
+  });
+
+  it("blocks live hotels when payments are configured but only in sandbox", async () => {
+    const { hotelBookingBlockedForMissingPayments } = await load({
+      ...CLEARED,
+      TBO_HOTEL_URL: LIVE_HOTEL,
+      TBO_HOTEL_BE_URL: LIVE_HOTEL_BE,
+    });
+    expect(hotelBookingBlockedForMissingPayments(false)).toBe(true);
+  });
+
+  it("still lets certification hosts run unpaid, whatever the payment mode", async () => {
+    const { hotelBookingBlockedForMissingPayments, hotelUnpaidBookingAllowed } = await load(CLEARED);
+    expect(hotelBookingBlockedForMissingPayments(false)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(false)).toBe(true);
   });
 });

@@ -10,13 +10,7 @@ import {
   refundNoticeEmail,
 } from "@/lib/email";
 import { alertOps } from "@/lib/alerts";
-import {
-  razorpayConfigured,
-  verifyPaymentSignature,
-  fetchPayment,
-  fetchOrder,
-  refundPayment,
-} from "@/lib/razorpay";
+import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, flightBind } from "@/lib/cashfree";
 import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
 
 // Live TBO booking calls — never cached, and Book/Ticket can run to 300s.
@@ -24,21 +18,22 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type Payment = { orderId?: string; paymentId?: string; signature?: string };
+type Payment = { orderId?: string };
 
-/** The booking payload plus the Razorpay handles from a completed checkout. */
+/** The booking payload plus the Cashfree order the customer paid. */
 type Incoming = IncomingBooking & {
-  /** Required when payment is configured; carries the signed order/payment ids. */
+  /** Required when payment is configured. Only OUR order id — Cashfree issues no
+   *  client-side receipt worth trusting, so the server re-reads the order itself. */
   payment?: Payment;
 };
 
-/** A payment we have independently confirmed captured, kept so we can refund it if TBO fails. */
-type ConfirmedPayment = { paymentId: string; orderId: string; amountInr: number };
+/** A payment we have independently confirmed paid, kept so we can refund it if TBO fails. */
+type ConfirmedPayment = { cfPaymentId: string; orderId: string; amountInr: number };
 
 /**
  * POST /api/book — collect payment (when configured) then run TBO's booking flow.
  *
- * When Razorpay is configured a captured, signature-verified payment is REQUIRED
+ * When Cashfree is configured a PAID, server-verified order is REQUIRED
  * before a single TBO call is made — and if ticketing then fails, the payment is
  * refunded automatically (money must never be held for a ticket the customer never
  * got). With no keys the flow degrades to a direct-ticket path so dev/staging can still
@@ -60,11 +55,11 @@ export async function POST(req: Request) {
   const bookingReq = parsed.req;
 
   // ── Fail closed on live ──
-  // Payment is only enforced below when Razorpay is configured, which was right for
+  // Payment is only enforced below when Cashfree is configured, which was right for
   // staging certification. Against LIVE TBO credentials that same branch would ticket
   // for free, so refuse outright rather than book unpaid.
-  if (bookingBlockedForMissingPayments(razorpayConfigured)) {
-    console.error("[api/book] refused: live TBO credentials with no Razorpay configuration.");
+  if (bookingBlockedForMissingPayments(cashfreePaymentsLive)) {
+    console.error("[api/book] refused: live TBO credentials with no LIVE Cashfree configuration (sandbox keys settle nothing).");
     return Response.json(
       { ok: false, error: "Online booking is temporarily unavailable. Please call us to book." },
       { status: 503 },
@@ -72,25 +67,28 @@ export async function POST(req: Request) {
   }
 
   // ── Payment gate ──
-  // Confirm the money is actually captured BEFORE touching TBO. The order was priced
+  // Confirm the money actually moved BEFORE touching TBO. The order was priced
   // server-side (/api/payment/order), so the order's amount — not any client number —
-  // is the amount we accept.
+  // is the amount we accept, and the order's `bind` tag proves it was created for THIS
+  // itinerary rather than some cheaper one the customer paid for earlier.
   let payment: ConfirmedPayment | null = null;
-  if (razorpayConfigured) {
-    const p = body.payment;
-    if (!p?.orderId || !p?.paymentId || !p?.signature) {
-      return Response.json({ ok: false, error: "Payment is required before ticketing." }, { status: 402 });
-    }
-    if (!verifyPaymentSignature({ orderId: p.orderId, paymentId: p.paymentId, signature: p.signature })) {
-      return Response.json({ ok: false, error: "Payment could not be verified." }, { status: 400 });
+  if (cashfreeConfigured) {
+    const orderId = body.payment?.orderId;
+    if (!orderId) {
+      return Response.json({ ok: false, unpaid: true, error: "Payment is required before ticketing." }, { status: 402 });
     }
     try {
-      const [pay, order] = await Promise.all([fetchPayment(p.paymentId), fetchOrder(p.orderId)]);
-      const captured = pay.status === "captured" && pay.order_id === p.orderId && pay.amount === order.amount;
-      if (!captured) {
-        return Response.json({ ok: false, error: "Payment has not been captured." }, { status: 402 });
+      const confirmed = await confirmPaidOrder({
+        orderId,
+        expectBind: flightBind(bookingReq.traceId, bookingReq.resultIndex),
+      });
+      if (!confirmed.ok) {
+        return Response.json(
+          { ok: false, unpaid: confirmed.unpaid, error: confirmed.error },
+          { status: confirmed.unpaid ? 402 : 400 },
+        );
       }
-      payment = { paymentId: pay.id, orderId: order.id, amountInr: Math.round(pay.amount / 100) };
+      payment = confirmed.payment;
     } catch (e) {
       console.error("[api/book] payment verification failed:", e);
       return Response.json(
@@ -106,14 +104,15 @@ export async function POST(req: Request) {
   // up front: the customer is never left out of pocket for a ticket they didn't get.
   if (payment && !result.ok) {
     try {
-      await refundPayment(payment.paymentId, {
-        notes: { reason: "ticketing_failed", traceId: bookingReq.traceId, orderId: payment.orderId },
+      await refundOrder(payment.orderId, {
+        amountInr: payment.amountInr,
+        note: `Ticketing failed for TBO trace ${bookingReq.traceId}`,
       });
       await alertOps("Flight ticketing failed after capture — auto-refunded", {
         route: `${bookingReq.origin} → ${bookingReq.destination}`,
         departDate: bookingReq.departDate,
         traceId: bookingReq.traceId,
-        paymentId: payment.paymentId,
+        paymentId: payment.cfPaymentId,
         amountInr: payment.amountInr,
         error: result.error,
       });
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
         try {
           await sendEmail({
             to,
-            ...refundNoticeEmail({ kind: "flight", amountInr: payment.amountInr, reference: payment.paymentId }),
+            ...refundNoticeEmail({ kind: "flight", amountInr: payment.amountInr, reference: payment.cfPaymentId }),
           });
         } catch (e) {
           console.error("[api/book] refund email failed (refund unaffected):", e);
@@ -138,7 +137,7 @@ export async function POST(req: Request) {
       // A failed refund must be loud — it needs manual settlement.
       await alertOps("URGENT: flight refund FAILED — settle manually", {
         route: `${bookingReq.origin} → ${bookingReq.destination}`,
-        paymentId: payment.paymentId,
+        paymentId: payment.cfPaymentId,
         orderId: payment.orderId,
         amountInr: payment.amountInr,
         ticketError: result.error,

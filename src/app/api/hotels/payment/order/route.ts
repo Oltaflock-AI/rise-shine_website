@@ -1,6 +1,12 @@
 import { preBookHotel } from "@/lib/tbo-hotel";
 import { validateHotelPax, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
-import { createOrder, razorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/razorpay";
+import {
+  createOrder,
+  cashfreeConfigured,
+  CASHFREE_MODE,
+  hotelBind,
+  newOrderId,
+} from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
 import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 
@@ -11,17 +17,17 @@ export const maxDuration = 120;
 
 /**
  * POST /api/hotels/payment/order — re-price a room (PreBook), validate the guests,
- * then open a Razorpay order for it.
+ * then open a Cashfree order for it.
  *
  * PreBook is the ONLY source of truth for the amount charged (never a client number),
  * and the same PreBook `ValidationInfo` drives guest validation — so a booking TBO
- * would reject fails here, before the customer is ever charged. Capture is then
- * confirmed in /api/hotels/book before Book is called.
+ * would reject fails here, before the customer is ever charged. Payment is then
+ * confirmed server-side in /api/hotels/book (Get Order) before Book is called.
  *
  * Body: same as /api/hotels/book minus payment: { bookingCode, nationality?, rooms }.
  */
 export async function POST(req: Request) {
-  if (!razorpayConfigured) {
+  if (!cashfreeConfigured) {
     // No keys. Whether the client may still book depends on WHICH TBO stack we are
     // pointed at, so the answer is decided here (server-side) and not by the browser:
     // on TBO's certification hosts an unpaid booking is the intended flow — it is how
@@ -30,7 +36,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         ok: false,
-        unpaidBookingAllowed: hotelUnpaidBookingAllowed(razorpayConfigured),
+        unpaidBookingAllowed: hotelUnpaidBookingAllowed(cashfreeConfigured),
         error: "Online payment is not configured.",
       },
       { status: 503 },
@@ -68,20 +74,50 @@ export async function POST(req: Request) {
 
   const user = await getUser().catch(() => null); // audit note only
 
+  // Cashfree requires a customer phone. TBO already mandates email + phone on each
+  // room's lead guest (validated just above), so take it from there.
+  const lead = body.rooms[0]?.passengers?.find((p) => p.leadPassenger) ?? body.rooms[0]?.passengers?.[0];
+  const phone = String(lead?.phone ?? "").trim();
+  if (!phone) {
+    return Response.json({ ok: false, error: "A contact phone number is required.", rule: "pax" }, { status: 422 });
+  }
+
   try {
+    const orderId = newOrderId("rsh");
     const order = await createOrder({
+      orderId,
       amountInr,
-      receipt: `rsh_${body.bookingCode}`.slice(0, 40),
-      notes: { bookingCode: body.bookingCode, userId: user?.id ?? "guest" },
+      customer: {
+        id: user?.id ?? `guest_${orderId}`,
+        phone,
+        email: String(lead?.email ?? "").trim() || undefined,
+        name: [lead?.firstName, lead?.lastName].filter(Boolean).join(" ") || undefined,
+      },
+      tags: {
+        // Bound to the PreBooked rate, so a paid order can only ticket THAT room.
+        bind: hotelBind(pb.bookingCode),
+        kind: "hotel",
+        userId: user?.id ?? "guest",
+      },
+      note: "Hotel booking",
+      expiryMinutes: 16, // Cashfree's floor; see ORDER_EXPIRY_FLOOR_MIN
     });
+
+    if (!order.payment_session_id) {
+      return Response.json({ ok: false, error: "Could not start payment." }, { status: 502 });
+    }
+
     return Response.json({
       ok: true,
-      orderId: order.id,
-      amount: order.amount, // paise — what Razorpay Checkout must open with
-      currency: order.currency,
-      keyId: RAZORPAY_KEY_ID,
+      orderId: order.order_id,
+      paymentSessionId: order.payment_session_id,
+      mode: CASHFREE_MODE, // the browser SDK must be initialised in the matching mode
+      amount: order.order_amount, // rupees — Cashfree is not paise-denominated
+      currency: order.order_currency,
       fareInr: amountInr,
       priceChanged: pb.isPriceChanged,
+      // The PreBook code the payment is bound to — the client must book with THIS.
+      bookingCode: pb.bookingCode,
     });
   } catch (e) {
     return Response.json(

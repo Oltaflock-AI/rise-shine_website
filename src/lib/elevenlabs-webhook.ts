@@ -19,7 +19,7 @@ import "server-only";
  * the ElevenLabs dashboard). Signatures older than 30 minutes are rejected — that
  * window is what stops a captured request being replayed at us.
  *
- * Raw REST + node:crypto, no SDK — same house style as lib/razorpay.ts.
+ * Raw REST + node:crypto, no SDK — same house style as lib/cashfree.ts.
  * Docs: https://elevenlabs.io/docs/eleven-agents/workflows/post-call-webhooks
  */
 import crypto from "node:crypto";

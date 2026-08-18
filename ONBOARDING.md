@@ -9,7 +9,7 @@
 Two things living in one Next.js app:
 
 1. **A marketing site** for Rise & Shine Travels, a travel agency in Ahmedabad — packages, itineraries, services, enquiry forms.
-2. **A real online travel agency (OTA)** — live flight and hotel search, booking and ticketing against **TBO (TekTravels)**, with **Razorpay** taking real money.
+2. **A real online travel agency (OTA)** — live flight and hotel search, booking and ticketing against **TBO (TekTravels)**, with **Cashfree Payments** taking real money.
 
 The second part is why this codebase is careful in places that look paranoid. When a bug ships here, a customer is charged and does not get a ticket. Read §7 (Rules that will bite you) before you touch anything under `src/lib/tbo*` or `src/app/api/`.
 
@@ -33,7 +33,7 @@ npm run dev                          # http://localhost:3000
 | Missing keys | What happens |
 |---|---|
 | `TBO_*` | Flight/hotel search returns "unavailable"; marketing site is fully functional |
-| `RAZORPAY_*` | Booking falls back to the legacy **direct-ticket** path (no payment). Dev/staging only |
+| `CASHFREE_*` | Flights refuse to book; hotels fall back to an unpaid Book on TBO's certification hosts only |
 | `NEXT_PUBLIC_SUPABASE_*` | Auth + account pages are inert; `src/proxy.ts` becomes a no-op |
 | `RESEND_API_KEY` | Confirmation/refund emails are silently skipped — bookings never fail on email |
 | `GOOGLE_MAPS_API_KEY` | Testimonials fall back to static reviews in `src/data/`; hotel cards lose review scores |
@@ -74,7 +74,7 @@ src/
 
 supabase/migrations/           # 0001 auth/bookings · 0002 payments cols · 0003 ledger
                                # 0004 hotel cols · 0005 voice_calls
-tests/                         # vitest — booking-request, razorpay signatures, tbo-validate
+tests/                         # vitest — booking-request, cashfree webhook HMAC, tbo-validate
 scripts/                       # fetch-hotel-cities.mjs · flight-cert.mts (certification runner)
 voice-agent/                   # SEPARATE app in the same repo. .vercelignore'd, never deployed
 reference/                     # GIT-IGNORED — live creds + TBO certification evidence
@@ -86,7 +86,7 @@ reference/                     # GIT-IGNORED — live creds + TBO certification 
 
 ## 4. The `src/lib/` layer — what each file owns
 
-Everything TBO/Razorpay/Supabase-admin is **server-only** (most import `"server-only"`, which throws if bundled into a client component).
+Everything TBO/Cashfree/Supabase-admin is **server-only** (most import `"server-only"`, which throws if bundled into a client component).
 
 ### Flights (TBO)
 
@@ -110,7 +110,7 @@ Everything TBO/Razorpay/Supabase-admin is **server-only** (most import `"server-
 
 | File | Owns |
 |---|---|
-| `razorpay.ts` | Create order, verify checkout + webhook HMAC signatures, fetch/confirm capture, refund. Raw REST + `node:crypto` — **no SDK**. |
+| `cashfree.ts` | Create order, `confirmPaidOrder()` (server-side Get Order — the browser gets no signed receipt), refund, webhook HMAC. Raw REST + `node:crypto` — **no SDK**. |
 | `payments-ledger.ts` | Writes the `payments` reconciliation table from the webhook (service-role). |
 | `booking-request.ts` | Parses/normalizes an incoming booking body → `BookingRequest`. Shared by `/api/payment/order` and `/api/book` so both see identical input. |
 | `booking-history.ts` | Mirrors confirmed flight/hotel bookings into `bookings` + `passengers` for the account page. |
@@ -137,9 +137,9 @@ All handlers are thin — they parse, rate-limit, delegate to `lib/`, and shape 
 |---|---|---|---|
 | `GET` | `/api/flights` | Search | `?from=&to=&depart=&return=&adults=&trip=&max=` — from/to accept IATA or city name. Rate limit 20/min. CDN `s-maxage=1800`. |
 | `POST` | `/api/quote` | FareRule + FareQuote | Returns `flags` telling the form which fields TBO demands (PAN/passport/GST/seat/meal). Rate limit 15/min. |
-| `POST` | `/api/payment/order` | **Validate, then open a Razorpay order** | Runs the FULL pre-ticket flow before charging. `maxDuration = 120`. |
+| `POST` | `/api/payment/order` | **Validate, then open a Cashfree order** | Runs the FULL pre-ticket flow before charging. `maxDuration = 120`. |
 | `POST` | `/api/book` | Verify payment → ticket | `maxDuration = 300`. Auto-refunds if ticketing fails after capture. |
-| `POST` | `/api/payment/webhook` | Razorpay server-to-server events | HMAC over the **raw** body. Writes the `payments` ledger. |
+| `POST` | `/api/payment/webhook` | Cashfree server-to-server events | HMAC over the **raw** body. Writes the `payments` ledger. |
 
 ### Hotels
 
@@ -148,7 +148,7 @@ All handlers are thin — they parse, rate-limit, delegate to `lib/`, and shape 
 | `GET` | `/api/hotels/cities` | Destination autocomplete (static dataset, CDN-cached) |
 | `POST` | `/api/hotels` | Search priced rooms — pass `hotelCodes` or a `cityCode` (first 100 hotels) |
 | `POST` | `/api/hotels/quote` | PreBook — re-price + return validation rules |
-| `POST` | `/api/hotels/payment/order` | PreBook + guest validation + Razorpay order |
+| `POST` | `/api/hotels/payment/order` | PreBook + guest validation + Cashfree order |
 | `POST` | `/api/hotels/book` | Verify payment → Book. Auto-refunds on failure |
 | `POST` | `/api/hotels/cancel` | Cancel / poll cancellation. **Auth required + ownership checked** against the account mirror |
 
@@ -176,7 +176,7 @@ Note the search pages (`/flights`, `/hotels`) **do not** call these API routes �
 ### Flight booking — capture, then fulfil
 
 ```
-Browser                     Our server                        TBO / Razorpay
+Browser                     Our server                        TBO / Cashfree
 ────────────────────────────────────────────────────────────────────────────
 search  ──────────────────► /flights (server component) ────► Search
                                                               ↳ TraceId (15-min life)
@@ -188,11 +188,13 @@ fill the form
                                FareRule → FareQuote →
                                all checklist validations →
                                SSR → duplicate guard        ← nothing charged yet
-                            ↳ createOrder(FareQuote total)  ──► Razorpay order
-Razorpay Checkout opens (checkout.js) → customer pays        ──► payment captured
-success ──────────────────► POST /api/book
-                            ↳ verify signature
-                            ↳ re-fetch payment, confirm CAPTURED
+                            ↳ createOrder(FareQuote total)  ──► Cashfree order
+                               + order_tags.bind = this fare      ↳ payment_session_id
+Cashfree popup opens (cashfree.js v3) → customer pays        ──► payment SUCCESS
+done    ──────────────────► POST /api/book  { payment: { orderId } }
+                            ↳ confirmPaidOrder(): Get Order  ──► order_status PAID?
+                               + bind tag matches this fare?     (the browser's own
+                               + a SUCCESS payment row?           result is never trusted)
                             ↳ bookFlight() ──────────────────► Book → Ticket
                                ├ ok   → mirror to `bookings`, email confirmation
                                └ fail → REFUND automatically, alert ops, email customer
@@ -212,18 +214,18 @@ Same shape, different supplier calls: `PreBook` replaces FareQuote as the author
 
 These are not style preferences. Each one exists because it broke, or would break, real money.
 
-1. **Never import `tbo*.ts`, `razorpay.ts`, `supabase/admin.ts`, `alerts.ts`, or `email.ts` from a client component.** They read credentials from `process.env`. Reach them only through `/api/*` or from server components.
+1. **Never import `tbo*.ts`, `cashfree.ts`, `supabase/admin.ts`, `alerts.ts`, or `email.ts` from a client component.** They read credentials from `process.env`. Reach them only through `/api/*` or from server components.
 2. **TraceId expires 15 minutes after Search.** The search cache TTL is 10 minutes — deliberately under it. Don't lengthen it; a stale TraceId fails at Book.
 3. **Match TBO errors by `ErrorCode`, never by message text.** Code `6` = invalid token → refresh and retry once. This is TBO's explicit checklist rule.
 4. **Book/Ticket are NEVER auto-retried.** On timeout, recover via `GetBookingDetails` (`recoverFromTimeout`, polls 20× at 12s). Re-booking double-charges. Hotels recover by `clientReferenceNo`.
 5. **The charged amount always comes from the supplier's re-price** (FareQuote / PreBook), never from the request body.
-6. **Never ticket before confirming capture.** `/api/book` re-fetches the payment from Razorpay and checks `status === "captured"` *and* the amount matches the order — signature alone isn't enough.
+6. **Never ticket before confirming payment server-side.** Cashfree hands the browser no signed receipt, so `/api/book` re-reads the order from Cashfree and requires `order_status === "PAID"`, a matching `order_tags.bind`, and a `SUCCESS` payment row. Nothing the client sends is evidence.
 7. **If fulfilment fails after capture, refund immediately.** If the refund itself fails, `alertOps()` must fire — a failed refund can never be a console line nobody reads.
 8. **On the server, verify the session with `supabase.auth.getUser()`, never `getSession()`.** `getUser()` re-validates the token against Supabase.
 9. **Keep `useAuth()`'s shape stable** — `{ user: {name, email}, ready, login, signup, logout }`. Header, AuthScreen and AccountView all depend on it.
 10. **Only server code with the service-role key writes `bookings`.** Client writes go through RLS; RLS gives users read-only access to their own rows.
 11. **Next 16 renamed `middleware` → `proxy`.** The file is `src/proxy.ts`, it exports `proxy()`, and it runs on the Node.js runtime. Do not create a `middleware.ts`.
-12. **Webhook signatures are computed over the RAW body.** Read `req.text()` and verify before parsing — re-serializing the JSON changes the bytes and breaks the HMAC. Applies to both Razorpay and ElevenLabs.
+12. **Webhook signatures are computed over the RAW body.** Read `req.text()` and verify before parsing — re-serializing the JSON changes the bytes and breaks the HMAC. Applies to both Cashfree and ElevenLabs. Cashfree additionally signs `x-webhook-timestamp + body` and encodes base64, not hex.
 13. **Webhook status codes are an API.** A DB write failure returns `500` so the sender retries; a bad signature or unknown event is terminal and gets `4xx`/`200`.
 14. **Best-effort side effects are `await`ed before responding.** On serverless the instance can freeze the moment you return, so fire-and-forget writes get killed. Wrap them in try/catch so they can never fail a paid booking.
 15. **All user-facing dates go through `formatDate()`** (`src/lib/format-date.ts`) — DD-MM-YY. No raw ISO strings in UI.
@@ -248,10 +250,10 @@ These are not style preferences. Each one exists because it broke, or would brea
 |---|---|---|
 | `profiles` | trigger on `auth.users` | RLS: owner read/insert/update |
 | `travellers` | user | Saved passenger details. RLS: owner all |
-| `bookings` | **service-role only** | Flight *and* hotel (`kind` column, migration 0004). Mirrors PNR/BookingId/status/fare + Razorpay ids. RLS: owner read |
+| `bookings` | **service-role only** | Flight *and* hotel (`kind` column, migration 0004). Mirrors PNR/BookingId/status/fare + Cashfree ids. RLS: owner read |
 | `passengers` | service-role | Per-booking pax + ticket numbers. RLS: read via owned booking |
 | `enquiries` | user | RLS: owner read/insert |
-| `payments` | **webhook, service-role** | Reconciliation ledger keyed by `razorpay_payment_id`. `captured \| failed \| refunded` |
+| `payments` | **webhook, service-role** | Reconciliation ledger keyed by `cf_payment_id`. `captured \| failed \| refunded` |
 | `voice_calls` | voice webhook, service-role | Keyed by `conversation_id`. Audio in the private `voice-call-audio` bucket |
 
 Migrations are plain SQL in `supabase/migrations/`, applied in order. `bookings.status` uses TBO's itinerary status codes (`5` = ticketed, `6` = cancellation requested).
@@ -283,7 +285,7 @@ Migrations are plain SQL in `supabase/migrations/`, applied in order. `bookings.
 - `AGENTS.md` — the Next.js 16 warning.
 - `README.md` — setup, routes, project structure.
 - `node_modules/next/dist/docs/` — the framework docs for the exact version installed. Trust these over anything online.
-- TBO flight API: <https://apidoc.tektravels.com/> · Razorpay: <https://razorpay.com/docs/api/> · Supabase: <https://supabase.com/docs>
+- TBO flight API: <https://apidoc.tektravels.com/> · Cashfree: <https://www.cashfree.com/docs/api-reference/payments/latest/overview> · Supabase: <https://supabase.com/docs>
 
 ---
 
@@ -299,7 +301,7 @@ Migrations are plain SQL in `supabase/migrations/`, applied in order. `bookings.
 | **PreBook** | The hotel equivalent of FareQuote. |
 | **SSR** | Special Service Request — baggage, meals, seats. |
 | **PNR** | The airline's booking reference. |
-| **Capture** | Razorpay has actually taken the money (as opposed to merely authorized). We only ticket after capture. |
+| **Capture** | The money has actually moved. With Cashfree this is `order_status === "PAID"`, confirmed server-side. We only ticket after that. |
 | **RLS** | Row Level Security — Postgres policies that decide which rows a signed-in user can see. |
 | **Certification** | TBO's live test-environment checklist that must pass before production credentials are issued. Done for both flights and hotels. |
 

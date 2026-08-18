@@ -22,7 +22,7 @@ jobs:
         run: npx tsc --noEmit
       - name: Tests
         run: npm test
-      - name: Build (no TBO/Razorpay creds — features degrade by design)
+      - name: Build (no TBO/Cashfree creds — features degrade by design)
         run: npm run build
       - name: Lint (non-blocking)
         run: npm run lint

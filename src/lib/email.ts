@@ -2,7 +2,7 @@ import "server-only";
 
 /**
  * Transactional email via Resend's REST API — raw fetch, no SDK (same pattern
- * as lib/razorpay.ts). Configured with RESEND_API_KEY (+ optional EMAIL_FROM);
+ * as lib/cashfree.ts). Configured with RESEND_API_KEY (+ optional EMAIL_FROM);
  * without a key every send is a silent no-op so the booking flow never depends
  * on email being provisioned. Senders are best-effort by contract: callers
  * fire them AFTER the money/ticket outcome is decided and swallow failures —

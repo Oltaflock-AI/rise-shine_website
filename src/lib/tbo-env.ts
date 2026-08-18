@@ -6,10 +6,10 @@
  * read from the TBO_*_URL vars — unset means staging.
  *
  * This exists for one reason: the payment guard in the booking routes. Payment is only
- * REQUIRED when Razorpay is configured, which is correct for staging — certification
+ * REQUIRED when Cashfree is configured, which is correct for staging — certification
  * needs bookings without a payment gateway. Against live credentials the same branch
  * issues real tickets on agency credit for free, so the guard makes the combination
- * "live TBO + no Razorpay" refuse to book instead of quietly giving stock away.
+ * "live TBO + no Cashfree" refuse to book instead of quietly giving stock away.
  *
  * FLIGHTS and HOTELS are judged separately, because they are separate stacks and can be
  * at different stages: the flight services went live while the hotel services are still
@@ -50,17 +50,21 @@ export function tboHotelIsLive(): boolean {
 }
 
 /**
- * True when we are live but have no way to charge — booking must be refused outright.
- * Fails closed: adding live URLs without payment keys disables booking rather than
- * enabling free ones.
+ * True when we are live but have no way to take REAL money — booking must be refused
+ * outright. Fails closed: adding live URLs without live payment keys disables booking
+ * rather than enabling free ones.
+ *
+ * Pass `cashfreePaymentsLive`, NOT `cashfreeConfigured`. Sandbox keys are "configured"
+ * but settle nothing, so live TBO + sandbox Cashfree would issue a real ticket against
+ * play money — the exact hole this guard exists to close.
  */
-export function bookingBlockedForMissingPayments(razorpayConfigured: boolean): boolean {
-  return tboIsLive() && !razorpayConfigured;
+export function bookingBlockedForMissingPayments(livePaymentsConfigured: boolean): boolean {
+  return tboIsLive() && !livePaymentsConfigured;
 }
 
 /** The hotel equivalent — judged on the hotel hosts, not the flight ones. */
-export function hotelBookingBlockedForMissingPayments(razorpayConfigured: boolean): boolean {
-  return tboHotelIsLive() && !razorpayConfigured;
+export function hotelBookingBlockedForMissingPayments(livePaymentsConfigured: boolean): boolean {
+  return tboHotelIsLive() && !livePaymentsConfigured;
 }
 
 /**
@@ -68,9 +72,9 @@ export function hotelBookingBlockedForMissingPayments(razorpayConfigured: boolea
  *
  * Only on TBO's certification hosts, and only while no payment gateway is configured —
  * which is exactly the state certification runs in. The moment either changes (live
- * hotel hosts, or Razorpay keys present) this returns false and the paid path is the
+ * hotel hosts, or Cashfree keys present) this returns false and the paid path is the
  * only path.
  */
-export function hotelUnpaidBookingAllowed(razorpayConfigured: boolean): boolean {
-  return !razorpayConfigured && !tboHotelIsLive();
+export function hotelUnpaidBookingAllowed(paymentsConfigured: boolean): boolean {
+  return !paymentsConfigured && !tboHotelIsLive();
 }

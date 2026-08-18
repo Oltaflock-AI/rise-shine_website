@@ -18,7 +18,8 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
 - **`src/data/`** — **all copy/content lives here.** Change content by editing data,
   not components.
 - **`supabase/migrations/`** — account, passenger, payment-ledger, hotel-booking,
-  voice-call-log (`0005`) and callback-queue (`0006`) schema. TBO remains canonical;
+  voice-call-log (`0005`), callback-queue (`0006`) and Cashfree column rename
+  (`0007`) schema. TBO remains canonical;
   Supabase is an account-facing mirror.
 - **`voice-agent/`** — separate Next.js 15 app: a dashboard over the ElevenLabs
   conversation API. Its own package manifest; run it from that directory. It is
@@ -39,14 +40,15 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
 | `tbo.ts` | Auth token cache + **Search**; normalizes raw TBO results → `FlightOffer` (per-adult fares, de-dupe, cheapest-first). 10-min result cache. |
 | `tbo-book.ts` | Booking flow: FareRule → FareQuote → SSR → **Book/Ticket** → GetBookingDetails. LCC = Ticket-only; non-LCC = Book→Ticket. |
 | `tbo-validate.ts` | The whole TBO certification checklist: PAN/passport/GST, title normalization, special-fare seat+meal, duplicate guard, per-pax fare split. |
-| `razorpay.ts` | Dormant payment scaffold: Razorpay REST calls, HMAC verification, capture checks, and refunds. Project owners confirm payments are **not implemented/live**. |
+| `cashfree.ts` | Cashfree PG (server): Create Order, `confirmPaidOrder()` (the paid-and-bound gate), refunds, webhook HMAC. Wired but **not yet live** — needs keys + owner sign-off. |
 | `booking-request.ts` | Parse/normalize an incoming booking body → `BookingRequest` (title normalization, casing). Shared by `/api/payment/order` and `/api/book`. |
 | `payments-ledger.ts` | Reconciliation ledger writer — upserts the `payments` table from the webhook (service-role). |
 
 API handlers are thin: `GET /api/flights` (search), `POST /api/quote` (FareQuote →
-which fields the form needs), and `POST /api/book` (booking). Payment-shaped routes
-(`/api/payment/order` and `/api/payment/webhook`) are scaffolding only; do not present
-them as a working integration. All are `runtime = "nodejs"`, `dynamic =
+which fields the form needs), and `POST /api/book` (booking). The payment routes
+(`/api/payment/order` and `/api/payment/webhook`) are a complete Cashfree integration
+but stay inert until the keys are set — see **Payments** below. All are
+`runtime = "nodejs"`, `dynamic =
 "force-dynamic"`; book declares `maxDuration = 300`, order `120`.
 
 **Those durations are aspirational.** The Vercel project is on the **Hobby** plan,
@@ -58,8 +60,8 @@ timeout, and drive sub-daily schedules from an external pinger (see **Voice**).
 
 Hotel search joins TBO's static city/hotel catalogue (`tbo-hotel-static.ts`) with
 live room pricing (`tbo-hotel.ts`). Checkout runs **PreBook** to re-price and discover
-PAN/passport requirements, then calls the booking flow. The hotel Razorpay order,
-capture, and refund code is dormant scaffolding, not an implemented payment system.
+PAN/passport requirements, then calls the booking flow. The hotel Cashfree order,
+verification, and refund path mirrors the flight one and is live-ready but keyless.
 Post-booking detail, voucher, and cancellation calls live in `tbo-hotel-post.ts`.
 Never retry Hotel Book after a timeout; recover by client reference.
 
@@ -135,18 +137,65 @@ loop and a conversation that fails with `max auth retry attempts reached for SIP
 invite` — zero duration, zero credits, no SIP Call SID. That exact misconfiguration
 cost a day on 2026-08-04. Full diagnosis in `platform_docs/elevenlabs.md`.
 
-### Payments (`src/lib/razorpay.ts` + `/api/payment/*`)
+### Payments — Cashfree (`src/lib/cashfree.ts` + `/api/payment/*`)
 
-Project owners confirm that **payments are not implemented**. The repository contains
-a Razorpay-shaped prototype: order creation, signature helpers, capture checks,
-refund branches, a webhook, and ledger migrations. Treat these as dummy/dormant code,
-not as evidence that checkout has been integrated or validated end to end.
+**Cashfree Payments (PG)** is the only gateway. Production keys are set in Vercel
+(`CASHFREE_APP_ID` + `CASHFREE_SECRET_KEY` + `CASHFREE_ENV=production`, 18 Aug 2026),
+but they are inert until this code is deployed. Local runs on sandbox keys. Before real
+customers: sandbox end-to-end, failure-path and abandoned-popup testing, webhook payload
+version set in the dashboard, domain whitelisted, and reconciliation sign-off.
 
-With Razorpay keys absent, `/api/payment/order` returns `503` and the client deliberately
-falls back to `/api/book` without a payment. Therefore the current usable path can book
-against TBO staging/agency credit without charging a customer. Do not add Razorpay keys
-or enable this scaffold without explicit owner approval, sandbox testing, failure-path
-testing, webhook verification, and financial reconciliation sign-off.
+Four things bite anyone who assumes a conventional gateway shape:
+
+- **The browser gets no signed receipt.** `cashfree.checkout()` resolves with
+  `paymentDetails`, but it is unsigned client data and proves nothing. The ONLY
+  confirmation is the server re-reading the order — `confirmPaidOrder()` does Get Order
+  (+ Get Payments) and requires `order_status === "PAID"`. Never gate on the client.
+- **Amounts are rupees with 2 dp, not paise.** No ×100 anywhere.
+- **We mint `order_id`** (`newOrderId()`, unique per Create Order), and **refunds are
+  per order** (`POST /orders/{order_id}/refunds`), not per payment id.
+- **Orders carry a `bind` tag** — a hash of the itinerary (`flightBind`/`hotelBind`).
+  The book routes recompute it and refuse an order paid for something else. Without
+  it, a customer could pay ₹1 on one order and present it against any booking.
+
+The browser loads `sdk.cashfree.com/js/v3/cashfree.js` via `lib/cashfree-checkout.ts`
+(our own types — the npm SDK ships none) and opens a `_modal` popup on the
+`payment_session_id`. There is **no publishable key**; nothing secret reaches the client.
+
+After checkout resolves the client always calls the book route, **even on
+`result.error`** — a customer who pays and then closes the popup must still get their
+ticket rather than a "cancelled" message and a silent charge.
+
+The REST API is pinned to **`2026-01-01`** (`CASHFREE_API_VERSION` overrides). Webhook
+payloads are versioned **separately**, per endpoint in the dashboard — set that to
+`2026-01-01` too. On this version `payment_amount` can be less than `order_amount`
+(offers, surcharge), so `confirmPaidOrder()` returns the **payment** amount: that is
+what gets refunded, mirrored and emailed. Cashfree rejects a refund above the
+transaction amount, so the order total is the wrong number everywhere downstream.
+
+Webhooks (`/api/payment/webhook`) are signed
+`base64(HMAC-SHA256(x-webhook-timestamp + RAW body))` with the **API secret** — there
+is no separate webhook secret. Read `req.text()`; re-serializing rewrites `170.00` →
+`170` and every signature fails. Events: `PAYMENT_SUCCESS_WEBHOOK`,
+`PAYMENT_FAILED_WEBHOOK`, `PAYMENT_USER_DROPPED_WEBHOOK`, `REFUND_STATUS_WEBHOOK`.
+
+With no keys, `/api/payment/order` returns `503` and flights refuse to book (there is
+no unpaid flight path). Hotels still fall back to an unpaid Book, but **only** on TBO's
+certification hosts — `src/lib/tbo-env.ts` fails closed against live hosts.
+
+**`cashfreeConfigured` vs `cashfreePaymentsLive` — do not swap these.** The first means
+"keys present, so run the payment gate"; the second means "the money is real"
+(configured *and* `CASHFREE_ENV=production`). The live-host guards in `tbo-env.ts` take
+the **second**. Sandbox keys satisfy the first, and sandbox keys against live TBO would
+issue a real ticket — or hold a real hotel room — for play money. The two identifiers
+are one word apart at the call site and swapping them fails silently, so
+`tests/tbo-env.test.ts` pins the distinction.
+
+Ledger columns are `cf_*`. `supabase/migrations/0007_cashfree.sql` renames the legacy
+ones that migrations `0002`/`0003` created; run it before enabling the webhook.
+
+Cashfree's **Secure ID / VRS** APIs (PAN, GSTIN, bank verification) are a *separate
+product* with separate credentials — nothing here uses them.
 
 ### Auth (`src/lib/supabase/` + `src/lib/auth.tsx`)
 
@@ -189,7 +238,7 @@ email-confirm/OAuth code. Schema + RLS: `supabase/migrations/0001_init.sql`.
   `LEGACY_TOUR_REDIRECTS` in `next.config.ts` — keep those in sync when slugs change.
 - **Env** (`.env.local`, git-ignored; template in `.env.local.example`):
   Supabase public + service-role keys; TBO flight, hotel static, and hotel booking
-  credentials; optional `TBO_PROXY_URL`; dormant Razorpay placeholders; ElevenLabs
+  credentials; optional `TBO_PROXY_URL`; Cashfree app id/secret/env; ElevenLabs
   (webhook secret, agent id, plus API key + phone number id for outbound); Resend,
   Google Places, GA4, and `CRON_SECRET`. Use the template as the authoritative list.
   Features degrade without credentials; no secrets in code or commits.
@@ -200,7 +249,7 @@ email-confirm/OAuth code. Schema + RLS: `supabase/migrations/0001_init.sql`.
 Use the Node 22 CI baseline (`.github/workflows/ci.yml`). Run `npm test`,
 `npx tsc --noEmit`, and `npm run build`; run `npm run lint` too, but CI currently
 treats pre-existing lint errors as non-blocking. Vitest discovers `tests/**/*.test.ts`;
-current tests cover booking parsing, isolated Razorpay HMAC helpers, TBO validation
+current tests cover booking parsing, isolated Cashfree webhook HMAC, TBO validation
 rules, and callback-queue phone handling. There are no end-to-end payment tests and no
 live-call tests. The production build intentionally succeeds without external-service
 credentials.

@@ -31,7 +31,7 @@ type BookingRow = {
   booking_id: number | null;
   fare_inr: number | null;
   amount_paid_inr: number | null;
-  razorpay_payment_id: string | null;
+  cf_payment_id: string | null;
   // flight
   pnr: string | null;
   origin: string | null;
@@ -59,7 +59,7 @@ type PaxRow = {
 };
 
 const BOOKING_COLUMNS =
-  "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, razorpay_payment_id, " +
+  "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, cf_payment_id, " +
   "pnr, origin, destination, depart_date, airline_code, flight_number, ticket_numbers, " +
   "hotel_name, city, check_in, check_out, rooms, confirmation_no";
 
@@ -282,7 +282,7 @@ export function AccountView() {
                   <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Payment</dt>
                   <dd className="text-ink">
                     ₹{inr.format(bk.amount_paid_inr)} paid online
-                    {bk.razorpay_payment_id ? ` · ${bk.razorpay_payment_id}` : ""}
+                    {bk.cf_payment_id ? ` · ${bk.cf_payment_id}` : ""}
                   </dd>
                 </div>
               )}

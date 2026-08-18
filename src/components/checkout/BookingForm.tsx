@@ -6,56 +6,9 @@ import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "l
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format-date";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
+import { openCashfreeCheckout, type CashfreeMode } from "@/lib/cashfree-checkout";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-
-// ── Razorpay Checkout (hosted script) ──
-type RzpResponse = {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-};
-type RzpOptions = {
-  key: string;
-  order_id: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description?: string;
-  prefill?: { name?: string; email?: string; contact?: string };
-  notes?: Record<string, string>;
-  theme?: { color?: string };
-  handler: (r: RzpResponse) => void;
-  modal?: { ondismiss?: () => void };
-};
-type RzpInstance = { open: () => void; on: (e: string, cb: (r: { error?: { description?: string } }) => void) => void };
-declare global {
-  interface Window {
-    Razorpay?: new (o: RzpOptions) => RzpInstance;
-  }
-}
-
-const RZP_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-
-/** Inject Razorpay's hosted checkout.js once; resolves false if it can't load. */
-function loadRazorpay(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${RZP_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve(true), { once: true });
-      existing.addEventListener("error", () => resolve(false), { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = RZP_SRC;
-    s.async = true;
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
 
 /** Titles TBO accepts (Navitaire 4X). "Master"/"Miss" are rejected. */
 const TITLES: Record<PaxType, string[]> = {
@@ -92,6 +45,8 @@ type Booked = {
   invoiceNo?: string;
   ticketNumbers?: string[];
   refunded?: boolean;
+  /** Server says the order was never paid — worded as "not charged", not as a failure. */
+  unpaid?: boolean;
   error?: string;
   rule?: string;
 };
@@ -280,29 +235,32 @@ export function BookingForm({
     };
   }
 
-  /** POST /api/book — ticket the fare. `payment` is present once Razorpay has confirmed. */
-  async function sendToBook(
-    passengers: ReturnType<typeof buildPassengers>,
-    payment: RzpResponse | null,
-  ) {
+  /**
+   * POST /api/book — ticket the fare, passing the Cashfree order the customer paid.
+   *
+   * Only the order id is sent. Cashfree gives the browser no signed receipt, so the
+   * server re-reads the order from Cashfree and refuses to ticket unless it is PAID
+   * and bound to this itinerary — nothing the client claims here is trusted.
+   */
+  async function sendToBook(passengers: ReturnType<typeof buildPassengers>, orderId: string | null) {
     try {
       const r = await fetch("/api/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...commonPayload(passengers),
-          payment: payment
-            ? {
-                orderId: payment.razorpay_order_id,
-                paymentId: payment.razorpay_payment_id,
-                signature: payment.razorpay_signature,
-              }
-            : undefined,
+          payment: orderId ? { orderId } : undefined,
         }),
       });
       const parsed = (await r.json()) as Booked;
       if (parsed.ok) trackEvent("booking_confirmed", { kind: "flight" });
-      setBooked(parsed);
+      // A 402 means the customer closed checkout or the payment never went through.
+      // Say so plainly rather than surfacing it as a booking failure.
+      setBooked(
+        parsed.unpaid
+          ? { ok: false, error: "Payment was not completed — you have not been charged." }
+          : parsed,
+      );
     } catch {
       setBooked({ ok: false, error: "Network error — please try again." });
     } finally {
@@ -311,7 +269,7 @@ export function BookingForm({
   }
 
   /**
-   * Collect payment (Razorpay), then ticket. Money is captured BEFORE we call TBO;
+   * Collect payment (Cashfree), then ticket. Money is taken BEFORE we call TBO;
    * the server refunds automatically if ticketing then fails.
    *
    * There is deliberately NO unpaid path. A 503 from the order route means payment is
@@ -327,9 +285,8 @@ export function BookingForm({
     let order: {
       ok: boolean;
       orderId?: string;
-      amount?: number;
-      currency?: string;
-      keyId?: string;
+      paymentSessionId?: string;
+      mode?: CashfreeMode;
       error?: string;
       rule?: string;
     };
@@ -357,7 +314,7 @@ export function BookingForm({
       return;
     }
 
-    if (!order.ok || !order.orderId || !order.keyId) {
+    if (!order.ok || !order.orderId || !order.paymentSessionId) {
       // Includes a 422 pre-charge validation failure (order.rule) — nothing was charged.
       setBooked({ ok: false, error: order.error ?? "Could not start payment.", rule: order.rule });
       setBooking(false);
@@ -365,42 +322,25 @@ export function BookingForm({
     }
 
     trackEvent("payment_started", { kind: "flight" });
-    const ready = await loadRazorpay();
-    if (!ready || !window.Razorpay) {
+    const result = await openCashfreeCheckout({
+      mode: order.mode ?? "sandbox",
+      paymentSessionId: order.paymentSessionId,
+    });
+    if (!result) {
       setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });
       setBooking(false);
       return;
     }
+    if (result.redirect) {
+      // In-app browsers can't host the popup; Cashfree takes over the page instead.
+      setBooked({ ok: false, error: "Taking you to the payment page…" });
+      return;
+    }
 
-    const rzp = new window.Razorpay({
-      key: order.keyId,
-      order_id: order.orderId,
-      amount: order.amount ?? 0,
-      currency: order.currency ?? "INR",
-      name: "Rise & Shine Travels",
-      description: `${b.from} → ${b.to} · ${b.airline}`,
-      prefill: { email: contact.email, contact: contact.phone },
-      notes: { traceId: b.traceId ?? "" },
-      theme: { color: "#e11d2a" },
-      handler: (resp) => {
-        // Paid — hand the signed handles to the server, which verifies then tickets.
-        void sendToBook(passengers, resp);
-      },
-      modal: {
-        ondismiss: () => {
-          setBooking(false);
-          setBooked({ ok: false, error: "Payment was cancelled — you have not been charged." });
-        },
-      },
-    });
-    rzp.on("payment.failed", (resp) => {
-      setBooking(false);
-      setBooked({
-        ok: false,
-        error: resp?.error?.description ?? "Payment failed — you have not been charged.",
-      });
-    });
-    rzp.open();
+    // Ask the SERVER whether the order is paid, whatever the popup reported. Doing this
+    // even on `result.error` matters: a customer who pays and then closes the window
+    // still gets their ticket instead of a "cancelled" message and a silent charge.
+    await sendToBook(passengers, order.orderId);
   }
 
   // ── states ──
@@ -734,7 +674,7 @@ export function BookingForm({
             )}
           </button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-[0.72rem] text-muted">
-            <ShieldCheck size={13} aria-hidden /> Secure payment via Razorpay · ticket issued on success
+            <ShieldCheck size={13} aria-hidden /> Secure payment via Cashfree · ticket issued on success
           </p>
         </div>
       </aside>

@@ -660,7 +660,7 @@
       <li><b>Next.js 16</b> App Router</li>
       <li><b>React 19</b> · TypeScript strict</li>
       <li><b>TBO</b> flights + hotels</li>
-      <li><b>Razorpay</b> payments</li>
+      <li><b>Cashfree</b> payments</li>
       <li><b>Supabase</b> auth + Postgres</li>
       <li><b>Vercel</b> hosting + cron</li>
     </ul>
@@ -699,7 +699,7 @@
           <div class="tier__body">
             <span class="node"><b>pages</b> / flights / hotels / packages</span>
             <span class="node"><b>client</b> checkout forms, filters, autocomplete</span>
-            <span class="node"><b>hosted</b> Razorpay checkout.js</span>
+            <span class="node"><b>hosted</b> Cashfree checkout v3 (popup)</span>
           </div>
         </div>
 
@@ -723,7 +723,7 @@
           <div class="tier__body">
             <span class="node node--out"><b>TBO air</b> Search · FareQuote · SSR · Book · Ticket</span>
             <span class="node node--out"><b>TBO hotel</b> static data · Search · PreBook · Book · Cancel</span>
-            <span class="node node--money"><b>Razorpay</b> orders · capture · refunds · webhook</span>
+            <span class="node node--money"><b>Cashfree</b> orders · order lookup · refunds · webhook</span>
             <span class="node node--out"><b>Supabase</b> auth · Postgres · storage</span>
             <span class="node node--out"><b>Resend</b> customer + ops email</span>
             <span class="node node--out"><b>Google Places</b> live reviews</span>
@@ -850,7 +850,8 @@
             <tr><th>Module</th><th>Where</th><th>Owns</th></tr>
           </thead>
           <tbody>
-            <tr><td class="t-mono">razorpay.ts</td><td><span class="tag tag--server">server</span></td><td class="t-note">Create order, verify checkout and webhook HMAC signatures, fetch/confirm capture, refund. Raw REST plus <code>node:crypto</code> — no SDK.</td></tr>
+            <tr><td class="t-mono">cashfree.ts</td><td><span class="tag tag--server">server</span></td><td class="t-note">Create Order, <code>confirmPaidOrder()</code> (re-reads the order server-side — the only trustworthy proof of payment), refunds, webhook HMAC. Raw REST plus <code>node:crypto</code> — no SDK.</td></tr>
+            <tr><td class="t-mono">cashfree-checkout.ts</td><td><span class="tag tag--client">client</span></td><td class="t-note">Loads Cashfree's hosted JS v3 and opens the <code>_modal</code> popup on a <code>payment_session_id</code>. Our own types — the npm SDK ships none. No publishable key exists; nothing secret reaches the browser.</td></tr>
             <tr><td class="t-mono">payments-ledger.ts</td><td><span class="tag tag--server">server</span></td><td class="t-note">Writes the <code>payments</code> reconciliation table from the webhook, with the service-role key.</td></tr>
             <tr><td class="t-mono">booking-request.ts</td><td><span class="tag tag--shared">shared</span></td><td class="t-note">Parses an incoming booking body into a <code>BookingRequest</code>. Shared by the order route and the book route so both see identical input.</td></tr>
             <tr><td class="t-mono">booking-history.ts</td><td><span class="tag tag--server">server</span></td><td class="t-note">Mirrors confirmed flight and hotel bookings into <code>bookings</code> + <code>passengers</code> for the account page.</td></tr>
@@ -907,7 +908,7 @@
         <div class="strip strip--money">
           <div class="strip__verb">POST</div>
           <div class="strip__path">/api/payment/order</div>
-          <div class="strip__desc">Runs the <b>full</b> pre-ticket flow, then opens a Razorpay order for TBO's re-priced total. A booking TBO would reject fails here — before the card is charged.</div>
+          <div class="strip__desc">Runs the <b>full</b> pre-ticket flow, then opens a Cashfree order for TBO's re-priced total, tagged with a <code>bind</code> hash of the itinerary. A booking TBO would reject fails here — before the card is charged.</div>
           <ul class="strip__meta">
             <li>same body as /api/book, minus payment</li>
             <li>maxDuration 120s</li>
@@ -917,21 +918,21 @@
         <div class="strip strip--money">
           <div class="strip__verb">POST</div>
           <div class="strip__path">/api/book</div>
-          <div class="strip__desc">Verifies the payment is captured, then tickets. If ticketing fails after capture, the payment is refunded automatically and ops are alerted.</div>
+          <div class="strip__desc">Re-reads the order from Cashfree and requires <code>PAID</code>, then tickets. If ticketing fails after payment, it is refunded automatically and ops are alerted.</div>
           <ul class="strip__meta">
             <li>maxDuration 300s</li>
-            <li>402 if not captured</li>
+            <li>402 if the order is not PAID</li>
             <li>mirrors to bookings · emails the lead passenger</li>
           </ul>
         </div>
         <div class="strip strip--money">
           <div class="strip__verb">POST</div>
           <div class="strip__path">/api/payment/webhook</div>
-          <div class="strip__desc">Razorpay server-to-server events into the <code>payments</code> ledger. Independent of the browser callback — it records the money even if the customer closes the tab.</div>
+          <div class="strip__desc">Cashfree server-to-server events into the <code>payments</code> ledger. Independent of the browser, which never sees a signed receipt — it records the money even if the customer closes the tab.</div>
           <ul class="strip__meta">
             <li>HMAC over the RAW body</li>
-            <li>payment.captured · payment.failed · refund.processed</li>
-            <li>500 on write failure so Razorpay retries</li>
+            <li>PAYMENT_SUCCESS · PAYMENT_FAILED · PAYMENT_USER_DROPPED · REFUND_STATUS</li>
+            <li>500 on write failure so Cashfree retries</li>
           </ul>
         </div>
       </div>
@@ -959,13 +960,13 @@
         <div class="strip strip--money">
           <div class="strip__verb">POST</div>
           <div class="strip__path">/api/hotels/payment/order</div>
-          <div class="strip__desc">PreBook + guest validation against the rate's own rules, then a Razorpay order for the PreBook amount.</div>
+          <div class="strip__desc">PreBook + guest validation against the rate's own rules, then a Cashfree order for the PreBook amount.</div>
           <ul class="strip__meta"><li>maxDuration 120s</li></ul>
         </div>
         <div class="strip strip--money">
           <div class="strip__verb">POST</div>
           <div class="strip__path">/api/hotels/book</div>
-          <div class="strip__desc">Confirms capture, then Book. Auto-refunds on failure. Always carries a <code>clientReferenceId</code> — the recovery key if Book times out.</div>
+          <div class="strip__desc">Confirms the order is PAID, then Book. Auto-refunds on failure. Always carries a <code>clientReferenceId</code> — the recovery key if Book times out.</div>
           <ul class="strip__meta"><li>maxDuration 300s</li></ul>
         </div>
         <div class="strip strip--supplier">
@@ -987,7 +988,7 @@
         <div class="strip">
           <div class="strip__verb">GET</div>
           <div class="strip__path">/api/cron/reconcile</div>
-          <div class="strip__desc">Weekly digest comparing the payments ledger against booking records, surfacing the failure that actually hurts: money captured with no booking on file.</div>
+          <div class="strip__desc">Weekly digest comparing the payments ledger against booking records, surfacing the failure that actually hurts: money collected with no booking on file.</div>
           <ul class="strip__meta"><li>Vercel cron 30 3 * * 1</li><li>Authorization: Bearer CRON_SECRET</li><li>8-day window — one day of overlap</li></ul>
         </div>
         <div class="strip">
@@ -1005,7 +1006,7 @@
           <tbody>
             <tr><td class="t-mono">200</td><td class="t-note">Success — always <code>{ ok: true, … }</code></td><td class="t-note">—</td></tr>
             <tr><td class="t-mono">400</td><td class="t-note">Malformed body or a bad signature</td><td class="t-note">Caller</td></tr>
-            <tr><td class="t-mono">401 / 402</td><td class="t-note">No session · payment required or not captured</td><td class="t-note">Caller</td></tr>
+            <tr><td class="t-mono">401 / 402</td><td class="t-note">No session · payment required, or the order is not PAID</td><td class="t-note">Caller</td></tr>
             <tr><td class="t-mono">422</td><td class="t-note">A validation rule failed — the response carries <code>rule</code></td><td class="t-note">The form can fix it and retry</td></tr>
             <tr><td class="t-mono">429</td><td class="t-note">Rate limited, with a <code>Retry-After</code> header</td><td class="t-note">Caller, later</td></tr>
             <tr><td class="t-mono">502</td><td class="t-note">Supplier or upstream failure</td><td class="t-note">Not the customer's fault</td></tr>
@@ -1024,7 +1025,7 @@
         <h2 class="sec__title">The booking flow</h2>
       </div>
 
-      <p class="lede">Capture, then fulfil. The order amount is always the supplier's re-price — never a number that came from the browser.</p>
+      <p class="lede">Collect, then fulfil. The order amount is always the supplier's re-price — never a number that came from the browser.</p>
 
       <div class="ladder">
         <div class="rung">
@@ -1041,21 +1042,21 @@
         </div>
         <div class="rung rung--money">
           <div class="rung__what">Validate, then open an order
-            <span><code>validateBooking()</code> runs the entire pre-ticket sequence and every checklist rule, including the duplicate guard. Only if all of it passes does a Razorpay order open — for the FareQuote total.</span>
+            <span><code>validateBooking()</code> runs the entire pre-ticket sequence and every checklist rule, including the duplicate guard. Only if all of it passes does a Cashfree order open — for the FareQuote total, in rupees, bound to this itinerary.</span>
           </div>
-          <div class="rung__wire"><b>TBO + Razorpay</b>nothing charged yet</div>
+          <div class="rung__wire"><b>TBO + Cashfree</b>nothing charged yet</div>
         </div>
         <div class="rung rung--money">
           <div class="rung__what">Customer pays
-            <span>Razorpay's hosted checkout opens in the browser and takes the money.</span>
+            <span>Cashfree's hosted checkout opens as a popup and takes the money. Whatever it resolves with, the browser then calls the book route — a customer who pays and closes the popup must still get their ticket.</span>
           </div>
-          <div class="rung__wire"><b>Razorpay · checkout.js</b>payment captured</div>
+          <div class="rung__wire"><b>Cashfree · checkout v3</b>order paid</div>
         </div>
         <div class="rung rung--money">
-          <div class="rung__what">Confirm the capture is real
-            <span>Signature verified, then the payment is re-fetched from Razorpay and checked: status <code>captured</code>, matching order, matching amount. Only then does any TBO call happen.</span>
+          <div class="rung__what">Confirm the payment is real
+            <span>The browser proves nothing — Cashfree hands it no signed receipt. The server re-reads the order from Cashfree and checks it itself: <code>order_status</code> is <code>PAID</code>, the amount matches, and the <code>bind</code> tag matches <em>this</em> booking. Only then does any TBO call happen.</span>
           </div>
-          <div class="rung__wire"><b>Razorpay · fetch payment + order</b>402 if anything is off</div>
+          <div class="rung__wire"><b>Cashfree · Get Order + Get Payments</b>402 if anything is off</div>
         </div>
         <div class="rung rung--money">
           <div class="rung__what">Ticket
@@ -1088,7 +1089,7 @@
 
       <h3>Why it's shaped like this</h3>
       <p><code>bookFlight()</code> and <code>validateBooking()</code> share <code>prepareBooking()</code> — the pre-charge checks and the ticketing checks are literally the same code path. That's the whole design: anything TBO would reject at ticketing gets rejected before the card is touched.</p>
-      <p>Running alongside, the Razorpay webhook writes every captured, failed and refunded payment into the <code>payments</code> ledger independently of the browser. The weekly cron then compares that ledger against booking records. Guest bookings are never mirrored by design, so the digest reports those as "verify by hand" rather than pretending certainty.</p>
+      <p>Running alongside, the Cashfree webhook writes every successful, failed and refunded payment into the <code>payments</code> ledger independently of the browser. The weekly cron then compares that ledger against booking records. Guest bookings are never mirrored by design, so the digest reports those as "verify by hand" rather than pretending certainty.</p>
 
       <h3>Hotels — same skeleton, different bones</h3>
       <div class="scroller">
@@ -1121,10 +1122,10 @@
           <tbody>
             <tr><td class="t-mono">profiles</td><td class="t-note">trigger on <code>auth.users</code></td><td class="t-note">Name, phone, GSTIN. RLS: owner reads, inserts, updates.</td></tr>
             <tr><td class="t-mono">travellers</td><td class="t-note">the user</td><td class="t-note">Saved passenger details for faster checkout. RLS: owner, full access.</td></tr>
-            <tr><td class="t-mono">bookings</td><td><span class="tag tag--server">service-role</span></td><td class="t-note">Flights <b>and</b> hotels, distinguished by <code>kind</code>. Mirrors PNR / BookingId / status / fare plus the Razorpay ids. RLS: owner reads only.</td></tr>
+            <tr><td class="t-mono">bookings</td><td><span class="tag tag--server">service-role</span></td><td class="t-note">Flights <b>and</b> hotels, distinguished by <code>kind</code>. Mirrors PNR / BookingId / status / fare plus the Cashfree ids. RLS: owner reads only.</td></tr>
             <tr><td class="t-mono">passengers</td><td><span class="tag tag--server">service-role</span></td><td class="t-note">Per-booking passengers and ticket numbers. RLS: readable through an owned booking.</td></tr>
             <tr><td class="t-mono">enquiries</td><td class="t-note">the user</td><td class="t-note">Package enquiries. RLS: owner reads and inserts.</td></tr>
-            <tr><td class="t-mono">payments</td><td><span class="tag tag--server">webhook</span></td><td class="t-note">Reconciliation ledger keyed by <code>razorpay_payment_id</code>: captured · failed · refunded, with method, contact and TraceId.</td></tr>
+            <tr><td class="t-mono">payments</td><td><span class="tag tag--server">webhook</span></td><td class="t-note">Reconciliation ledger keyed by <code>cf_payment_id</code>: paid · failed · dropped · refunded, with method, contact and TraceId.</td></tr>
             <tr><td class="t-mono">voice_calls</td><td><span class="tag tag--server">webhook</span></td><td class="t-note">One row per conversation — transcript, extracted lead fields, qualification. Audio lands in the private <code>voice-call-audio</code> bucket.</td></tr>
           </tbody>
         </table>
@@ -1148,18 +1149,18 @@
       <p class="lede">Not style preferences. Each one exists because it broke real money, or would have.</p>
 
       <ol class="rules">
-        <li><b>Server-only modules stay on the server.</b><span>Never import <code>tbo*</code>, <code>razorpay</code>, <code>supabase/admin</code>, <code>alerts</code> or <code>email</code> from a client component. They read credentials from the environment. Reach them through <code>/api/*</code> or a server component.</span></li>
+        <li><b>Server-only modules stay on the server.</b><span>Never import <code>tbo*</code>, <code>cashfree</code>, <code>supabase/admin</code>, <code>alerts</code> or <code>email</code> from a client component. They read credentials from the environment. Reach them through <code>/api/*</code> or a server component.</span></li>
         <li><b>TraceId dies 15 minutes after Search.</b><span>The search cache TTL is 10 minutes, deliberately under it. Don't lengthen it — a stale TraceId fails at Book.</span></li>
         <li><b>Match TBO errors by ErrorCode, never message text.</b><span>Code 6 means an invalid token: refresh once and retry. This is TBO's explicit checklist rule.</span></li>
         <li><b>Book and Ticket are never auto-retried.</b><span>On timeout, recover through GetBookingDetails — 20 polls at 12-second intervals. A retry double-charges. Hotels recover by <code>clientReferenceNo</code>.</span></li>
         <li><b>The charged amount comes from the supplier.</b><span>FareQuote for flights, PreBook for hotels. Never a number from the request body.</span></li>
-        <li><b>Never ticket before confirming capture.</b><span>Signature verification alone is not enough — re-fetch the payment and check that status is <code>captured</code> and the amount matches the order.</span></li>
-        <li><b>Failed fulfilment after capture means refund now.</b><span>And if the refund itself fails, <code>alertOps()</code> must fire. A failed refund can never be a console line nobody reads.</span></li>
+        <li><b>Never ticket on the browser's word.</b><span>Cashfree hands the browser no signed receipt, so there is nothing client-side worth verifying. Re-read the order server-side and require <code>order_status</code> <code>PAID</code>, a matching amount, and a matching <code>bind</code> tag.</span></li>
+        <li><b>Failed fulfilment after payment means refund now.</b><span>Refund the <em>payment</em> amount, which can be under the order total on this API version — Cashfree rejects anything higher. And if the refund itself fails, <code>alertOps()</code> must fire. A failed refund can never be a console line nobody reads.</span></li>
         <li><b>On the server, verify with <code>getUser()</code>, never <code>getSession()</code>.</b><span><code>getUser()</code> re-validates the token against Supabase.</span></li>
         <li><b>Keep <code>useAuth()</code>'s shape stable.</b><span>Header, AuthScreen and AccountView all depend on <code>{ user, ready, login, signup, logout }</code>.</span></li>
         <li><b>Only service-role server code writes <code>bookings</code>.</b><span>Client access goes through RLS, which grants read-only access to a user's own rows.</span></li>
         <li><b>Next 16 renamed middleware to proxy.</b><span>The file is <code>src/proxy.ts</code>, it exports <code>proxy()</code>, and it runs on the Node.js runtime. Don't create a <code>middleware.ts</code>.</span></li>
-        <li><b>Webhook signatures are computed over the raw body.</b><span>Read <code>req.text()</code> and verify before parsing — re-serializing the JSON changes the bytes and breaks the HMAC. True for both Razorpay and ElevenLabs.</span></li>
+        <li><b>Webhook signatures are computed over the raw body.</b><span>Read <code>req.text()</code> and verify before parsing — re-serializing the JSON changes the bytes and breaks the HMAC — Cashfree signs the timestamp plus the raw body, so <code>170.00</code> becoming <code>170</code> fails every signature. True for both Cashfree and ElevenLabs.</span></li>
         <li><b>Webhook status codes are an API.</b><span>A write failure returns 500 so the sender retries. A bad signature or an unknown event is terminal.</span></li>
         <li><b>Await your best-effort side effects.</b><span>Serverless can freeze the instant you return, so fire-and-forget writes get killed. Await them, wrapped in try/catch, so they can never fail a paid booking.</span></li>
         <li><b>All user-facing dates go through <code>formatDate()</code>.</b><span>DD-MM-YY. No raw ISO strings anywhere in the UI.</span></li>
@@ -1181,7 +1182,7 @@
           <thead><tr><th>Missing</th><th>Behaviour</th><th>Blocks work?</th></tr></thead>
           <tbody>
             <tr><td class="t-mono">TBO_*</td><td class="t-note">Search returns "unavailable"; the marketing site is fully functional</td><td><span class="tag tag--off">flights + hotels</span></td></tr>
-            <tr><td class="t-mono">RAZORPAY_*</td><td class="t-note">Booking degrades to the legacy direct-ticket path — dev and staging only</td><td><span class="tag tag--off">payments</span></td></tr>
+            <tr><td class="t-mono">CASHFREE_*</td><td class="t-note">The order route returns 503; flights refuse to book. Hotels fall back to an unpaid Book, but only on TBO's certification hosts</td><td><span class="tag tag--off">payments</span></td></tr>
             <tr><td class="t-mono">NEXT_PUBLIC_SUPABASE_*</td><td class="t-note">Auth and account pages go inert; <code>proxy.ts</code> becomes a no-op</td><td><span class="tag tag--off">accounts</span></td></tr>
             <tr><td class="t-mono">RESEND_API_KEY</td><td class="t-note">Emails are silently skipped — a booking never fails because of email</td><td><span class="tag tag--on">no</span></td></tr>
             <tr><td class="t-mono">GOOGLE_MAPS_API_KEY</td><td class="t-note">Static testimonials instead of live reviews; hotel cards lose review scores</td><td><span class="tag tag--on">no</span></td></tr>
@@ -1198,7 +1199,7 @@
           <thead><tr><th>Command</th><th>What it proves</th></tr></thead>
           <tbody>
             <tr><td class="t-mono">npm run build</td><td class="t-note">Type-checks and static-generates. This is the real gate — run it before every PR.</td></tr>
-            <tr><td class="t-mono">npm test</td><td class="t-note">Vitest over the money paths: Razorpay HMACs, TBO validations, booking parsing. Touch that code, add a test.</td></tr>
+            <tr><td class="t-mono">npm test</td><td class="t-note">Vitest over the money paths: Cashfree webhook HMACs, TBO validations, booking parsing. Touch that code, add a test.</td></tr>
             <tr><td class="t-mono">npm run lint</td><td class="t-note">ESLint. New errors in <code>src/</code> are yours to fix; the pre-existing ones in <code>voice-agent/</code> are not.</td></tr>
           </tbody>
         </table>
@@ -1269,7 +1270,7 @@
             <tr><td class="t-mono">PreBook</td><td class="t-note">The hotel equivalent of FareQuote.</td></tr>
             <tr><td class="t-mono">SSR</td><td class="t-note">Special Service Request — baggage, meals, seats.</td></tr>
             <tr><td class="t-mono">PNR</td><td class="t-note">The airline's booking reference.</td></tr>
-            <tr><td class="t-mono">Capture</td><td class="t-note">Razorpay has actually taken the money, as opposed to merely authorising it. We only ticket after capture.</td></tr>
+            <tr><td class="t-mono">PAID</td><td class="t-note">Cashfree's order status once the money is actually collected. Read from the server, never from the browser — we only ticket after the server has seen it.</td></tr>
             <tr><td class="t-mono">RLS</td><td class="t-note">Row Level Security — Postgres policies deciding which rows a signed-in user may see.</td></tr>
             <tr><td class="t-mono">Certification</td><td class="t-note">TBO's live test-environment checklist that must pass before production credentials are issued. Complete for both flights and hotels.</td></tr>
           </tbody>

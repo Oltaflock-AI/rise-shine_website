@@ -11,13 +11,7 @@ import {
   refundNoticeEmail,
 } from "@/lib/email";
 import { alertOps } from "@/lib/alerts";
-import {
-  razorpayConfigured,
-  verifyPaymentSignature,
-  fetchPayment,
-  fetchOrder,
-  refundPayment,
-} from "@/lib/razorpay";
+import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, hotelBind } from "@/lib/cashfree";
 import { hotelBookingBlockedForMissingPayments } from "@/lib/tbo-env";
 
 // Live TBO hotel booking — never cached; Book can run long.
@@ -25,17 +19,17 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type Payment = { orderId?: string; paymentId?: string; signature?: string };
-type ConfirmedPayment = { paymentId: string; orderId: string };
+type Payment = { orderId?: string };
+type ConfirmedPayment = { cfPaymentId: string; orderId: string };
 
 /**
  * POST /api/hotels/book — collect payment (when configured) then run TBO's Book.
  *
- * When Razorpay is configured a captured, signature-verified payment is REQUIRED
+ * When Cashfree is configured a PAID, server-verified order is REQUIRED
  * before Book is called — and if Book then fails, the payment is refunded
  * automatically (money must never be held for a stay the guest never got). With no keys
  * the flow degrades to a direct-book path so dev/staging can still demo — but ONLY
- * against staging TBO; live hosts with no Razorpay are refused outright.
+ * against staging TBO; live hosts with no Cashfree are refused outright.
  *
  * Body: { bookingCode, nationality?, netAmount, isVoucherBooking?, rooms, validation?, payment? }
  */
@@ -63,12 +57,12 @@ export async function POST(req: Request) {
   if (!body.rooms?.length) return Response.json({ ok: false, error: "At least one room is required." }, { status: 400 });
 
   // ── Fail closed on live ──
-  // Live HOTEL credentials with no Razorpay would hold real rooms on agency credit
+  // Live HOTEL credentials with no Cashfree would hold real rooms on agency credit
   // without collecting any money. Judged on the hotel hosts specifically: the flight
   // stack going live must not block hotel certification, which by design books without
   // a payment gateway.
-  if (hotelBookingBlockedForMissingPayments(razorpayConfigured)) {
-    console.error("[api/hotels/book] refused: live TBO hotel credentials with no Razorpay configuration.");
+  if (hotelBookingBlockedForMissingPayments(cashfreePaymentsLive)) {
+    console.error("[api/hotels/book] refused: live TBO hotel credentials with no LIVE Cashfree configuration (sandbox keys settle nothing).");
     return Response.json(
       { ok: false, error: "Online booking is temporarily unavailable. Please call us to book." },
       { status: 503 },
@@ -83,22 +77,26 @@ export async function POST(req: Request) {
   // What the customer actually paid (order is server-priced at the RSP-floored
   // selling fare; body.netAmount is TBO's net and no longer matches it).
   let paidInr: number | null = null;
-  if (razorpayConfigured) {
-    const p = body.payment;
-    if (!p?.orderId || !p?.paymentId || !p?.signature) {
-      return Response.json({ ok: false, error: "Payment is required before booking." }, { status: 402 });
-    }
-    if (!verifyPaymentSignature({ orderId: p.orderId, paymentId: p.paymentId, signature: p.signature })) {
-      return Response.json({ ok: false, error: "Payment could not be verified." }, { status: 400 });
+  if (cashfreeConfigured) {
+    const orderId = body.payment?.orderId;
+    if (!orderId) {
+      return Response.json({ ok: false, unpaid: true, error: "Payment is required before booking." }, { status: 402 });
     }
     try {
-      const [pay, order] = await Promise.all([fetchPayment(p.paymentId), fetchOrder(p.orderId)]);
-      const captured = pay.status === "captured" && pay.order_id === p.orderId && pay.amount === order.amount;
-      if (!captured) {
-        return Response.json({ ok: false, error: "Payment has not been captured." }, { status: 402 });
+      // The order was bound to the PreBook code the client was quoted, so a paid
+      // order can only ever book THAT room at THAT rate.
+      const confirmed = await confirmPaidOrder({
+        orderId,
+        expectBind: hotelBind(body.bookingCode),
+      });
+      if (!confirmed.ok) {
+        return Response.json(
+          { ok: false, unpaid: confirmed.unpaid, error: confirmed.error },
+          { status: confirmed.unpaid ? 402 : 400 },
+        );
       }
-      payment = { paymentId: pay.id, orderId: order.id };
-      paidInr = order.amount / 100; // paise → INR
+      payment = { cfPaymentId: confirmed.payment.cfPaymentId, orderId: confirmed.payment.orderId };
+      paidInr = confirmed.payment.amountInr; // rupees — Cashfree is not paise-denominated
     } catch (e) {
       console.error("[api/hotels/book] payment verification failed:", e);
       return Response.json(
@@ -124,14 +122,15 @@ export async function POST(req: Request) {
   // Paid but NOT booked → refund immediately.
   if (payment && !result.ok) {
     try {
-      await refundPayment(payment.paymentId, {
-        notes: { reason: "hotel_book_failed", bookingCode: request.bookingCode, orderId: payment.orderId },
+      await refundOrder(payment.orderId, {
+        amountInr: paidInr ?? undefined,
+        note: "Hotel booking failed after payment",
       });
       await alertOps("Hotel booking failed after capture — auto-refunded", {
         hotel: body.stay?.hotelName,
         city: body.stay?.city,
         bookingCode: request.bookingCode,
-        paymentId: payment.paymentId,
+        paymentId: payment.cfPaymentId,
         amountInr: Math.round(paidInr ?? request.netAmount),
         error: result.error,
       });
@@ -145,7 +144,7 @@ export async function POST(req: Request) {
             ...refundNoticeEmail({
               kind: "hotel",
               amountInr: Math.round(paidInr ?? request.netAmount),
-              reference: payment.paymentId,
+              reference: payment.cfPaymentId,
             }),
           });
         } catch (e) {
@@ -160,7 +159,7 @@ export async function POST(req: Request) {
       await alertOps("URGENT: hotel refund FAILED — settle manually", {
         hotel: body.stay?.hotelName,
         bookingCode: request.bookingCode,
-        paymentId: payment.paymentId,
+        paymentId: payment.cfPaymentId,
         orderId: payment.orderId,
         amountInr: Math.round(paidInr ?? request.netAmount),
         bookError: result.error,
