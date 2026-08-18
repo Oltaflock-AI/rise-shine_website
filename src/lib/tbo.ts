@@ -153,7 +153,15 @@ type RawResult = {
   IsLCC?: boolean;
   IsRefundable?: boolean;
   AirlineCode?: string;
-  Fare?: { PublishedFare?: number; OfferedFare?: number; BaseFare?: number; Tax?: number };
+  // ServiceFee is the agency's per-passenger fee. It lives ONLY here, never in
+  // FareBreakdown, and is already inside PublishedFare — see perAdultFare.
+  Fare?: {
+    PublishedFare?: number;
+    OfferedFare?: number;
+    BaseFare?: number;
+    Tax?: number;
+    ServiceFee?: number;
+  };
   FareBreakdown?: RawFareBreakdown[];
   Segments?: RawSeg[][];
 };
@@ -190,35 +198,53 @@ function totalDuration(legs: RawSeg[]): number {
 }
 
 /**
- * Fare PER ADULT. TBO's `Fare.PublishedFare` is the TOTAL across all
- * passengers, so for a 2-adult search it is double the single-seat price.
- * The adult `FareBreakdown` entry (PassengerType 1) carries that pax type's
- * total, which we divide by its count to get one adult's fare. Falls back to
- * PublishedFare / adults when no breakdown is present.
+ * Fare PER ADULT, ALL-INCLUSIVE — what the customer is actually charged, divided by
+ * heads. This is the only fare that may reach a search card.
+ *
+ * `Fare.PublishedFare` is the booking TOTAL across every passenger, so a 2-adult
+ * search returns double the single-seat price; dividing by the adult count gives one
+ * seat. Search is adults-only — `/api/flights` accepts no child or infant count — so
+ * that division is exact.
+ *
+ * Do NOT price this from `FareBreakdown`. It carries base and tax per passenger type
+ * and has no service-fee field at all: `Fare.ServiceFee` (the agency's per-passenger
+ * fee, ₹1,000 on the live account) exists only on the top-level `Fare`, folded into
+ * PublishedFare. Pricing the card off the breakdown understated every listing by the
+ * whole fee, so a customer saw ₹5,601 in results and was asked for ₹6,601 at
+ * checkout — ₹3,000 adrift for a family of three. `tests/flight-displayed-fare.test.ts`
+ * pins this.
+ *
+ * `baseINR` / `taxINR` remain the genuine airline split, for anywhere that wants to
+ * itemise. `fareINR` is the displayable number.
  */
-function perAdultFare(
+export function perAdultFare(
   r: RawResult,
   adults: number,
 ): { fareINR: number; baseINR: number; taxINR: number } {
+  const heads = Math.max(1, adults);
   const fb = r.FareBreakdown?.find(
     (b) => (b.PassengerType ?? 0) === 1 && (b.PassengerCount ?? 0) > 0,
   );
-  if (fb) {
-    const n = fb.PassengerCount as number;
-    const base = (fb.BaseFare ?? 0) / n;
-    const tax = (fb.Tax ?? 0) / n;
-    return {
-      fareINR: Math.round(base + tax),
-      baseINR: Math.round(base),
-      taxINR: Math.round(tax),
-    };
+  const n = (fb?.PassengerCount as number) || heads;
+  const base = fb ? (fb.BaseFare ?? 0) / n : (r.Fare?.BaseFare ?? 0) / heads;
+  const tax = fb ? (fb.Tax ?? 0) / n : (r.Fare?.Tax ?? 0) / heads;
+
+  // PublishedFare is the customer-facing total and already contains the service fee.
+  // Only when TBO omits it do we rebuild the same number from its parts; OfferedFare
+  // is the last resort and is TBO's charge to the agency, never a price to display.
+  const published = r.Fare?.PublishedFare ?? 0;
+  let allIn: number;
+  if (published > 0) {
+    allIn = published / heads;
+  } else {
+    const rebuilt = base + tax + (r.Fare?.ServiceFee ?? 0) / heads;
+    allIn = rebuilt > 0 ? rebuilt : (r.Fare?.OfferedFare ?? 0) / heads;
   }
-  const total = r.Fare?.PublishedFare ?? r.Fare?.OfferedFare ?? 0;
-  const per = adults > 0 ? total / adults : total;
+
   return {
-    fareINR: Math.round(per),
-    baseINR: Math.round((r.Fare?.BaseFare ?? 0) / Math.max(1, adults)),
-    taxINR: Math.round((r.Fare?.Tax ?? 0) / Math.max(1, adults)),
+    fareINR: Math.round(allIn),
+    baseINR: Math.round(base),
+    taxINR: Math.round(tax),
   };
 }
 
