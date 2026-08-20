@@ -36,6 +36,12 @@ export const site = {
     mobileHref: "tel:+918866010022",
     whatsapp: "918866010022",
     whatsappHref: "https://wa.me/918866010022",
+    // 8866010022 is not registered on WhatsApp yet. A wa.me link to an unregistered
+    // number opens a dead chat, which is worse than no button at all — so while this
+    // is false every WhatsApp affordance is hidden, and the few paths that carry a
+    // real message fall back to email rather than disappearing. Flip to true once the
+    // number is live on WhatsApp; nothing else needs to change. See lib/whatsapp.ts.
+    whatsappEnabled: false as boolean,
   },
 
   address: {

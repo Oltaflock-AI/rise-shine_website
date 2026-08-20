@@ -19,7 +19,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
 import { formatDate } from "@/lib/format-date";
-import { site } from "@/data/site";
+import { contactHref } from "@/lib/whatsapp";
 import { cn } from "@/lib/cn";
 
 /** One row of the customer's booking mirror (see migrations 0001/0002/0004). */
@@ -102,12 +102,16 @@ function StatusBadge({ bk }: { bk: BookingRow }) {
   );
 }
 
-/** WhatsApp deep link asking the agency to cancel a flight (no self-serve TBO air cancel). */
-function flightCancelHref(bk: BookingRow): string {
+/**
+ * Asks the agency to cancel a flight. There is no self-serve TBO air cancel, so this is
+ * the customer's only route and it must never vanish: when WhatsApp is unavailable it
+ * becomes an email carrying the same details.
+ */
+function flightCancelHref(bk: BookingRow): { href: string; via: "whatsapp" | "email" } {
   const text = `Hi Rise & Shine! I'd like to request cancellation of my flight booking:
 ${bk.origin ?? ""} → ${bk.destination ?? ""} on ${fmtDate(bk.depart_date)}${bk.pnr ? `\nPNR: ${bk.pnr}` : ""}${bk.booking_id ? `\nBooking id: ${bk.booking_id}` : ""}
 Please let me know the cancellation charges and refund.`;
-  return `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(text)}`;
+  return contactHref(text, "Flight cancellation request");
 }
 
 const PAX_TYPE: Record<number, string> = { 1: "Adult", 2: "Child", 3: "Infant" };
@@ -338,7 +342,7 @@ export function AccountView() {
                   )
                 ) : (
                   <a
-                    href={flightCancelHref(bk)}
+                    href={flightCancelHref(bk).href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-red/60 px-4 py-2 text-[0.8rem] font-semibold text-red transition-colors hover:bg-red/5"
@@ -347,11 +351,14 @@ export function AccountView() {
                   </a>
                 ))}
               <a
-                href={`https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(
-                  `Hi! I have a question about my ${bk.kind} booking ${
-                    bk.kind === "hotel" ? bk.confirmation_no ?? "" : bk.pnr ?? ""
-                  }`.trim(),
-                )}`}
+                href={
+                  contactHref(
+                    `Hi! I have a question about my ${bk.kind} booking ${
+                      bk.kind === "hotel" ? bk.confirmation_no ?? "" : bk.pnr ?? ""
+                    }`.trim(),
+                    "Question about my booking",
+                  ).href
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[0.8rem] font-semibold text-ink underline underline-offset-4 hover:text-red"

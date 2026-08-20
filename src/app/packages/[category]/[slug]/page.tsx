@@ -22,6 +22,7 @@ import { CTABand } from "@/components/sections/CTABand";
 import { LightItineraryDetail } from "@/components/sections/LightItineraryDetail";
 import { LiveFare } from "@/components/ui/LiveFare";
 import { site } from "@/data/site";
+import { waHref } from "@/lib/whatsapp";
 import { CATALOG_PACKAGES, PACKAGE_LIST, isCatalogPackage } from "@/data/catalog";
 import type { CatalogPackage, PackageCategory } from "@/data/catalog/types";
 import { getLightItinerary, lightItineraries } from "@/data/itineraries";
@@ -118,7 +119,7 @@ export default async function PackageDetailPage({
 
   const enquiryHref = `/plan-my-trip?package=${encodeURIComponent(pkg.key)}`;
   const waText = `Hi Rise & Shine! I'm interested in the ${pkg.tourName} (${pkg.durationNights}N/${pkg.durationDays}D) package. Please share a quote and availability.`;
-  const waHref = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(waText)}`;
+  const waLink = waHref(waText);
   const isDomestic = pkg.category === "domestic";
   const showVisa = !!pkg.visa && !isDomestic;
 
@@ -183,9 +184,11 @@ export default async function PackageDetailPage({
             <Button href={enquiryHref} arrow>
               Enquire About This Package
             </Button>
-            <Button href={waHref} variant="light">
-              Chat on WhatsApp
-            </Button>
+            {waLink && (
+              <Button href={waLink} variant="light">
+                Chat on WhatsApp
+              </Button>
+            )}
           </div>
         </Container>
       </section>
@@ -450,14 +453,16 @@ export default async function PackageDetailPage({
                   <Button href={enquiryHref} arrow fullWidth>
                     Enquire About This Package
                   </Button>
-                  <a
-                    href={waHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 flex items-center justify-center gap-2 rounded-full border border-line py-3 text-[0.9rem] font-semibold text-navy transition-colors hover:border-red hover:text-red"
-                  >
-                    <MessageCircle size={16} aria-hidden /> Chat on WhatsApp
-                  </a>
+                  {waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex items-center justify-center gap-2 rounded-full border border-line py-3 text-[0.9rem] font-semibold text-navy transition-colors hover:border-red hover:text-red"
+                    >
+                      <MessageCircle size={16} aria-hidden /> Chat on WhatsApp
+                    </a>
+                  )}
                   <a
                     href={site.phone.landlineHref}
                     className="mt-3 block text-center text-[0.85rem] text-muted hover:text-red"

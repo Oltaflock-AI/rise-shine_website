@@ -18,7 +18,7 @@ import {
 import { FlightCard, buildCheckoutQuery, type BookingContext } from "./FlightCard";
 import { CheckRow, DualRange, Section, SelectClear } from "./filter-controls";
 import type { FlightOffer } from "@/lib/tbo";
-import { site } from "@/data/site";
+import { waHref as waDeepLink } from "@/lib/whatsapp";
 import { useAuth } from "@/lib/auth";
 import { AUTH_DISABLED } from "@/lib/flags";
 import { cn } from "@/lib/cn";
@@ -114,7 +114,8 @@ ${offer.airlineName} (${offer.segments.map((s) => s.flightNumber).join(" / ")})
 ${s0?.from} ${(s0?.depTime || "").slice(11, 16)} → ${sL?.to} ${(sL?.arrTime || "").slice(11, 16)} · ${offer.stops === 0 ? "non-stop" : `${offer.stops} stop`}
 Fare ₹${inr.format(offer.fareINR)} per adult × ${adults}.
 Please confirm availability and proceed to book.`;
-  return `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(text)}`;
+  // "" when WhatsApp is off — CheckoutView requires an http(s) href and hides it.
+  return waDeepLink(text) ?? "";
 }
 
 /** "15 KG" / "1 PC" / "Included" → true; "" / "0 KG" / "No" → false. */

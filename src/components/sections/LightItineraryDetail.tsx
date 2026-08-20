@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { CTABand } from "@/components/sections/CTABand";
 import { site } from "@/data/site";
+import { waHref } from "@/lib/whatsapp";
 import type { LightItinerary } from "@/data/itineraries/types";
 
 const CATEGORY_LABEL = { domestic: "Domestic", international: "International" };
@@ -45,7 +46,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
     isDomestic ? "Domestic" : "International"
   }`;
   const waText = `Hi Rise & Shine! I'm interested in a ${it.name} holiday (${durationLabel}). Please share options and a quote.`;
-  const waHref = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(waText)}`;
+  const waLink = waHref(waText);
 
   const quickFacts = [
     { icon: CalendarDays, label: "Duration", value: `${durationLabel} (customisable)` },
@@ -119,9 +120,11 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
             <Button href={enquiryHref} arrow>
               Enquire About This Trip
             </Button>
-            <Button href={waHref} variant="light">
-              Chat on WhatsApp
-            </Button>
+            {waLink && (
+              <Button href={waLink} variant="light">
+                Chat on WhatsApp
+              </Button>
+            )}
           </div>
         </Container>
       </section>
@@ -237,14 +240,16 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
                   <Button href={enquiryHref} arrow fullWidth>
                     Enquire About This Trip
                   </Button>
-                  <a
-                    href={waHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 flex items-center justify-center gap-2 rounded-full border border-line py-3 text-[0.9rem] font-semibold text-navy transition-colors hover:border-red hover:text-red"
-                  >
-                    <MessageCircle size={16} aria-hidden /> Chat on WhatsApp
-                  </a>
+                  {waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex items-center justify-center gap-2 rounded-full border border-line py-3 text-[0.9rem] font-semibold text-navy transition-colors hover:border-red hover:text-red"
+                    >
+                      <MessageCircle size={16} aria-hidden /> Chat on WhatsApp
+                    </a>
+                  )}
                   <a
                     href={site.phone.landlineHref}
                     className="mt-3 block text-center text-[0.85rem] text-muted hover:text-red"

@@ -65,7 +65,7 @@ function shell(title: string, bodyHtml: string): string {
   </td></tr>
   <tr><td style="padding:28px;">${bodyHtml}</td></tr>
   <tr><td style="padding:18px 28px;border-top:1px solid #e6ebee;font-size:12px;color:#68777f;">
-    Need help? Reply to this email, WhatsApp us at ${site.phone.mobileDisplay}, or call ${site.phone.landlineDisplay}.<br/>
+    Need help? Reply to this email, or call us on ${site.phone.landlineDisplay} or ${site.phone.mobileDisplay}.<br/>
     ${site.email}
   </td></tr>
 </table>

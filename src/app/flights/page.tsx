@@ -11,6 +11,7 @@ import { RecentSearches } from "@/components/ui/RecentSearches";
 import { searchFlights, defaultDates } from "@/lib/tbo";
 import { resolveAirport } from "@/data/airports";
 import { site } from "@/data/site";
+import { whatsappEnabled } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -254,9 +255,11 @@ async function FlightResults({
                 <Button href={`/plan-my-trip?destination=${encodeURIComponent(toCity)}&journey=${to.length === 3 && fromCountry === "IN" && toCountry === "IN" ? "Domestic" : "International"}`} arrow>
                   Enquire for This Route
                 </Button>
-                <Button href={site.phone.whatsappHref} variant="light">
-                  WhatsApp Us
-                </Button>
+                {whatsappEnabled && (
+                  <Button href={site.phone.whatsappHref} variant="light">
+                    WhatsApp Us
+                  </Button>
+                )}
               </div>
             </div>
           ) : (

@@ -15,6 +15,7 @@ import { RecentSearches } from "@/components/ui/RecentSearches";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { nationalityAllowed, nationalityLabel, normalizeNationality } from "@/data/nationalities";
 import { site } from "@/data/site";
+import { whatsappEnabled } from "@/lib/whatsapp";
 import { formatDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
@@ -145,9 +146,11 @@ export default async function HotelsPage({
                 <Button href={qs({ nat: "IN" })} arrow>
                   Search as Indian national
                 </Button>
-                <Button href={site.phone.whatsappHref} variant="light">
-                  WhatsApp Us
-                </Button>
+                {whatsappEnabled && (
+                  <Button href={site.phone.whatsappHref} variant="light">
+                    WhatsApp Us
+                  </Button>
+                )}
               </div>
             </div>
           </Container>
@@ -315,9 +318,11 @@ async function HotelResults({
           <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>
             Enquire for This Stay
           </Button>
-          <Button href={site.phone.whatsappHref} variant="light">
-            WhatsApp Us
-          </Button>
+          {whatsappEnabled && (
+            <Button href={site.phone.whatsappHref} variant="light">
+              WhatsApp Us
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -353,9 +358,11 @@ async function HotelResults({
                         Enquire for This Stay
                       </Button>
                     )}
-                    <Button href={site.phone.whatsappHref} variant="light">
-                      WhatsApp Us
-                    </Button>
+                    {whatsappEnabled && (
+                      <Button href={site.phone.whatsappHref} variant="light">
+                        WhatsApp Us
+                      </Button>
+                    )}
                   </div>
                 </div>
               ) : (

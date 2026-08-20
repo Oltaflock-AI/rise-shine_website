@@ -1,10 +1,13 @@
-import { site } from "@/data/site";
+import { waHref } from "@/lib/whatsapp";
 
 /** Floating WhatsApp contact button (keeps WhatsApp's official green). */
 export function WhatsAppFloat() {
+  const href = waHref();
+  // Nothing to float to while the mobile is not on WhatsApp.
+  if (!href) return null;
   return (
     <a
-      href={site.phone.whatsappHref}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"

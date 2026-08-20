@@ -7,6 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format-date";
 import { site } from "@/data/site";
+import { whatsappEnabled } from "@/lib/whatsapp";
 
 /**
  * The hotel voucher — everything TBO's portal verification checks on it
@@ -113,9 +114,11 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
             <Button href="/account" arrow>
               My bookings
             </Button>
-            <Button href={site.phone.whatsappHref} variant="light">
-              WhatsApp Us
-            </Button>
+            {whatsappEnabled && (
+              <Button href={site.phone.whatsappHref} variant="light">
+                WhatsApp Us
+              </Button>
+            )}
           </div>
         </div>
       </Container>

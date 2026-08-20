@@ -24,6 +24,7 @@ import { nationalityAllowed, nationalityLabel, normalizeNationality } from "@/da
 import { hotelInfo } from "@/lib/tbo-hotel-static";
 import { cityByCode } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
+import { whatsappEnabled } from "@/lib/whatsapp";
 import { formatDate } from "@/lib/format-date";
 import { cn } from "@/lib/cn";
 
@@ -335,7 +336,9 @@ async function RoomOptions({
                     <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(cityLabel || name)}`} arrow>
                       Enquire
                     </Button>
-                    <Button href={site.phone.whatsappHref} variant="light">WhatsApp Us</Button>
+                    {whatsappEnabled && (
+                      <Button href={site.phone.whatsappHref} variant="light">WhatsApp Us</Button>
+                    )}
                   </div>
                 </div>
               ) : (
