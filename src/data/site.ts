@@ -32,10 +32,10 @@ export const site = {
   phone: {
     landlineDisplay: "+91 79 2329 7232",
     landlineHref: "tel:+917923297232",
-    mobileDisplay: "+91 97255 97232",
-    mobileHref: "tel:+919725597232",
-    whatsapp: "919725597232",
-    whatsappHref: "https://wa.me/919725597232",
+    mobileDisplay: "+91 88660 10022",
+    mobileHref: "tel:+918866010022",
+    whatsapp: "918866010022",
+    whatsappHref: "https://wa.me/918866010022",
   },
 
   address: {
@@ -58,7 +58,7 @@ export const site = {
     facebook: "https://www.facebook.com/share/191ptG3xrK/",
     instagram: "https://www.instagram.com/rise_and_shine_travel",
     youtube: "https://www.youtube.com/@rise_and_shine_travel",
-    whatsapp: "https://wa.me/919725597232",
+    whatsapp: "https://wa.me/918866010022",
   },
 } as const;
 
