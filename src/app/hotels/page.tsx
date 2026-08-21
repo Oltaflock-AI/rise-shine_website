@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { BedDouble, TriangleAlert } from "lucide-react";
+import { BedDouble, CalendarDays, TriangleAlert } from "lucide-react";
 import { HotelResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { RecentSearches } from "@/components/ui/RecentSearches";
 import { resolveCity } from "@/lib/hotel-city-search";
 import { nationalityAllowed, nationalityLabel, normalizeNationality } from "@/data/nationalities";
+import { stayDatesError, todayInIndiaISO } from "@/lib/stay-dates";
 import { site } from "@/data/site";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { formatDate } from "@/lib/format-date";
@@ -116,6 +117,48 @@ export default async function HotelsPage({
                 ))}
               </div>
               <RecentSearches kind="hotel" className="mt-6" />
+            </div>
+          </Container>
+        </section>
+      </>
+    );
+  }
+
+  // A hotel URL outlives its dates — a bookmark or a history entry comes back
+  // with a check-in that has passed. TBO rejects that outright, and rendering it
+  // as "live rates unavailable" reads as an outage (mistaken for exactly that on
+  // 21-Aug-2026). Say what is actually wrong, and never ask TBO the question.
+  const datesProblem = stayDatesError(sp.checkIn, sp.checkOut);
+  if (datesProblem) {
+    const today = todayInIndiaISO();
+    const inDays = (n: number) => {
+      const d = new Date(`${today}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    return (
+      <>
+        {header}
+        <section className="py-20">
+          <Container>
+            <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
+              <CalendarDays className="mx-auto mb-4 text-red" aria-hidden />
+              <h2 className="h-sm mb-2">
+                {datesProblem === "past-check-in" ? "These dates have already passed" : "Check-out must be after check-in"}
+              </h2>
+              <p className="mb-6 text-muted">
+                {datesProblem === "past-check-in" ? (
+                  <>
+                    This search is for {formatDate(sp.checkIn)} to {formatDate(sp.checkOut)}, which is in the
+                    past — most likely an old link. Pick new dates above and we&apos;ll price {city.label} live.
+                  </>
+                ) : (
+                  <>Your stay needs at least one night. Pick your dates above and we&apos;ll price {city.label} live.</>
+                )}
+              </p>
+              <Button href={qs({ checkIn: inDays(14), checkOut: inDays(16) })} arrow>
+                Search the next available dates
+              </Button>
             </div>
           </Container>
         </section>
@@ -311,8 +354,13 @@ async function HotelResults({
         <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
         <h2 className="h-sm mb-2">Live rates are unavailable right now</h2>
         <p className="mb-6 text-muted">
-          We couldn&apos;t reach the hotel system for {city.label} just now. Send us your
+          We couldn&apos;t price {city.label} for these dates just now. Send us your
           stay and our team will get you the best rate.
+          {/* The supplier's own words when it gave a reason — "unreachable" is a
+              guess, and a wrong guess sends everyone hunting the wrong fault. */}
+          {res.error && res.error !== "not-configured" && res.error !== "network" ? (
+            <span className="mt-2 block text-[0.82rem] text-muted/80">Reason: {res.error}</span>
+          ) : null}
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>

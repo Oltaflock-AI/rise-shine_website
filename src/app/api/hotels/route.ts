@@ -1,6 +1,7 @@
 import { searchCityHotels, CITY_SEARCH_CODE_CEILING, type RoomOccupancy } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
 import { tooMany } from "@/lib/rate-limit";
+import { stayDatesError } from "@/lib/stay-dates";
 
 // Live TBO hotel search — never statically cached.
 export const dynamic = "force-dynamic";
@@ -45,8 +46,18 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (body.checkOut <= body.checkIn) {
+  // Reject a stay TBO would certainly reject (past check-in, zero nights) here,
+  // so the caller gets a straight answer instead of a supplier error relayed as
+  // an outage.
+  const datesProblem = stayDatesError(body.checkIn, body.checkOut);
+  if (datesProblem === "check-out-before-check-in") {
     return Response.json({ ok: false, error: "checkOut must be after checkIn." }, { status: 400 });
+  }
+  if (datesProblem === "past-check-in") {
+    return Response.json(
+      { ok: false, error: "checkIn is in the past — hotels can only be searched from today onwards." },
+      { status: 400 },
+    );
   }
 
   const rooms: RoomOccupancy[] =
