@@ -22,10 +22,14 @@ import { tboFetch } from "./tbo-fetch";
 const DEFAULT_BASE = "https://affiliate.tektravels.com/HotelAPI";
 
 function cfg() {
+  const username = process.env.TBO_HOTEL_USERNAME || process.env.TBO_USERNAME || "";
+  const password = process.env.TBO_HOTEL_PASSWORD || process.env.TBO_PASSWORD || "";
   return {
     base: (process.env.TBO_HOTEL_URL || DEFAULT_BASE).replace(/\/+$/, ""),
-    username: process.env.TBO_HOTEL_USERNAME || process.env.TBO_USERNAME || "",
-    password: process.env.TBO_HOTEL_PASSWORD || process.env.TBO_PASSWORD || "",
+    username,
+    password,
+    /** The flight login is standing in because no hotel-specific one is set. */
+    usingFlightCredentials: !process.env.TBO_HOTEL_USERNAME || !process.env.TBO_HOTEL_PASSWORD,
     ip: process.env.TBO_END_USER_IP || "115.112.175.13",
   };
 }
@@ -87,6 +91,18 @@ export async function bookingCall<T extends { Status?: TboStatus }>(
   }
   const code = json?.Status?.Code;
   if (code !== undefined && code !== 200) {
+    // A 401 here empties the whole site of inventory, and the most likely cause
+    // is that no hotel-specific login is configured, so the FLIGHT login is
+    // standing in — which TBO's hotel hosts reject once the flight account moves
+    // to live. That outage (18-Aug-2026) looked like "no availability" and cost
+    // TBO a verification round, so say plainly what to check.
+    if (code === 401 && cfg().usingFlightCredentials) {
+      console.error(
+        `[tbo-hotel] ${method} refused with 401 and no TBO_HOTEL_USERNAME/TBO_HOTEL_PASSWORD is set — ` +
+          "the flight login is being reused for hotels and TBO's hotel hosts do not accept it. " +
+          "Set the hotel-specific credentials.",
+      );
+    }
     throw new TboHotelError(json.Status?.Description || `${method} failed (Status ${code}).`, code);
   }
   return json;
