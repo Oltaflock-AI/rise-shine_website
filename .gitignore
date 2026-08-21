@@ -49,3 +49,9 @@ next-env.d.ts
 # .docx/.pptx itineraries + decks (~114MB) and the raw logo originals (~4.5MB)
 /docs
 /logos
+
+# Playwright MCP scratch (page snapshots + console logs from browser checks)
+.playwright-mcp/
+
+# Local tooling config, not part of the site
+/config/

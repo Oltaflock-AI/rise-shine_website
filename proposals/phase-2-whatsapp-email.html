@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Phase 2 — WhatsApp &amp; Email Automation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; box-sizing:border-box; margin:0; padding:0; }
+  @page { size:A4 portrait; margin:15mm 14mm 13mm; }
+  @page :first { margin:0 0 13mm 0; }
+
+  :root{
+    --navy:#083249;
+    --navy-deep:#06283b;
+    --navy-light:#0e4a68;
+    --red:#e21e26;
+    --red-deep:#a5161c;
+    --green:#0f7b56;
+    --green-soft:#e8f4ef;
+    --ink:#0d2734;
+    --muted:#5c6f7a;
+    --faint:#93a6b0;
+    --line:#dae3e8;
+    --line-soft:#edf2f5;
+    --surface:#f4f7f9;
+    --amber:#9a6207;
+    --amber-soft:#fdf4e4;
+
+    --display:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+  }
+
+  html{ background:#fff; }
+  body{ color:var(--ink); font-family:var(--body); font-size:9.6pt; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  @media screen{
+    html{ background:#e8eef2; }
+    body{ width:182mm; margin:0 auto; padding:15mm 0 20mm; background:#fff;
+      box-shadow:0 0 0 14mm #fff, 0 6mm 18mm rgba(6,40,59,.13); }
+  }
+
+  .p1{ padding:0 14mm; }
+  .newpage{ break-before:page; }
+  .keep{ break-inside:avoid; }
+  h2, h3, h4, .sechead{ break-after:avoid; }
+
+  /* ── masthead ── */
+  .mast{
+    background:linear-gradient(112deg,#052232 0%,var(--navy) 48%,var(--navy-light) 100%);
+    color:#fff; padding:14mm 14mm 8.5mm; position:relative; overflow:hidden;
+  }
+  .mast::after{
+    content:""; position:absolute; right:-32mm; top:-44mm;
+    width:96mm; height:96mm; border-radius:50%; background:rgba(226,30,38,.15);
+  }
+  .brandline{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:var(--mono); font-size:6.8pt; letter-spacing:.2em; text-transform:uppercase;
+    color:#8fb6cd; margin-bottom:9mm; position:relative; z-index:2;
+  }
+  .brandline b{ color:#fff; font-weight:600; }
+  .brandline i{ font-style:normal; color:var(--red); }
+  .kicker{
+    font-family:var(--mono); font-size:7pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--red); font-weight:600; margin-bottom:3.5mm; position:relative; z-index:2;
+  }
+  .kicker span{ color:#8fb6cd; }
+  h1{
+    font-family:var(--display); font-weight:800; font-size:22pt; line-height:1.1;
+    letter-spacing:-.6pt; max-width:152mm; position:relative; z-index:2; text-wrap:balance;
+  }
+  h1 em{ font-style:normal; color:#ff7276; }
+  .standfirst{
+    margin-top:4mm; font-size:10pt; line-height:1.42; color:#c9dce8;
+    max-width:140mm; position:relative; z-index:2;
+  }
+
+  /* ── stat strip ── */
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); background:var(--red); color:#fff; }
+  .stats div{ padding:4mm 5mm 4.2mm; border-right:1px solid rgba(255,255,255,.24); text-align:center; }
+  .stats div:last-child{ border-right:0; }
+  .stats b{
+    display:block; font-family:var(--display); font-weight:800; font-size:18.5pt;
+    letter-spacing:-.6pt; line-height:1;
+  }
+  .stats span{
+    display:block; margin-top:2.4mm; font-family:var(--mono); font-size:5.8pt;
+    letter-spacing:.11em; text-transform:uppercase; line-height:1.35; color:rgba(255,255,255,.92); font-weight:600;
+  }
+
+  /* ── section furniture ── */
+  section{ margin-top:7mm; }
+  .sechead{ display:flex; align-items:baseline; gap:3.5mm; margin-bottom:3.4mm; }
+  .sechead .num{ font-family:var(--mono); font-size:6.8pt; font-weight:600; color:var(--red); letter-spacing:.12em; }
+  .sechead h2{
+    font-family:var(--display); font-weight:700; font-size:14.5pt; color:var(--navy);
+    letter-spacing:-.3pt; line-height:1.15;
+  }
+  .sechead .rule{ flex:1; height:1px; background:var(--line); align-self:center; }
+  .sub{ font-size:9.2pt; color:var(--muted); margin-top:-1mm; margin-bottom:3.6mm; }
+  h3{ font-family:var(--display); font-weight:700; font-size:10.5pt; color:var(--navy); letter-spacing:-.1pt; }
+  strong{ font-weight:600; color:var(--navy); }
+
+  /* ── matrix ── */
+  .matrix{ border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .mrow{ display:grid; grid-template-columns:30mm repeat(5,1fr); }
+  .mrow + .mrow{ border-top:1px solid var(--line); }
+  .mrow > div{ padding:2.8mm 2.6mm; border-left:1px solid var(--line-soft); }
+  .mrow > div:first-child{ border-left:0; }
+  .mhead{ background:var(--navy); }
+  .mhead > div{ border-left-color:rgba(255,255,255,.14); }
+  .mhead .stage{ font-family:var(--display); font-size:8pt; font-weight:600; color:#fff; line-height:1.22; }
+  .mhead .corner{ background:var(--navy-deep); }
+  .lane{ font-family:var(--display); font-size:8.6pt; font-weight:700; color:var(--navy); line-height:1.22; }
+  .lane span{
+    display:block; font-family:var(--mono); font-size:5.6pt; letter-spacing:.13em;
+    text-transform:uppercase; font-weight:600; margin-bottom:1.4mm;
+  }
+  .lane.mmt span{ color:var(--faint); }
+  .lane.now span{ color:var(--red); }
+  .lane.next span{ color:var(--green); }
+  .cell .mark{
+    display:flex; align-items:center; gap:1.6mm; font-family:var(--display);
+    font-weight:700; font-size:8pt; line-height:1.2;
+  }
+  .cell .mark svg{ width:3.6mm; height:3.6mm; flex:none; }
+  .r-mmt{ background:#fbfcfd; }
+  .r-mmt .mark{ color:#546b78; }
+  .r-now .cell.miss{ background:#fdf1f1; }
+  .r-now .cell.miss .mark{ color:var(--red); }
+  .r-now .cell.soso .mark{ color:var(--amber); }
+  .r-next{ background:var(--green-soft); }
+  .r-next .mark{ color:var(--green); }
+  .r-next .lane{ color:var(--green); }
+
+  /* ── worksheet ── */
+  .sheet{ border:1.4px solid var(--navy); border-radius:4px; overflow:hidden; }
+  .sheet > header{
+    background:var(--navy); color:#fff; padding:2.8mm 5mm;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .sheet > header b{ font-family:var(--display); font-size:10pt; font-weight:700; }
+  .sheet > header span{
+    font-family:var(--mono); font-size:6pt; letter-spacing:.14em; text-transform:uppercase; color:#8fb6cd; font-weight:600;
+  }
+  .srow{ display:grid; grid-template-columns:9mm 1fr 30mm 32mm; align-items:center; padding:2.3mm 5mm; }
+  .srow + .srow{ border-top:1px solid var(--line-soft); }
+  .srow .k{
+    font-family:var(--mono); font-size:7pt; font-weight:600; color:var(--faint);
+  }
+  .srow .q{ font-size:9pt; line-height:1.35; }
+  .srow .q em{ font-style:normal; color:var(--muted); font-size:8pt; display:block; margin-top:.8mm; }
+  .srow .yours{
+    height:6mm; border:1px dashed var(--line); border-radius:2px; background:var(--surface);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:5.8pt; letter-spacing:.12em; text-transform:uppercase; color:#a9b8c1;
+  }
+  .srow .ex{
+    text-align:right; font-family:var(--display); font-weight:700; font-size:11pt;
+    color:var(--navy); font-variant-numeric:tabular-nums;
+  }
+  .srow.zero .ex{ color:var(--red); }
+  .srow.total{ background:var(--green-soft); }
+  .srow.total .q{ font-family:var(--display); font-weight:700; font-size:10pt; color:var(--green); }
+  .srow.total .ex{ color:var(--green); font-size:15pt; letter-spacing:-.4pt; }
+  .srow.total .yours{ border-color:var(--green); border-style:solid; background:#fff; color:var(--green); }
+  .sheet .colkey{
+    display:grid; grid-template-columns:9mm 1fr 30mm 32mm; padding:2mm 5mm 0;
+    font-family:var(--mono); font-size:5.6pt; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--muted); font-weight:600;
+  }
+  .sheet .colkey div:nth-child(3){ text-align:center; }
+  .sheet .colkey div:nth-child(4){ text-align:right; }
+  .sheetfoot{
+    padding:2.6mm 5mm 2.8mm; background:var(--surface); border-top:1px solid var(--line);
+    font-size:7.4pt; line-height:1.38; color:var(--muted);
+  }
+
+  /* ── urgency strip ── */
+  .urgent{
+    margin-top:4.5mm; background:var(--red-deep); color:#fff; border-radius:4px;
+    padding:3.8mm 5mm; display:grid; grid-template-columns:auto 1fr; gap:4.5mm; align-items:center;
+  }
+  .urgent .n{
+    font-family:var(--display); font-weight:800; font-size:24pt; line-height:1; letter-spacing:-.8pt;
+    color:#fff; text-align:center;
+  }
+  .urgent .n small{
+    display:block; font-family:var(--mono); font-size:5.6pt; letter-spacing:.13em;
+    text-transform:uppercase; color:rgba(255,255,255,.75); margin-top:2mm; font-weight:600;
+  }
+  .urgent p{ font-size:9pt; line-height:1.42; color:#ffdfe0; }
+  .urgent p b{ color:#fff; font-weight:600; }
+
+  /* ── break-even ── */
+  table.be{ width:100%; border-collapse:collapse; }
+  table.be th{
+    font-family:var(--mono); font-size:5.8pt; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; text-align:left; padding:0 2mm 2mm; border-bottom:1px solid var(--line);
+  }
+  table.be th.r, table.be td.r{ text-align:right; }
+  table.be td{ padding:2mm; border-bottom:1px solid var(--line-soft); font-size:8.6pt; font-variant-numeric:tabular-nums; }
+  table.be td.r{ font-family:var(--display); font-weight:700; color:var(--green); font-size:10.5pt; }
+  table.be tr:last-child td{ border-bottom:0; }
+
+  /* ── flow strip ── */
+  .flow{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; align-items:stretch; }
+  .step{ position:relative; padding-right:4.4mm; }
+  .step:last-child{ padding-right:0; }
+  .step::after{
+    content:""; position:absolute; right:1mm; top:11mm; width:0; height:0;
+    border-left:1.9mm solid var(--line); border-top:1.4mm solid transparent; border-bottom:1.4mm solid transparent;
+  }
+  .step:last-child::after{ display:none; }
+  .step .when{
+    font-family:var(--mono); font-size:6.4pt; font-weight:600; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--red); margin-bottom:2mm;
+  }
+  .step .box{ border:1px solid var(--line); border-radius:4px; padding:3.2mm 3.2mm 3.6mm; height:100%; background:#fff; }
+  .step .box h4{ font-family:var(--display); font-size:8.6pt; font-weight:700; color:var(--navy); line-height:1.22; }
+  .step .box p{ font-size:8pt; line-height:1.35; color:var(--muted); margin-top:1.6mm; }
+  .step .box .chip{
+    display:inline-flex; margin-top:2.4mm; font-family:var(--mono); font-size:5.6pt;
+    letter-spacing:.1em; text-transform:uppercase; font-weight:600; padding:1mm 2mm; border-radius:2px;
+  }
+  .chip.wa{ background:var(--green-soft); color:var(--green); }
+  .chip.em{ background:#eaf1f6; color:var(--navy-light); }
+  .chip.ph{ background:#fdeeee; color:var(--red); }
+  .step.win .box{ border-color:var(--green); background:var(--green-soft); }
+  .step.win .box h4{ color:var(--green); }
+  .step.win .box p{ color:#33655a; }
+  .step.win .when{ color:var(--green); }
+
+  /* ── loyalty ladder ── */
+  .ladder{ display:grid; grid-template-columns:repeat(4,1fr); gap:4mm; align-items:end; }
+  .rung{ display:flex; flex-direction:column; justify-content:flex-end; }
+  .rung .cap{
+    border:1px solid var(--line); border-bottom:0; border-radius:4px 4px 0 0;
+    padding:3.2mm 3.2mm 2.8mm; background:#fff;
+  }
+  .rung .cap .tier{
+    font-family:var(--mono); font-size:5.8pt; letter-spacing:.14em; text-transform:uppercase;
+    font-weight:600; color:var(--muted); margin-bottom:1.6mm;
+  }
+  .rung .cap h4{ font-family:var(--display); font-size:8.8pt; font-weight:700; color:var(--navy); line-height:1.2; }
+  .rung .cap p{ font-size:7.8pt; line-height:1.35; color:var(--muted); margin-top:1.4mm; }
+  .rung .bar{ border-radius:0 0 3px 3px; color:#fff; padding:2.4mm 3.2mm 2.8mm; display:flex; flex-direction:column; justify-content:flex-end; }
+  .rung .bar b{ font-family:var(--display); font-weight:800; font-size:10.5pt; letter-spacing:-.3pt; line-height:1; }
+  .rung .bar span{
+    display:block; font-family:var(--mono); font-size:5.6pt; letter-spacing:.12em;
+    text-transform:uppercase; color:rgba(255,255,255,.72); margin-top:1.5mm; font-weight:600;
+  }
+  .rung:nth-child(1) .bar{ background:#4d6b7c; height:12mm; }
+  .rung:nth-child(2) .bar{ background:var(--navy-light); height:16mm; }
+  .rung:nth-child(3) .bar{ background:var(--navy); height:20mm; }
+  .rung:nth-child(4) .bar{ background:var(--green); height:24mm; }
+  .rung:nth-child(4) .cap{ border-color:var(--green); background:var(--green-soft); }
+  .rung:nth-child(4) .cap h4{ color:var(--green); }
+  .rung:nth-child(4) .cap p{ color:#33655a; }
+
+  /* ── notes ── */
+  .note{
+    border-left:2.5px solid var(--amber); background:var(--amber-soft);
+    padding:3.4mm 4.4mm; border-radius:0 3px 3px 0; font-size:8.6pt; line-height:1.45;
+    color:#5c4212; break-inside:avoid;
+  }
+  .note b.h{
+    display:block; font-family:var(--mono); font-size:6pt; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--amber); margin-bottom:1.5mm; font-weight:600;
+  }
+  .note strong{ color:#5c4212; font-weight:600; }
+  .note.navy{ border-color:var(--navy); background:var(--surface); color:#31505f; }
+  .note.navy b.h{ color:var(--navy); }
+  .note.navy strong{ color:var(--navy); }
+
+  /* ── price ── */
+  .money{ display:grid; grid-template-columns:1.05fr 1fr; gap:5mm; align-items:stretch; }
+  .pricebox{
+    background:var(--navy-deep); color:#fff; border-radius:4px; padding:4.6mm 5.2mm 5mm;
+    display:flex; flex-direction:column;
+  }
+  .pricebox .eyebrow{
+    font-family:var(--mono); font-size:6pt; letter-spacing:.18em; text-transform:uppercase;
+    color:#7fa9c3; font-weight:600; margin-bottom:3.4mm;
+  }
+  .pricerow{ display:flex; align-items:flex-start; justify-content:space-between; gap:4mm; }
+  .pricerow + .pricerow{ margin-top:3.6mm; padding-top:3.6mm; border-top:1px solid rgba(255,255,255,.16); }
+  .pricerow .lbl{ font-family:var(--display); font-size:9pt; font-weight:600; color:#fff; line-height:1.3; }
+  .pricerow .lbl small{ display:block; font-family:var(--body); font-size:7.8pt; color:#9fc0d3; font-weight:400; margin-top:1.2mm; line-height:1.35; }
+  .pricerow .amt{ text-align:right; white-space:nowrap; }
+  .pricerow .amt b{
+    font-family:var(--display); font-weight:800; font-size:17pt; letter-spacing:-.5pt;
+    font-variant-numeric:tabular-nums; color:#fff; line-height:1;
+  }
+  .pricerow .amt.run b{ color:#5fd3a3; font-size:14.5pt; }
+  .pricerow .amt span{
+    display:block; font-family:var(--mono); font-size:5.6pt; letter-spacing:.12em;
+    text-transform:uppercase; color:#7fa9c3; margin-top:1.5mm; font-weight:600;
+  }
+  .includes{ margin-top:4mm; padding-top:3.6mm; border-top:1px solid rgba(255,255,255,.16); }
+  .includes .h{
+    font-family:var(--mono); font-size:5.8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:#7fa9c3; font-weight:600; margin-bottom:2.2mm;
+  }
+  .includes ul{ list-style:none; }
+  .includes li{
+    position:relative; padding-left:4.4mm; margin-bottom:1.3mm;
+    font-size:8.2pt; line-height:1.32; color:#dceaf2;
+  }
+  .includes li::before{
+    content:""; position:absolute; left:0; top:1.7mm; width:1.6mm; height:1.6mm;
+    border-radius:50%; background:#5fd3a3;
+  }
+  .pricenote{ margin-top:auto; padding-top:3.4mm; font-size:7pt; line-height:1.38; color:#9fc0d3; }
+
+  .sidebox{ border:1px solid var(--line); border-radius:4px; padding:4mm 4.6mm 4.4mm; display:flex; flex-direction:column; }
+  .sidebox h3{ margin-bottom:2mm; }
+  .sidebox > p{ font-size:8.4pt; color:var(--muted); line-height:1.4; }
+  .sidebox .beNote{ margin-top:2.2mm; font-size:7.2pt; line-height:1.36; color:var(--muted); }
+
+  ul.plain{ list-style:none; }
+  ul.plain li{ position:relative; padding-left:5mm; margin-bottom:1.2mm; font-size:8.2pt; line-height:1.36; }
+  ul.plain li::before{
+    content:""; position:absolute; left:0; top:2mm; width:2mm; height:2mm;
+    border-radius:50%; background:var(--red); opacity:.5;
+  }
+
+  .closing{
+    margin-top:4mm; background:var(--navy-deep); color:#fff; border-radius:4px;
+    padding:4.4mm 5.4mm 4.8mm; break-inside:avoid;
+  }
+  .closing h3{ color:#fff; font-size:11.5pt; margin-bottom:2.6mm; }
+  .closing ol{ list-style:none; counter-reset:step; }
+  .closing li{
+    counter-increment:step; position:relative; padding-left:7.2mm; margin-bottom:1.6mm;
+    color:#c2d8e5; font-size:8.6pt; line-height:1.38;
+  }
+  .closing li::before{
+    content:counter(step); position:absolute; left:0; top:.2mm;
+    font-family:var(--mono); font-size:7.4pt; font-weight:600; color:var(--red);
+  }
+  .closing li b{ color:#fff; font-weight:600; }
+  .sig{
+    margin-top:4mm; padding-top:3.4mm; border-top:1px solid rgba(255,255,255,.16);
+    font-family:var(--mono); font-size:6.4pt; letter-spacing:.16em; text-transform:uppercase; color:#8fb6cd;
+  }
+  .sig b{ color:#fff; font-weight:600; }
+  .sig i{ font-style:normal; color:var(--red); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 ═══════════ -->
+<header class="mast">
+  <div class="brandline">
+    <b>Oltaflock <i>&#9679;</i> AI Systems for Travel</b>
+    <span>Phase 2 Proposal &middot; Confidential</span>
+  </div>
+  <div class="kicker">Rise &amp; Shine Travels <span>&#9679;</span> Ahmedabad</div>
+  <h1>Your customers already expect this.<br/>They just <em>don&rsquo;t get it from you.</em></h1>
+  <p class="standfirst">Every trip they book on MakeMyTrip lands on WhatsApp in seconds. Yours doesn&rsquo;t.
+    Phase 2 fixes that &mdash; in three weeks, on the website you already have.</p>
+</header>
+
+<div class="stats">
+  <div><b>0</b><span>Follow-ups you send<br/>when a booking is abandoned</span></div>
+  <div><b>3</b><span>Chances to win them back<br/>after Phase 2</span></div>
+  <div><b>15 min</b><span>Until the first one<br/>reaches their phone</span></div>
+  <div><b>3 weeks</b><span>To switch<br/>the whole thing on</span></div>
+</div>
+
+<div class="p1">
+<section style="margin-top:7mm">
+  <div class="sechead"><span class="num">01</span><h2>Them vs you, at the five moments that decide a sale</h2><span class="rule"></span></div>
+
+  <div class="matrix keep">
+    <div class="mrow mhead">
+      <div class="corner"></div>
+      <div class="stage">Browses,<br/>never enquires</div>
+      <div class="stage">Leaves at the<br/>payment page</div>
+      <div class="stage">Pays and gets<br/>the ticket</div>
+      <div class="stage">Day before<br/>travel</div>
+      <div class="stage">Two months<br/>later</div>
+    </div>
+
+    <div class="mrow r-mmt">
+      <div class="lane mmt"><span>Them</span>MakeMyTrip,<br/>Yatra, Cleartrip</div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 12 22l-9-9V4h9l8.6 8.6a1.9 1.9 0 0 1 0 2.8z"/></svg>Offer for their number</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.2-5.4A8.4 8.4 0 1 1 21 11.5z"/></svg>Chased within the hour</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Ticket on WhatsApp</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Check-in reminder</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h10"/><path d="M4 19h7"/></svg>Offers keep coming</div></div>
+    </div>
+
+    <div class="mrow r-now">
+      <div class="lane now"><span>You, today</span>After Phase 1</div>
+      <div class="cell miss"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Gone, no trace</div></div>
+      <div class="cell miss"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Nothing happens</div></div>
+      <div class="cell soso"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5h.01"/></svg>On screen only</div></div>
+      <div class="cell miss"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Nothing</div></div>
+      <div class="cell miss"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Typed one by one</div></div>
+    </div>
+
+    <div class="mrow r-next">
+      <div class="lane next"><span>You, after</span>Phase 2</div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Number captured</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Chased in 15 minutes</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Ticket on WhatsApp</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sent automatically</div></div>
+      <div class="cell"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Whole list, one click</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sechead"><span class="num">02</span><h2>What it is worth &mdash; in your numbers</h2><span class="rule"></span></div>
+
+  <div class="sheet keep">
+    <header><b>The abandoned-booking maths</b><span>Fill in your own figures</span></header>
+    <div class="colkey"><div></div><div></div><div>Your number</div><div>Example</div></div>
+
+    <div class="srow">
+      <div class="k">A</div>
+      <div class="q">People who reach your payment page each month</div>
+      <div class="yours">write here</div>
+      <div class="ex">100</div>
+    </div>
+    <div class="srow zero">
+      <div class="k">B</div>
+      <div class="q">How many of them you follow up today<em>Not an estimate. There is no follow-up in the system.</em></div>
+      <div class="yours">0</div>
+      <div class="ex">0</div>
+    </div>
+    <div class="srow">
+      <div class="k">C</div>
+      <div class="q">If just 1 in 10 comes back once they are chased</div>
+      <div class="yours">A &divide; 10</div>
+      <div class="ex">10</div>
+    </div>
+    <div class="srow">
+      <div class="k">D</div>
+      <div class="q">What you earn on one booking</div>
+      <div class="yours">write here</div>
+      <div class="ex">&#8377;2,000</div>
+    </div>
+    <div class="srow total">
+      <div class="k">C&times;D</div>
+      <div class="q">Recovered every month</div>
+      <div class="yours">C &times; D</div>
+      <div class="ex">&#8377;20,000</div>
+    </div>
+
+    <div class="sheetfoot">
+      We are not promising 1 in 10 &mdash; put in whatever number you believe. The arithmetic is yours, and from
+      month one your own report shows the real figure. The only number we are certain of is <strong>B, which is
+      zero today</strong>.
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- ═══════════ PAGE 2 ═══════════ -->
+<section class="newpage">
+  <div class="sechead"><span class="num">03</span><h2>Three ways it earns, on one page</h2><span class="rule"></span></div>
+  <p class="sub"><strong>One &mdash; the sale that walked away.</strong> Today it ends at the payment page.</p>
+
+  <div class="flow keep">
+    <div class="step">
+      <div class="when">Right now</div>
+      <div class="box"><h4>They walk away</h4><p>Phone rang. Card not handy.</p></div>
+    </div>
+    <div class="step">
+      <div class="when">15 minutes</div>
+      <div class="box"><h4>WhatsApp nudge</h4><p>Their trip, one link back to it.</p><span class="chip wa">WhatsApp</span></div>
+    </div>
+    <div class="step">
+      <div class="when">3 hours</div>
+      <div class="box"><h4>Email follow-up</h4><p>Fares move &mdash; a fair warning.</p><span class="chip em">Email</span></div>
+    </div>
+    <div class="step">
+      <div class="when">Next day</div>
+      <div class="box"><h4>Your agent calls</h4><p>The AI voice agent rings them.</p><span class="chip ph">Phone call</span></div>
+    </div>
+    <div class="step win">
+      <div class="when">Result</div>
+      <div class="box"><h4>Booked with you</h4><p>Or a real number on your list.</p></div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:6mm"><strong>Two &mdash; the visitor who never calls.</strong> A small offer buys their number.</p>
+
+  <div class="flow keep">
+    <div class="step">
+      <div class="when">Step 1</div>
+      <div class="box"><h4>About to leave</h4><p>Looked at fares. Never called.</p></div>
+    </div>
+    <div class="step">
+      <div class="when">Step 2</div>
+      <div class="box"><h4>One offer appears</h4><p>&ldquo;&#8377;500 off your first booking.&rdquo;</p></div>
+    </div>
+    <div class="step">
+      <div class="when">Step 3</div>
+      <div class="box"><h4>They give a number</h4><p>Code arrives on WhatsApp.</p><span class="chip wa">WhatsApp</span></div>
+    </div>
+    <div class="step">
+      <div class="when">Step 4</div>
+      <div class="box"><h4>Used once</h4><p>Your rule, your cap, at checkout.</p></div>
+    </div>
+    <div class="step win">
+      <div class="when">From then on</div>
+      <div class="box"><h4>On your list</h4><p>Every future fare reaches them.</p></div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:6mm"><strong>Three &mdash; the customer who books once.</strong> Points make the second trip yours.</p>
+
+  <div class="ladder keep">
+    <div class="rung">
+      <div class="cap"><div class="tier">Booking 1</div><h4>Points start</h4><p>Credited the day the ticket is issued.</p></div>
+      <div class="bar"><b>Joined</b><span>Account created</span></div>
+    </div>
+    <div class="rung">
+      <div class="cap"><div class="tier">Booking 3</div><h4>First reward</h4><p>A fixed amount off the next trip.</p></div>
+      <div class="bar"><b>Silver</b><span>Reward unlocked</span></div>
+    </div>
+    <div class="rung">
+      <div class="cap"><div class="tier">Booking 5</div><h4>Looked after</h4><p>Bigger reward, plus perks that cost you nothing.</p></div>
+      <div class="bar"><b>Gold</b><span>Priority service</span></div>
+    </div>
+    <div class="rung">
+      <div class="cap"><div class="tier">The point</div><h4>They stop shopping around</h4><p>Leaving you now costs them points.</p></div>
+      <div class="bar"><b>Loyal</b><span>Books you first</span></div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:5mm">
+    <b class="h">Both offers stay capped, on purpose</b>
+    A flat 5&ndash;10&nbsp;% off an air fare can exceed your whole margin on that ticket. So the discount and the
+    points are <strong>fixed rupee amounts, capped, on packages and hotels rather than air fare, and expiring
+    after twelve months</strong>. You set every number; we show what each one costs before it goes live.
+  </div>
+</section>
+
+<!-- ═══════════ PAGE 3 ═══════════ -->
+<section class="newpage">
+  <div class="sechead"><span class="num">04</span><h2>Investment</h2><span class="rule"></span></div>
+
+  <div class="money keep">
+    <div class="pricebox">
+      <div class="eyebrow">Phase 2 &mdash; complete</div>
+      <div class="pricerow">
+        <div class="lbl">Build it and switch it on<small>Live in three weeks</small></div>
+        <div class="amt"><b>&#8377;65,000</b><span>one time</span></div>
+      </div>
+      <div class="pricerow">
+        <div class="lbl">Keep it running<small>WhatsApp uptime, approvals, fixes, monthly report</small></div>
+        <div class="amt run"><b>&#8377;10,000</b><span>per month</span></div>
+      </div>
+      <div class="includes">
+        <div class="h">Everything included</div>
+        <ul>
+          <li>Booking confirmations on WhatsApp and email</li>
+          <li>The abandoned-booking chase, all three steps</li>
+          <li>Website pop-up and single-use discount codes</li>
+          <li>Points, milestones and rewards on customer accounts</li>
+          <li>Campaigns to your existing contact list</li>
+          <li>Day-before-travel reminders</li>
+          <li>Your reporting screen, plus a monthly report</li>
+        </ul>
+      </div>
+      <div class="pricenote">
+        Half to start, half at go-live. Ex-GST. WhatsApp bills you per message directly &mdash; paise for a
+        confirmation, under a rupee for a promotion. We add nothing to it.
+      </div>
+    </div>
+
+    <div class="sidebox">
+      <h3>When it pays for itself</h3>
+      <p>Arithmetic, not a forecast. &#8377;10,000 a month is covered by this many recovered bookings:</p>
+      <table class="be" style="margin-top:3.4mm">
+        <thead><tr><th>You earn on one booking</th><th class="r">Bookings needed<br/>each month</th></tr></thead>
+        <tbody>
+          <tr><td>&#8377;1,000</td><td class="r">10</td></tr>
+          <tr><td>&#8377;2,000</td><td class="r">5</td></tr>
+          <tr><td>&#8377;3,000</td><td class="r">4</td></tr>
+          <tr><td>&#8377;5,000 &nbsp;<span style="color:var(--muted); font-size:7.6pt">a package</span></td><td class="r">2</td></tr>
+        </tbody>
+      </table>
+      <p class="beNote">The one-time &#8377;65,000 is covered inside the first few months on the same maths. After
+        that the system is the cheapest salesperson in the office &mdash; it works nights, Sundays and Diwali,
+        and it never forgets to follow up.</p>
+    </div>
+  </div>
+
+  <div class="urgent keep">
+    <div class="n">100%<small>of them leave silently</small></div>
+    <p><b>Every month this waits, the same thing happens.</b> Everyone who reaches your payment page and
+      hesitates walks away and hears nothing &mdash; while MakeMyTrip messages the same customer within the hour
+      and books the trip you had almost won. The traffic is already yours. Only the follow-up is missing.</p>
+  </div>
+</section>
+
+<section style="margin-top:5.5mm">
+  <div class="sechead"><span class="num">05</span><h2>Three weeks &mdash; and what we need from you</h2><span class="rule"></span></div>
+  <ul class="plain">
+    <li><strong>Week 1</strong> &mdash; WhatsApp live in your business name; every booking confirmed on WhatsApp and email.</li>
+    <li><strong>Week 2</strong> &mdash; the abandoned-booking chase, the pop-up and the discount codes go live.</li>
+    <li><strong>Week 3</strong> &mdash; points and rewards, your contact list imported, campaigns ready, team trained.</li>
+    <li><strong>From you:</strong> GST certificate and business papers for WhatsApp verification &middot; a decision on
+      the phone number (once it goes on WhatsApp&rsquo;s business system it leaves the handset app) &middot; the
+      discount and points values &middot; your contact list in Excel &middot; a yes on the wording.</li>
+    <li><strong>The only clock we don&rsquo;t control</strong> is Meta&rsquo;s verification of your business &mdash; usually
+      a few days. It starts the day you send the papers, and everything else runs alongside it.</li>
+  </ul>
+</section>
+
+<div class="closing">
+  <h3>To get started</h3>
+  <ol>
+    <li><b>Approve Phase 2.</b> &#8377;65,000 to build, &#8377;10,000 a month to run.</li>
+    <li><b>Send the business papers this week</b> &mdash; that starts Meta&rsquo;s clock.</li>
+    <li><b>Tell us the discount and the number.</b> Both are one-time decisions.</li>
+    <li><b>Three weeks later</b> &mdash; nothing walks away unnoticed again.</li>
+  </ol>
+  <div class="sig"><b>Oltaflock <i>&#9679;</i> AI Systems for Travel</b> &nbsp;&mdash;&nbsp; Phase 2 for Rise &amp; Shine Travels, Ahmedabad</div>
+</div>
+
+</body>
+</html>

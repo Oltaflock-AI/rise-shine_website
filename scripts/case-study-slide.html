@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Rise &amp; Shine Travels — AI Case Study Slide</title>
+<style>
+  /* 16:9 — fills a Loom / screen-share frame edge to edge */
+  @page { size: 338.667mm 190.5mm; margin: 0; }
+
+  :root{
+    --red:#e21e26;
+    --navy:#083249;
+    --navy-deep:#06283b;
+    --ink:#102a39;
+    --muted:#6b7a84;
+    --grey:#a3adb4;
+    --line:#e2e7ea;
+    --green:#0f7b56;
+    --green-soft:#e8f4ef;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    width:338.667mm; height:190.5mm;
+    background:#fff; color:var(--ink);
+    font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .slide{
+    width:338.667mm; height:190.5mm;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- top ---------- */
+  .top{
+    flex:none;
+    background:linear-gradient(110deg, var(--navy-deep) 0%, var(--navy) 55%, #0e4a68 100%);
+    color:#fff;
+    padding:11mm 20mm 10mm;
+    position:relative; overflow:hidden;
+  }
+  .top::after{
+    content:""; position:absolute; right:-40mm; top:-60mm;
+    width:150mm; height:150mm; border-radius:50%;
+    background:rgba(226,30,38,.15);
+  }
+  .kicker{
+    font-size:9.5pt; letter-spacing:.26em; text-transform:uppercase;
+    font-weight:700; color:#9fc3d8; margin-bottom:5mm;
+    position:relative; z-index:2;
+  }
+  .kicker i{ font-style:normal; color:var(--red); margin:0 2mm; }
+  h1{
+    font-size:31pt; line-height:1.12; font-weight:800; letter-spacing:-.8pt;
+    position:relative; z-index:2;
+  }
+  h1 em{ font-style:normal; color:#ff5f66; }
+
+  /* ---------- three leaks ---------- */
+  .grid{
+    flex:1;
+    display:grid; grid-template-columns:repeat(3,1fr);
+  }
+  .col{
+    padding:9mm 11mm 8mm;
+    border-right:1px solid var(--line);
+    display:flex; flex-direction:column;
+  }
+  .col:first-child{ padding-left:20mm; }
+  .col:last-child{ border-right:0; padding-right:20mm; }
+
+  .num{
+    font-size:8.5pt; font-weight:800; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:5mm;
+  }
+
+  .pair{ display:flex; align-items:baseline; gap:4mm; }
+  .was{
+    font-size:14pt; font-weight:700; color:var(--grey);
+    text-decoration:line-through; text-decoration-color:rgba(226,30,38,.6);
+    text-decoration-thickness:2px; white-space:nowrap;
+  }
+  .to{ font-size:13pt; font-weight:800; color:var(--red); }
+  .now{
+    font-size:26pt; font-weight:800; color:var(--green);
+    letter-spacing:-.6pt; line-height:1; white-space:nowrap;
+  }
+
+  .delta{
+    align-self:flex-start; margin-top:4.5mm;
+    background:var(--green-soft); color:var(--green);
+    border-radius:20px; padding:1.6mm 4mm;
+    font-size:8.5pt; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+  }
+
+  .claim{
+    margin-top:6mm;
+    font-size:14pt; line-height:1.3; font-weight:800; color:var(--ink);
+    letter-spacing:-.2pt;
+  }
+  .note{
+    margin-top:5mm;
+    font-size:9.5pt; line-height:1.45; color:var(--muted);
+  }
+
+  /* ---------- bottom ---------- */
+  .bar{
+    flex:none;
+    background:var(--red); color:#fff;
+    padding:8mm 20mm;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .metrics{ display:flex; gap:9.5mm; }
+  .m b{ display:block; font-size:20pt; font-weight:800; line-height:1; letter-spacing:-.5pt; }
+  .m b span.per{
+    display:inline; font-size:12pt; font-weight:700; letter-spacing:0;
+    text-transform:none; color:rgba(255,255,255,.9);
+  }
+  .m span{ display:block; margin-top:2.6mm; font-size:8pt; letter-spacing:.1em;
+           text-transform:uppercase; font-weight:700; color:rgba(255,255,255,.92); line-height:1.35; }
+  .brandmark{
+    text-align:right; font-size:10pt; letter-spacing:.2em; text-transform:uppercase;
+    font-weight:800; line-height:1.7; padding-left:8mm;
+  }
+  .brandmark small{
+    display:block; font-size:8pt; letter-spacing:.1em; font-weight:600;
+    color:rgba(255,255,255,.82); text-transform:none;
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+
+  <header class="top">
+    <div class="kicker">Case Study <i>&#9679;</i> Rise &amp; Shine Travels</div>
+    <h1>They weren&rsquo;t short of leads.<br/>They were losing them to <em>the clock.</em></h1>
+  </header>
+
+  <section class="grid">
+    <div class="col">
+      <div class="num">01 &mdash; Lead follow-up</div>
+      <div class="pair">
+        <span class="was">4 hrs 20 min</span>
+        <span class="to">&rarr;</span>
+        <span class="now">90 sec</span>
+      </div>
+      <div class="delta">99% faster first contact</div>
+      <div class="claim">Every lead called back before it goes cold</div>
+      <div class="note">Average time to first contact, across 400+ enquiries.</div>
+      <div style="margin-top:auto"></div>
+    </div>
+
+    <div class="col">
+      <div class="num">02 &mdash; Missed calls</div>
+      <div class="pair">
+        <span class="was">0 captured</span>
+        <span class="to">&rarr;</span>
+        <span class="now">41 / mo</span>
+      </div>
+      <div class="delta">100% of calls answered</div>
+      <div class="claim">After-hours callers now turn into bookings</div>
+      <div class="note">Calls outside office hours used to hit voicemail and never come back.</div>
+    </div>
+
+    <div class="col">
+      <div class="num">03 &mdash; Quoting</div>
+      <div class="pair">
+        <span class="was">4 hrs</span>
+        <span class="to">&rarr;</span>
+        <span class="now">Instant</span>
+      </div>
+      <div class="delta">48 staff hours saved / month</div>
+      <div class="claim">Live fares quoted without touching a portal</div>
+      <div class="note">Six full working days handed back to the team, every month.</div>
+    </div>
+  </section>
+
+  <footer class="bar">
+    <div class="metrics">
+      <div class="m"><b>+43%</b><span>Monthly<br/>revenue</span></div>
+      <div class="m"><b>10&rarr;12.5%</b><span>Enquiry to<br/>booking rate</span></div>
+      <div class="m"><b>$12,000<span class="per">/yr</span></b><span>Staffing cost<br/>saved</span></div>
+      <div class="m"><b>576<span class="per">hrs</span></b><span>Team time saved<br/>a year</span></div>
+      <div class="m"><b>7 days</b><span>To install<br/>end to end</span></div>
+    </div>
+    <div class="brandmark">
+      Oltaflock
+      <small>AI systems for travel agencies</small>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Rise &amp; Shine Travels — AI Sales System Case Study</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+
+  :root{
+    --red:#e21e26;
+    --red-deep:#8d191c;
+    --navy:#083249;
+    --navy-light:#0e4a68;
+    --charcoal:#404041;
+    --ink:#102a39;
+    --muted:#5e6a72;
+    --line:#e2e7ea;
+    --cream:#f7f8f9;
+    --cream-2:#eef2f4;
+    --green:#0f7b56;
+    --green-soft:#eaf6f1;
+    --red-soft:#fdeceb;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    width:210mm; height:297mm;
+    background:#fff;
+    color:var(--ink);
+    font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .page{
+    width:210mm; height:297mm;
+    padding:0;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------------- header ---------------- */
+  .head{
+    flex:none;
+    background:linear-gradient(115deg, #06283b 0%, var(--navy) 42%, var(--navy-light) 100%);
+    color:#fff;
+    padding:8mm 12mm 7mm;
+    position:relative;
+    overflow:hidden;
+  }
+  .head::after{
+    content:""; position:absolute; right:-30mm; top:-40mm;
+    width:90mm; height:90mm; border-radius:50%;
+    background:rgba(226,30,38,.16);
+  }
+  .eyebrow{
+    font-size:7.6pt; letter-spacing:.22em; text-transform:uppercase;
+    color:#9fc3d8; font-weight:700; margin-bottom:3.5mm;
+  }
+  .eyebrow span{ color:var(--red); }
+  h1{
+    font-size:20.5pt; line-height:1.14; font-weight:800; letter-spacing:-.4pt;
+    max-width:168mm; position:relative; z-index:2;
+  }
+  h1 em{ font-style:normal; color:#ff6a6f; }
+  .sub{
+    margin-top:4mm; font-size:9.4pt; line-height:1.5; color:#c2d6e2;
+    max-width:145mm; position:relative; z-index:2;
+  }
+
+  /* ---------------- stat strip ---------------- */
+  .stats{
+    flex:none;
+    display:grid; grid-template-columns:repeat(4,1fr);
+    background:var(--red);
+    color:#fff;
+  }
+  .stat{
+    padding:5mm 5mm 5.2mm; text-align:center;
+    border-right:1px solid rgba(255,255,255,.22);
+  }
+  .stat:last-child{ border-right:0; }
+  .stat b{
+    display:block; font-size:21pt; font-weight:800; letter-spacing:-.5pt; line-height:1;
+  }
+  .stat small{
+    display:block; margin-top:2.4mm; font-size:7.2pt; line-height:1.35;
+    letter-spacing:.06em; text-transform:uppercase; font-weight:600;
+    color:rgba(255,255,255,.9);
+  }
+
+  /* ---------------- compare ---------------- */
+  .body{ padding:6mm 12mm 0; flex:1; }
+
+  .sectitle{
+    font-size:8pt; letter-spacing:.2em; text-transform:uppercase;
+    font-weight:700; color:var(--muted); margin-bottom:3.2mm;
+    display:flex; align-items:center; gap:3mm;
+  }
+  .sectitle::after{ content:""; flex:1; height:1px; background:var(--line); }
+
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:0 6mm; }
+  .colhead{
+    display:flex; align-items:center; gap:2.5mm;
+    font-size:9.5pt; font-weight:800; letter-spacing:.02em;
+    padding-bottom:3mm;
+  }
+  .pill{
+    font-size:6.6pt; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+    padding:1.2mm 2.6mm; border-radius:20px; color:#fff;
+  }
+  .pill.b{ background:var(--charcoal); }
+  .pill.a{ background:var(--green); }
+  .colhead.before{ color:var(--charcoal); }
+  .colhead.after{ color:var(--green); }
+
+  .row{ display:contents; }
+  .cell{
+    padding:2.8mm 3.6mm;
+    font-size:8.2pt; line-height:1.42;
+    border-radius:9px;
+    margin-bottom:2.1mm;
+  }
+  .cell .lbl{
+    display:block; font-size:6.8pt; letter-spacing:.14em; text-transform:uppercase;
+    font-weight:800; margin-bottom:1.6mm; opacity:.75;
+  }
+  .cell.b{ background:var(--red-soft); color:#6e2b28; }
+  .cell.b .lbl{ color:var(--red-deep); }
+  .cell.a{ background:var(--green-soft); color:#124f3c; border-left:2.5px solid var(--green); }
+  .cell.a .lbl{ color:var(--green); }
+  .cell strong{ font-weight:800; }
+
+  /* ---------------- installed ---------------- */
+  .installed{
+    margin-top:3.5mm;
+    background:var(--cream-2);
+    border-radius:11px;
+    padding:4mm 5mm 4.4mm;
+  }
+  .installed h3{
+    font-size:8pt; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--navy); font-weight:800; margin-bottom:3mm;
+  }
+  .chips{ display:grid; grid-template-columns:repeat(4,1fr); gap:3mm; }
+  .chip{
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    padding:2.6mm 3mm;
+  }
+  .chip b{ display:block; font-size:7.8pt; font-weight:800; color:var(--navy); line-height:1.25; }
+  .chip span{ display:block; margin-top:1.4mm; font-size:6.8pt; line-height:1.35; color:var(--muted); }
+
+  /* ---------------- quote + footer ---------------- */
+  .foot{
+    flex:none;
+    margin-top:auto;
+    display:grid; grid-template-columns:1.55fr 1fr;
+    border-top:3px solid var(--red);
+  }
+  .quote{
+    background:var(--navy); color:#fff;
+    padding:5.5mm 8mm 6mm 12mm;
+  }
+  .quote p{
+    font-size:9.6pt; line-height:1.5; font-weight:500; color:#e8f1f6;
+  }
+  .quote p::before{ content:"\201C"; color:var(--red); font-size:20pt; font-weight:800; line-height:0; margin-right:1mm; }
+  .quote cite{
+    display:block; margin-top:3.5mm; font-style:normal;
+    font-size:7.4pt; letter-spacing:.1em; text-transform:uppercase;
+    color:#8fb3c8; font-weight:700;
+  }
+  .cta{
+    background:#06283b; color:#fff;
+    padding:5.5mm 12mm 6mm 8mm;
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  .cta b{ font-size:9.4pt; font-weight:800; line-height:1.3; display:block; }
+  .cta span{ display:block; margin-top:2.5mm; font-size:7.6pt; line-height:1.5; color:#a9c6d6; }
+  .cta .brand{
+    margin-top:4mm; padding-top:3mm; border-top:1px solid rgba(255,255,255,.16);
+    font-size:7pt; letter-spacing:.16em; text-transform:uppercase; color:#ffffff; font-weight:800;
+  }
+  .cta .brand i{ font-style:normal; color:var(--red); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="head">
+    <div class="eyebrow">Case Study <span>&#9679;</span> AI Sales System for Travel Agencies</div>
+    <h1>Rise &amp; Shine Travels stopped losing leads<br/>to <em>slow replies and missed calls.</em></h1>
+    <p class="sub">A 20-year-old Ahmedabad travel agency with strong enquiry volume and a leaking funnel.
+      We installed an AI front desk that answers every call, calls every lead back within two minutes,
+      quotes instantly and takes payment &mdash; without adding a single staff member.</p>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><b>5&times;</b><small>More enquiries<br/>converted</small></div>
+    <div class="stat"><b>&lt;2 min</b><small>Lead callback<br/>was 4&ndash;6 hrs</small></div>
+    <div class="stat"><b>24/7</b><small>Calls answered<br/>zero voicemail</small></div>
+    <div class="stat"><b>100%</b><small>Calls logged<br/>&amp; transcribed</small></div>
+  </section>
+
+  <main class="body">
+    <div class="sectitle">Before &amp; After</div>
+
+    <div class="cols">
+      <div class="colhead before"><span class="pill b">Before</span> Manual, and only in office hours</div>
+      <div class="colhead after"><span class="pill a">After</span> Automated, running round the clock</div>
+
+      <div class="cell b"><span class="lbl">Lead follow-up</span>Enquiry sits in an inbox until someone is free. First reply lands <strong>4&ndash;6 hours later</strong> &mdash; by then the customer has booked elsewhere.</div>
+      <div class="cell a"><span class="lbl">Lead follow-up</span>Every enquiry is queued and the AI agent <strong>calls back in under 2 minutes</strong>, automatically, every single time.</div>
+
+      <div class="cell b"><span class="lbl">After-hours calls</span>Calls after 7pm and on Sundays ring out to <strong>voicemail</strong>. Nobody hears them till Monday. That lead is simply gone.</div>
+      <div class="cell a"><span class="lbl">After-hours calls</span>An AI voice agent <strong>picks up 24/7</strong>, understands the trip, qualifies the lead and books the human callback.</div>
+
+      <div class="cell b"><span class="lbl">Quoting</span>Staff open supplier portals, compare fares by hand and WhatsApp a screenshot. <strong>2&ndash;6 hours per quote</strong>, one at a time.</div>
+      <div class="cell a"><span class="lbl">Quoting</span>Live flight &amp; hotel fares on the website. The customer gets an <strong>all-inclusive price instantly</strong> &mdash; no staff involved.</div>
+
+      <div class="cell b"><span class="lbl">Booking &amp; payment</span>Payment chased over WhatsApp and UPI, ticket issued by hand the next morning. Drop-offs at every step.</div>
+      <div class="cell a"><span class="lbl">Booking &amp; payment</span>Card / UPI / netbanking checkout on the site, <strong>e-ticket issued automatically</strong> in seconds. Confirmation emailed.</div>
+
+      <div class="cell b"><span class="lbl">Record keeping</span>What was promised on a call lives in <strong>one person&rsquo;s head</strong>. No record, no follow-up list, nothing to hand over.</div>
+      <div class="cell a"><span class="lbl">Record keeping</span>Every call <strong>transcribed, tagged and searchable</strong> in the CRM, with the follow-up queue built in.</div>
+    </div>
+
+    <div class="installed">
+      <h3>What we installed</h3>
+      <div class="chips">
+        <div class="chip"><b>AI Voice Agent</b><span>Answers inbound calls and places outbound callbacks, in Hindi &amp; English.</span></div>
+        <div class="chip"><b>Instant Quote Engine</b><span>Live airline &amp; hotel inventory priced all-inclusive on the site.</span></div>
+        <div class="chip"><b>Callback Queue</b><span>No enquiry can be missed, duplicated or dialled twice.</span></div>
+        <div class="chip"><b>Booking &amp; Payments</b><span>Online payment, automatic ticketing, receipts and refunds.</span></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="quote">
+      <p>We were not short of enquiries. We were losing them to the clock. Now nothing rings out and nobody waits for a quote.</p>
+      <cite>&mdash; Rise &amp; Shine Travels, Ahmedabad</cite>
+    </div>
+    <div class="cta">
+      <b>Running a travel agency with the same leak?</b>
+      <span>We install the same system in 2&ndash;3 weeks, on your existing website and phone number.</span>
+      <div class="brand">Oltaflock <i>&#9679;</i> AI Systems for Travel</div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
