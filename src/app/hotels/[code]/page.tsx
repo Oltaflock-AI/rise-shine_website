@@ -20,6 +20,9 @@ import { searchHotels, type HotelRoomOffer } from "@/lib/tbo-hotel";
 import { RoomRateDetails } from "@/components/ui/RoomRateDetails";
 import { HotelGallery } from "@/components/ui/HotelGallery";
 import { RoomContentNote } from "@/components/ui/RoomContentNote";
+import { HotelAmenities } from "@/components/ui/HotelAmenities";
+import { HotelAbout } from "@/components/ui/HotelAbout";
+import { HotelLocation } from "@/components/ui/HotelLocation";
 import { matchRoomContent, type RoomContent } from "@/lib/hotel-room-match";
 import {
   nationalityAllowed,
@@ -31,6 +34,7 @@ import { cityByCode } from "@/lib/hotel-city-search";
 import { site } from "@/data/site";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { formatDate } from "@/lib/format-date";
+import { cancellationWindows } from "@/lib/hotel-cancellation";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -40,40 +44,23 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-/** TBO cancel-policy dates arrive as "DD-MM-YYYY hh:mm:ss" → ISO for formatDate. */
-function tboDateToISO(s: string): string {
-  const m = /^(\d{2})-(\d{2})-(\d{4})/.exec(s || "");
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
-}
-
-/** "Free cancellation before X" when the rate's first charge window starts later. */
+/**
+ * "Free cancellation before X", but only while that window is still OPEN.
+ *
+ * TBO dates the first policy row from when the free window began, which for a
+ * near-term stay is already in the past — the old check read row 0, saw a zero
+ * charge and promised a refund the guest could no longer get.
+ */
 function freeCancelUntil(room: HotelRoomOffer): string | null {
-  const policies = room.cancelPolicies;
-  if (!policies?.length || !room.isRefundable) return null;
-  if ((policies[0]?.charge ?? 0) > 0) return null;
-  const firstCharged = policies.find((p) => (p.charge ?? 0) > 0);
-  const iso = firstCharged ? tboDateToISO(firstCharged.fromDate) : "";
-  return iso ? formatDate(iso) : null;
+  if (!room.isRefundable) return null;
+  const active = cancellationWindows(room.cancelPolicies).find((w) => w.active);
+  if (!active?.free || !active.untilISO) return null;
+  return formatDate(active.untilISO) || null;
 }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
   const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
   return Math.max(1, Math.round(ms / (24 * 60 * 60 * 1000)));
-}
-
-/** TBO facility strings are messy — keep short, display-worthy ones. */
-function curateFacilities(list: string[], max = 12): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const f of list) {
-    const t = f.trim();
-    const key = t.toLowerCase();
-    if (t.length < 3 || t.length > 34 || seen.has(key)) continue;
-    seen.add(key);
-    out.push(t[0].toUpperCase() + t.slice(1));
-    if (out.length >= max) break;
-  }
-  return out;
 }
 
 export default async function HotelDetailPage({
@@ -115,7 +102,14 @@ export default async function HotelDetailPage({
   const info = await hotelInfoWithRooms(code);
   const nights = hasStay ? nightsBetween(sp.checkIn!, sp.checkOut!) : 1;
   const name = info?.name || `Hotel ${code}`;
-  const facilities = curateFacilities(info?.facilities ?? []);
+  // Lead the mosaic with TBO's own primary photo, then the rest of the feed
+  // minus that shot, so the best image is first and never appears twice.
+  const galleryImages = info?.heroImage
+    ? [
+        info.heroImage,
+        ...(info.images ?? []).filter((u) => u !== info.heroImage),
+      ]
+    : (info?.images ?? []);
 
   return (
     <>
@@ -173,7 +167,7 @@ export default async function HotelDetailPage({
       <section className="py-10 sm:py-14">
         <Container>
           {/* ── gallery ── */}
-          <HotelGallery images={info?.images ?? []} name={name} />
+          <HotelGallery images={galleryImages} name={name} />
 
           <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
             {/* ── rooms ── */}
@@ -247,46 +241,17 @@ export default async function HotelDetailPage({
                 </div>
               )}
 
-              {facilities.length > 0 && (
-                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                  <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
-                    Amenities
-                  </h3>
-                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    {facilities.map((f) => (
-                      <li
-                        key={f}
-                        className="flex items-start gap-1.5 text-[0.83rem] text-muted"
-                      >
-                        <Check
-                          size={14}
-                          className="mt-0.5 flex-none text-red"
-                          aria-hidden
-                        />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <HotelAmenities facilities={info?.facilities} />
 
-              {info?.description && (
-                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                  <h3 className="mb-2 text-[0.95rem] font-bold text-ink">
-                    About this property
-                  </h3>
-                  {/* Supplier text can embed HTML — strip to plain text, never inject. */}
-                  <p className="line-clamp-[14] whitespace-pre-line text-[0.85rem] leading-relaxed text-muted">
-                    {info.description
-                      .replace(/<br\s*\/?>/gi, "\n")
-                      .replace(/<\/p>/gi, "\n\n")
-                      .replace(/<[^>]+>/g, "")
-                      .replace(/&amp;/g, "&")
-                      .replace(/&nbsp;/g, " ")
-                      .trim()}
-                  </p>
-                </div>
-              )}
+              <HotelLocation
+                name={name}
+                address={info?.address}
+                lat={info?.lat}
+                lng={info?.lng}
+                attractions={info?.attractions}
+              />
+
+              <HotelAbout description={info?.description} />
             </aside>
           </div>
         </Container>

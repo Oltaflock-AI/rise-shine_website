@@ -243,6 +243,19 @@ export type TboHotelInfo = {
   facilities: string[];
   /** Absolute image URLs (tboholidays.com) — often 50–90 per hotel. */
   images: string[];
+  /**
+   * TBO's OWN designated primary photo (`Image`, singular), which is usually a
+   * different and better shot than `Images[0]` — the array is in upload order,
+   * so it opens on whatever the supplier happened to send first: a car park, a
+   * corridor, a logo. Falls back to `Images[0]` when TBO omits it.
+   */
+  heroImage?: string;
+  /**
+   * Nearby landmarks, nearest first. TBO sends these as an OBJECT keyed
+   * "1) ", "2) " … rather than an array, so the order has to be recovered
+   * from the keys.
+   */
+  attractions: string[];
   address: string;
   cityName?: string;
   lat?: string;
@@ -305,6 +318,8 @@ function mapInfo(
     description: s(raw.Description),
     facilities: arr(raw.HotelFacilities),
     images: imgs(raw.Images),
+    heroImage: normaliseImageUrl(s(raw.Image)) || imgs(raw.Images)[0],
+    attractions: mapAttractions(raw.Attractions),
     address: s(raw.Address),
     cityName: s(raw.CityName) || undefined,
     lat: lat || undefined,
@@ -320,6 +335,23 @@ function mapInfo(
  * name, because TBO repeats a room type once per rate plan, and trimmed because
  * the raw array is most of the response weight.
  */
+/**
+ * `Attractions` is an object, not an array: `{ "1) ": "Dubai Creek", "2) ": … }`.
+ * `Object.values` alone would trust JS insertion order for what is really a
+ * numbered list, so the index is parsed out of the key and sorted on.
+ */
+function mapAttractions(raw: unknown): string[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  return Object.entries(raw as Record<string, unknown>)
+    .map(([k, v]) => ({
+      n: parseInt(k, 10),
+      text: typeof v === "string" ? v.trim() : "",
+    }))
+    .filter((e) => e.text && Number.isFinite(e.n))
+    .sort((a, b) => a.n - b.n)
+    .map((e) => e.text);
+}
+
 function mapRooms(raw: unknown): RoomContent[] {
   if (!Array.isArray(raw)) return [];
   const byName = new Map<string, RoomContent>();

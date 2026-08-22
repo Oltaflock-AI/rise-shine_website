@@ -33,6 +33,19 @@
   --font-sans: var(--font-roboto), system-ui, -apple-system, sans-serif;
   --font-script: var(--font-dancing), "Segoe Script", cursive;
 
+  /* ---- type scale for supporting copy ----
+     The booking UI had grown twelve ad-hoc sizes between 0.72rem and 0.98rem,
+     which is 11.5px at the bottom — small enough that fare captions, voucher
+     labels and rate footnotes were being skipped rather than read. Three named
+     steps replace them, with 13px as the hard floor for anything a guest is
+     expected to actually read. Never go below --text-meta. */
+  --text-meta: 0.8125rem; /* 13px — captions, field labels, footnotes */
+  --text-meta--line-height: 1.45;
+  --text-body: 0.9375rem; /* 15px — secondary body copy, list rows */
+  --text-body--line-height: 1.6;
+  --text-lead: 1.0625rem; /* 17px — card titles, sub-headings */
+  --text-lead--line-height: 1.35;
+
   /* ---- radii ---- */
   --radius-brand-sm: 13px;
   --radius-brand: 20px;

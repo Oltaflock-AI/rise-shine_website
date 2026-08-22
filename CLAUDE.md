@@ -85,6 +85,22 @@ left alone, because the `img=` token is base64 containing `/` and `+` and stops
 resolving if re-encoded. Checking that photo URLs appear in the HTML does NOT
 prove they render — fetch the `/_next/image?url=…` and look at the status.
 
+**The hotel content feed needs curating, not printing.** Three helpers do it,
+all pure and tested: `hotel-amenities.ts` (651 distinct facility strings per
+city, one pool arriving four ways, a third of it pandemic boilerplate → iconed
+categories), `hotel-description.ts` (the description is HTML whose `<strong>`
+runs are real section headings — parse them, never `dangerouslySetInnerHTML`),
+and `hotel-cancellation.ts`. Cards lead with TBO's own `Image` (singular), NOT
+`Images[0]` — the array is upload-ordered and often opens on a corridor. `Map`
+and `Attractions` drive the location panel.
+
+**Cancellation rows are WINDOWS, not dates.** Each `CancelPolicies` row opens a
+window that runs until the next row's date. Printing the rows verbatim showed a
+guest checking in on the 23rd "From 21-08-26: No charge" — a free window that
+had already closed, i.e. a refund promise the site could not keep. Always go
+through `cancellationWindows()`, which pairs each row with its end, drops the
+lapsed ones and marks the one containing now.
+
 **TBO returns no per-room photographs.** `RoomDetails[].imageURL` is in the
 schema and empty on every room of every hotel on our account (6,879 rooms across
 23 hotels, three cities, checked 2026-08-22). The room list shows `RoomSize` and
