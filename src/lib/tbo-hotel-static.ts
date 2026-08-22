@@ -260,6 +260,34 @@ export type TboHotelInfo = {
 
 const infoCache = new Map<string, { data: TboHotelInfo; exp: number }>();
 
+/**
+ * TBO writes its photo URLs with a doubled slash after the host:
+ *
+ *   https://www.tboholidays.com//imageresource.aspx?img=…
+ *
+ * Next's dev optimizer tolerates that; **Vercel's does not** — it answers
+ * `400 INVALID_IMAGE_OPTIMIZE_REQUEST` for every one of them, which is why
+ * hotel photos rendered locally and were blank in production even once the
+ * URLs reached the page. The single-slash form of the same URL returns 200.
+ *
+ * Collapsing runs of slashes in the PATH only (never the `//` in the scheme,
+ * never inside the query, whose base64 token contains `/` and must survive
+ * byte-for-byte) makes the same image optimizable. Anything unparseable is
+ * returned untouched rather than dropped — a URL we cannot read is still one
+ * the browser might.
+ */
+export function normaliseImageUrl(url: string): string {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    u.pathname = u.pathname.replace(/\/{2,}/g, "/");
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function mapInfo(
   raw: Record<string, unknown>,
   withRooms = false,
@@ -267,6 +295,7 @@ function mapInfo(
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   const arr = (v: unknown) =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  const imgs = (v: unknown) => arr(v).map(normaliseImageUrl).filter(Boolean);
   // Map arrives as "lat|long".
   const [lat, lng] = s(raw.Map).split("|");
   return {
@@ -275,7 +304,7 @@ function mapInfo(
     rating: Math.max(0, Math.min(5, Number(raw.HotelRating) || 0)),
     description: s(raw.Description),
     facilities: arr(raw.HotelFacilities),
-    images: arr(raw.Images),
+    images: imgs(raw.Images),
     address: s(raw.Address),
     cityName: s(raw.CityName) || undefined,
     lat: lat || undefined,
@@ -307,7 +336,9 @@ function mapRooms(raw: unknown): RoomContent[] {
       : rawSize;
     const description =
       typeof r.RoomDescription === "string" ? r.RoomDescription.trim() : "";
-    const image = typeof r.imageURL === "string" ? r.imageURL.trim() : "";
+    const image = normaliseImageUrl(
+      typeof r.imageURL === "string" ? r.imageURL : "",
+    );
     if (!size && !description && !image) continue;
     byName.set(name, {
       name,
