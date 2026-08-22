@@ -32,6 +32,8 @@ export function HotelGallery({
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
 
   const show = useCallback(
     (i: number) => {
@@ -40,24 +42,56 @@ export function HotelGallery({
     [images.length],
   );
 
+  // Keyboard handling, re-bound as the shown photo changes.
   useEffect(() => {
     if (!open) return;
-    closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
       if (e.key === "ArrowRight") show(index + 1);
       if (e.key === "ArrowLeft") show(index - 1);
+      // Keep Tab inside the viewer. Without this the focus ring walks off into
+      // the room list behind the overlay, where nothing is visible and Enter
+      // navigates the page out from under an open dialog.
+      if (e.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (
+        e.shiftKey &&
+        (active === first || !dialogRef.current?.contains(active))
+      ) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, index, show]);
+
+  // Open/close only. Kept apart from the key handler above because that one
+  // re-runs on every arrow press, and restoring focus in its cleanup would
+  // yank the guest back to the mosaic tile each time they changed photo.
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
     // The viewer covers the page; letting the page scroll behind it means the
     // reader loses their place in the room list on close.
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      // Hand focus back to the tile that opened the viewer, not to the top of
+      // the document.
+      openerRef.current?.focus();
     };
-  }, [open, index, show]);
+  }, [open]);
 
   if (!tiles.length) return null;
 
@@ -68,7 +102,8 @@ export function HotelGallery({
           <button
             key={i}
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              openerRef.current = e.currentTarget;
               setIndex(i);
               setOpen(true);
             }}
@@ -94,7 +129,7 @@ export function HotelGallery({
             />
             {i === tiles.length - 1 && images.length > tiles.length && (
               <span className="absolute inset-0 grid place-items-center bg-black/45 transition-colors group-hover:bg-black/60">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-[0.78rem] font-bold text-ink">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-meta font-bold text-ink">
                   <ImagesIcon size={13} aria-hidden /> See all {images.length}{" "}
                   photos
                 </span>
@@ -106,6 +141,7 @@ export function HotelGallery({
 
       {open && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${name} photos`}
@@ -113,7 +149,7 @@ export function HotelGallery({
           onClick={() => setOpen(false)}
         >
           <div className="flex flex-none items-center justify-between px-4 py-3 text-white sm:px-6">
-            <span className="text-[0.9rem] font-semibold tabular-nums">
+            <span className="text-body font-semibold tabular-nums">
               {index + 1} / {images.length}
             </span>
             <button

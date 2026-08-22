@@ -158,12 +158,12 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
       <div className="mx-auto my-12 max-w-3xl rounded-brand-lg border border-line bg-white p-8 shadow-brand-sm print:border-0 print:shadow-none">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
           <div>
-            <p className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-red">
+            <p className="text-meta font-bold uppercase tracking-[0.14em] text-red">
               Hotel voucher
             </p>
             <h1 className="h-sm mt-1">{detail.hotelName || "Your stay"}</h1>
             {(detail.address || detail.city) && (
-              <p className="mt-1 flex items-start gap-1.5 text-[0.88rem] text-muted">
+              <p className="mt-1 flex items-start gap-1.5 text-body text-muted">
                 <MapPin
                   size={14}
                   className="mt-0.5 flex-none text-red"
@@ -174,7 +174,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
             )}
           </div>
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.78rem] font-bold ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-meta font-bold ${
               confirmed
                 ? "bg-green-50 text-green-700"
                 : "bg-amber-50 text-amber-700"
@@ -187,53 +187,53 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
 
         <dl className="mb-6 grid gap-3 sm:grid-cols-2">
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Confirmation no.
             </dt>
-            <dd className="text-[0.95rem] font-bold tracking-wide text-navy">
+            <dd className="text-lead font-bold tracking-wide text-navy">
               {detail.confirmationNo || "—"}
             </dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Booking reference
             </dt>
-            <dd className="text-[0.95rem] font-semibold text-ink">
+            <dd className="text-body font-semibold text-ink">
               {detail.bookingRefNo || detail.bookingId || "—"}
             </dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Stay
             </dt>
-            <dd className="inline-flex items-center gap-1.5 text-[0.95rem] font-semibold text-ink">
+            <dd className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
               <CalendarDays size={14} className="text-red" aria-hidden />
               {formatDate(toISO(detail.checkIn))} →{" "}
               {formatDate(toISO(detail.checkOut))}
             </dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Rooms
             </dt>
-            <dd className="inline-flex items-center gap-1.5 text-[0.95rem] font-semibold text-ink">
+            <dd className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
               <BedDouble size={14} className="text-red" aria-hidden />
               {detail.noOfRooms ?? detail.rooms?.length ?? 1}
             </dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Booking amount
             </dt>
-            <dd className="text-[0.95rem] font-bold text-navy">
+            <dd className="text-lead font-bold text-navy">
               {money(detail.invoiceAmount, currency)}
             </dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+            <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
               Voucher
             </dt>
-            <dd className="text-[0.95rem] font-semibold text-ink">
+            <dd className="text-body font-semibold text-ink">
               {detail.isVoucherBooked ? "Issued" : "Not issued yet"}
             </dd>
           </div>
@@ -241,11 +241,11 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
 
         {(detail.rooms ?? []).map((room, i) => (
           <div key={i} className="mb-4 rounded-brand border border-line p-5">
-            <h2 className="text-[0.98rem] font-bold text-ink">
+            <h2 className="text-lead font-bold text-ink">
               Room {i + 1}
               {room.roomTypeName ? ` · ${room.roomTypeName}` : ""}
             </h2>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.84rem] text-muted">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-body text-muted">
               {room.mealType && <span>{room.mealType.replace(/_/g, " ")}</span>}
               {room.totalFare != null && (
                 <span className="font-semibold text-ink">
@@ -254,7 +254,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
               )}
             </div>
             {room.guests.length > 0 && (
-              <p className="mt-2 flex items-start gap-1.5 text-[0.84rem] text-ink">
+              <p className="mt-2 flex items-start gap-1.5 text-body text-ink">
                 <Users
                   size={14}
                   className="mt-0.5 flex-none text-red"
@@ -264,7 +264,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
               </p>
             )}
             {room.cancelPolicies.length > 0 && (
-              <div className="mt-3 border-t border-line pt-3 text-[0.82rem]">
+              <div className="mt-3 border-t border-line pt-3 text-meta">
                 <p className="mb-1 inline-flex items-center gap-1.5 font-semibold text-ink">
                   <ShieldCheck size={14} className="text-red" aria-hidden />{" "}
                   Cancellation policy
@@ -288,7 +288,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
           </Button>
           <Link
             href="/account"
-            className="text-[0.85rem] font-semibold text-red hover:underline"
+            className="text-body font-semibold text-red hover:underline"
           >
             My bookings
           </Link>

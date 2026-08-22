@@ -1,10 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Info, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { HotelCard, type HotelStub } from "./HotelCard";
 import { CheckRow, DualRange, Section } from "./filter-controls";
 import type { HotelOffer } from "@/lib/tbo-hotel";
+import type { Amenity } from "@/lib/hotel-amenities";
+import {
+  pageCount,
+  pageSlice,
+  pageWindow,
+  starBucket,
+  STAR_BUCKET_LABEL,
+  type StarBucket,
+} from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
 import { Button } from "./Button";
 
@@ -19,53 +35,39 @@ export type HotelItem = {
   /** Google review score for this property (absent when the lookup missed). */
   review?: { rating: number; count: number };
   image?: string;
+  /** A few curated facilities for the card (absent when content failed). */
+  amenities?: Amenity[];
   detailHref: string;
 };
 
-const DISPLAY_CAP = 25;
+/** Hotels per page. A city can return 200 offers; one dump of 200 cards is
+ *  ~200 image requests and an unusable scrollbar. */
+const PER_PAGE = 20;
 
 const SORT_TABS: { key: SortKey; label: string; hint?: string }[] = [
   {
     key: "reco",
     label: "Recommended",
-    hint: "Our best balance of price and star class",
+    hint: "Best balance of price and star class",
   },
-  {
-    key: "reviews",
-    label: "Top reviews",
-    hint: "Highest Google review scores first",
-  },
+  { key: "reviews", label: "Top reviews", hint: "Highest Google scores first" },
   { key: "price", label: "Lowest price" },
   { key: "price-desc", label: "Highest price" },
   { key: "stars", label: "Most stars" },
 ];
 
-/** 5/4/3 star classes; everything below (incl. unrated) buckets to 0. */
-const starBucket = (stars: number): 5 | 4 | 3 | 0 =>
-  stars >= 5 ? 5 : stars === 4 ? 4 : stars === 3 ? 3 : 0;
-
-const STAR_OPTIONS: { bucket: 5 | 4 | 3 | 0; label: string }[] = [
-  { bucket: 5, label: "5 star" },
-  { bucket: 4, label: "4 star" },
-  { bucket: 3, label: "3 star" },
-  { bucket: 0, label: "2 star & below" },
-];
+const STAR_ORDER: StarBucket[] = [5, 4, 3, 2, 0];
 
 /** Sort the hotel list. "reco" blends price (55%) and star class (45%). */
 function bySort(list: HotelItem[], key: SortKey): HotelItem[] {
   if (list.length < 2) return list;
   if (key === "price")
-    return [...list].sort(
-      (a, b) => a.offer.cheapestFare - b.offer.cheapestFare,
-    );
+    return [...list].sort((a, b) => a.offer.cheapestFare - b.offer.cheapestFare);
   if (key === "price-desc")
-    return [...list].sort(
-      (a, b) => b.offer.cheapestFare - a.offer.cheapestFare,
-    );
+    return [...list].sort((a, b) => b.offer.cheapestFare - a.offer.cheapestFare);
   if (key === "stars")
     return [...list].sort(
-      (a, b) =>
-        b.stars - a.stars || a.offer.cheapestFare - b.offer.cheapestFare,
+      (a, b) => b.stars - a.stars || a.offer.cheapestFare - b.offer.cheapestFare,
     );
   if (key === "reviews")
     // Rating first, review volume as the tiebreak; unrated hotels sink to the end.
@@ -82,8 +84,7 @@ function bySort(list: HotelItem[], key: SortKey): HotelItem[] {
   const score = (i: HotelItem) =>
     norm(i.offer.cheapestFare) * 0.55 + (1 - i.stars / 5) * 0.45;
   return [...list].sort(
-    (a, b) =>
-      score(a) - score(b) || a.offer.cheapestFare - b.offer.cheapestFare,
+    (a, b) => score(a) - score(b) || a.offer.cheapestFare - b.offer.cheapestFare,
   );
 }
 
@@ -100,6 +101,7 @@ export function HotelResultsClient({
   nationality,
   initialSort,
   initialMinStars,
+  rateFilters,
 }: {
   items: HotelItem[];
   nights: number;
@@ -116,6 +118,13 @@ export function HotelResultsClient({
   initialSort?: string;
   /** Legacy ?stars=N URLs → pre-check those star classes. */
   initialMinStars?: number;
+  /**
+   * Rate-type filters TBO itself applies, so they are links that re-run the
+   * search rather than client state. They live in this panel anyway: two
+   * filter UIs in two places, with two interaction models, is one more than a
+   * guest should have to find.
+   */
+  rateFilters?: { label: string; href: string; active: boolean }[];
 }) {
   const [sort, setSort] = useState<SortKey>(
     initialSort === "price-desc" ||
@@ -125,11 +134,10 @@ export function HotelResultsClient({
       : "reco",
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
 
   // Filter domain from the raw result set.
   const domain = useMemo(() => {
-    const starMin: Partial<Record<5 | 4 | 3 | 0, number>> = {};
+    const starMin: Partial<Record<StarBucket, number>> = {};
     let fLo = Infinity;
     let fHi = 0;
     for (const i of items) {
@@ -148,14 +156,14 @@ export function HotelResultsClient({
 
   const allStars = () =>
     new Set<number>(
-      STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map(
-        (s) => s.bucket,
-      ),
+      STAR_ORDER.filter((b) => domain.starMin[b] != null),
     );
   const [nameQ, setNameQ] = useState("");
   const [starsSel, setStarsSel] = useState<Set<number>>(() => {
     if (initialMinStars && [3, 4, 5].includes(initialMinStars)) {
-      return new Set([5, 4, 3].filter((b) => b >= initialMinStars));
+      // A legacy ?stars=4 URL means "4 star and up" — it never meant to hide
+      // the properties TBO simply has no rating for, so keep those checked.
+      return new Set([...[5, 4, 3].filter((b) => b >= initialMinStars), 0]);
     }
     return allStars();
   });
@@ -164,14 +172,22 @@ export function HotelResultsClient({
     domain.fareHi,
   ]);
   const [ratingMin, setRatingMin] = useState<0 | 4 | 4.5>(0);
+  const [page, setPage] = useState(1);
+  const listTop = useRef<HTMLDivElement>(null);
 
   const starCount = allStars().size;
-  const filtersActive =
+  // Split deliberately: "Reset all" can only clear the client-side filters, so
+  // it must not appear on the strength of a rate filter it cannot undo. The
+  // mobile badge, which just says "something is narrowing this list", counts
+  // both.
+  const clientFiltersActive =
     nameQ.trim().length > 0 ||
     starsSel.size < starCount ||
     price[0] > domain.fareLo ||
     price[1] < domain.fareHi ||
     ratingMin > 0;
+  const anyFiltersActive =
+    clientFiltersActive || Boolean(rateFilters?.some((f) => f.active));
 
   const resetAll = () => {
     setNameQ("");
@@ -193,9 +209,30 @@ export function HotelResultsClient({
     return bySort(items.filter(pass), sort);
   }, [items, sort, nameQ, starsSel, price, ratingMin]);
 
+  // Any change to what is being listed puts the guest back at result 1 —
+  // otherwise a narrowed filter leaves them on a page that no longer exists.
+  // Adjusted during render rather than in an effect: React re-renders before
+  // painting, so the guest never sees the stale page flash past.
+  const filterKey = `${nameQ}|${[...starsSel].sort().join(",")}|${price[0]}-${price[1]}|${ratingMin}|${sort}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const pages = pageCount(sorted.length, PER_PAGE);
+  const shown = pageSlice(sorted, page, PER_PAGE);
+  const firstIndex = (Math.min(page, pages) - 1) * PER_PAGE;
+
+  const goto = (p: number) => {
+    setPage(p);
+    listTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const tabs = domain.anyReviews
     ? SORT_TABS
     : SORT_TABS.filter((t) => t.key !== "reviews");
+  const activeHint = tabs.find((t) => t.key === sort)?.hint;
 
   const filtersPanel = (
     <div
@@ -206,17 +243,40 @@ export function HotelResultsClient({
       )}
     >
       <div className="flex items-center justify-between pb-1">
-        <h2 className="text-[1.05rem] font-bold text-ink">Filters</h2>
-        {filtersActive && (
+        <h2 className="text-lead font-bold text-ink">Filters</h2>
+        {clientFiltersActive && (
           <button
             type="button"
             onClick={resetAll}
-            className="flex items-center gap-1 text-[0.8rem] font-semibold text-red hover:underline"
+            className="flex items-center gap-1 text-meta font-semibold text-red hover:underline"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset all
           </button>
         )}
       </div>
+
+      {rateFilters && rateFilters.length > 0 && (
+        <Section title="Rate type">
+          <div className="flex flex-wrap gap-1.5">
+            {rateFilters.map((f) => (
+              <Link
+                key={f.label}
+                href={f.href}
+                scroll={false}
+                aria-pressed={f.active}
+                className={cn(
+                  "rounded-full border px-3.5 py-2 text-meta font-semibold transition-colors",
+                  f.active
+                    ? "border-red bg-red/10 text-red"
+                    : "border-line text-ink hover:border-red/50",
+                )}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Hotel name">
         <label className="flex items-center gap-2 rounded-full border border-line px-3.5 py-2.5 focus-within:border-red/60">
@@ -226,7 +286,7 @@ export function HotelResultsClient({
             onChange={(e) => setNameQ(e.target.value)}
             placeholder="Search hotel name"
             aria-label="Filter by hotel name"
-            className="w-full bg-transparent text-[0.9rem] font-medium text-ink outline-none placeholder:text-muted/70"
+            className="w-full bg-transparent text-body font-medium text-ink outline-none placeholder:text-muted"
           />
         </label>
       </Section>
@@ -248,24 +308,22 @@ export function HotelResultsClient({
       )}
 
       <Section title="Star class">
-        {STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map(
-          (s) => (
-            <CheckRow
-              key={s.bucket}
-              checked={starsSel.has(s.bucket)}
-              onChange={(on) =>
-                setStarsSel((prev) => {
-                  const next = new Set(prev);
-                  if (on) next.add(s.bucket);
-                  else next.delete(s.bucket);
-                  return next;
-                })
-              }
-              label={s.label}
-              fromINR={domain.starMin[s.bucket]}
-            />
-          ),
-        )}
+        {STAR_ORDER.filter((b) => domain.starMin[b] != null).map((b) => (
+          <CheckRow
+            key={b}
+            checked={starsSel.has(b)}
+            onChange={(on) =>
+              setStarsSel((prev) => {
+                const next = new Set(prev);
+                if (on) next.add(b);
+                else next.delete(b);
+                return next;
+              })
+            }
+            label={STAR_BUCKET_LABEL[b]}
+            fromINR={domain.starMin[b]}
+          />
+        ))}
       </Section>
 
       {domain.anyReviews && (
@@ -288,9 +346,7 @@ export function HotelResultsClient({
                 onChange={() => setRatingMin(v)}
                 className="h-4 w-4 cursor-pointer accent-red"
               />
-              <span className="text-[0.9rem] font-medium text-ink">
-                {label}
-              </span>
+              <span className="text-body font-medium text-ink">{label}</span>
             </label>
           ))}
         </Section>
@@ -305,51 +361,40 @@ export function HotelResultsClient({
           type="button"
           onClick={() => setFiltersOpen((o) => !o)}
           className={cn(
-            "mb-4 flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[0.85rem] font-semibold lg:hidden",
-            filtersActive
+            "mb-4 flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-body font-semibold lg:hidden",
+            anyFiltersActive
               ? "border-red bg-red/10 text-red"
               : "border-line text-ink",
           )}
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden />
           {filtersOpen ? "Hide filters" : "Filters"}
-          {filtersActive && !filtersOpen ? " · on" : ""}
+          {anyFiltersActive && !filtersOpen ? " · on" : ""}
         </button>
         {filtersPanel}
       </aside>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" ref={listTop}>
+        {/* A radiogroup, not a tablist: these buttons re-order one list, they
+            do not switch panels, and the tablist role promised arrow-key
+            navigation that was never wired up. */}
         <div className="mb-4 overflow-x-auto rounded-brand-lg border border-line bg-white shadow-brand-sm">
-          <div
-            className="flex min-w-max"
-            role="tablist"
-            aria-label="Sort hotels"
-          >
+          <div className="flex min-w-max" role="radiogroup" aria-label="Sort hotels">
             {tabs.map((t) => {
               const active = sort === t.key;
               return (
                 <button
                   key={t.key}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
-                  title={t.hint}
+                  role="radio"
+                  aria-checked={active}
                   onClick={() => setSort(t.key)}
                   className={cn(
-                    "relative whitespace-nowrap px-5 py-3.5 text-[0.95rem] font-semibold transition-colors sm:px-6",
+                    "relative whitespace-nowrap px-5 py-3.5 text-body font-semibold transition-colors sm:px-6",
                     active ? "text-red" : "text-ink hover:text-red/80",
                   )}
                 >
-                  <span className="flex items-center gap-1.5">
-                    {t.label}
-                    {t.hint && (
-                      <Info
-                        size={14}
-                        className={active ? "text-red" : "text-muted"}
-                        aria-hidden
-                      />
-                    )}
-                  </span>
+                  {t.label}
                   {active && (
                     <span
                       className="absolute inset-x-4 bottom-0 h-[3px] rounded-t-full bg-red"
@@ -362,12 +407,24 @@ export function HotelResultsClient({
           </div>
         </div>
 
-        {filtersActive && (
-          <p className="mb-4 text-[0.88rem] text-muted">
-            Showing <b className="text-ink">{sorted.length}</b> of{" "}
-            {items.length} hotels
-          </p>
-        )}
+        {/* The hint used to live in a title attribute, which a phone never
+            shows. Render the active sort's explanation instead. */}
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-meta text-muted">
+          <span>
+            {sorted.length > 0 && (
+              <>
+                Showing{" "}
+                <b className="text-ink">
+                  {firstIndex + 1}–{firstIndex + shown.length}
+                </b>{" "}
+                of {sorted.length}
+                {clientFiltersActive ? ` (filtered from ${items.length})` : ""}{" "}
+                hotels
+              </>
+            )}
+          </span>
+          {activeHint && <span>{activeHint}</span>}
+        </div>
 
         {sorted.length === 0 ? (
           <div className="rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
@@ -382,7 +439,7 @@ export function HotelResultsClient({
         ) : (
           <>
             <div className="space-y-4">
-              {(showAll ? sorted : sorted.slice(0, DISPLAY_CAP)).map((i) => (
+              {shown.map((i) => (
                 <HotelCard
                   key={i.offer.hotelCode}
                   offer={i.offer}
@@ -398,19 +455,58 @@ export function HotelResultsClient({
                   nationality={nationality}
                   review={i.review}
                   image={i.image}
+                  amenities={i.amenities}
                   detailHref={i.detailHref}
                 />
               ))}
             </div>
-            {sorted.length > DISPLAY_CAP && !showAll && (
-              <Button
-                variant="ghost"
-                fullWidth
-                className="mt-6"
-                onClick={() => setShowAll(true)}
+
+            {pages > 1 && (
+              <nav
+                aria-label="Hotel results pages"
+                className="mt-6 flex flex-wrap items-center justify-center gap-1.5"
               >
-                Show all {sorted.length} hotels
-              </Button>
+                <button
+                  type="button"
+                  onClick={() => goto(page - 1)}
+                  disabled={page <= 1}
+                  aria-label="Previous page"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-line text-ink disabled:opacity-40"
+                >
+                  <ChevronLeft size={18} aria-hidden />
+                </button>
+                {pageWindow(page, pages).map((p, i) =>
+                  p === null ? (
+                    <span key={`gap-${i}`} className="px-1 text-muted">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => goto(p)}
+                      aria-current={p === page ? "page" : undefined}
+                      className={cn(
+                        "h-11 min-w-11 rounded-full border px-3 text-body font-semibold",
+                        p === page
+                          ? "border-red bg-red text-white"
+                          : "border-line text-ink hover:border-red/50",
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  onClick={() => goto(page + 1)}
+                  disabled={page >= pages}
+                  aria-label="Next page"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-line text-ink disabled:opacity-40"
+                >
+                  <ChevronRight size={18} aria-hidden />
+                </button>
+              </nav>
             )}
           </>
         )}

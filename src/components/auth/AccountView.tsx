@@ -94,7 +94,7 @@ function StatusBadge({ bk }: { bk: BookingRow }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.72rem] font-bold",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-meta font-bold",
         s.tone === "good" && "bg-emerald-100 text-emerald-800",
         s.tone === "warn" && "bg-amber-100 text-amber-800",
         s.tone === "bad" && "bg-red/10 text-red",
@@ -265,7 +265,7 @@ export function AccountView() {
                   <StatusBadge bk={bk} />
                 </span>
               </p>
-              <p className="text-[0.82rem] text-muted">
+              <p className="text-meta text-muted">
                 {bk.kind === "hotel" ? (
                   <>
                     {bk.city ? `${bk.city} · ` : ""}
@@ -289,10 +289,10 @@ export function AccountView() {
             />
           </button>
           <div className="text-right">
-            <p className="text-[0.82rem] font-bold tracking-wide text-navy">
+            <p className="text-body font-bold tracking-wide text-navy">
               {bk.kind === "hotel" ? bk.confirmation_no || "—" : bk.pnr || "—"}
             </p>
-            <p className="text-[0.78rem] text-muted">
+            <p className="text-meta text-muted">
               {bk.amount_paid_inr != null || bk.fare_inr != null
                 ? `₹${inr.format(bk.amount_paid_inr ?? bk.fare_inr ?? 0)}`
                 : ""}
@@ -301,17 +301,17 @@ export function AccountView() {
         </div>
 
         {open && (
-          <div className="border-t border-line bg-cream/40 px-4 py-3 text-[0.85rem]">
+          <div className="border-t border-line bg-cream/40 px-4 py-3 text-body">
             <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               <div>
-                <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                   Booked on
                 </dt>
                 <dd className="text-ink">{fmtDate(bk.created_at)}</dd>
               </div>
               {bk.kind === "flight" && bk.flight_number && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     Flight
                   </dt>
                   <dd className="text-ink">{bk.flight_number}</dd>
@@ -319,7 +319,7 @@ export function AccountView() {
               )}
               {bk.booking_id != null && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     Booking id
                   </dt>
                   <dd className="text-ink">{bk.booking_id}</dd>
@@ -327,7 +327,7 @@ export function AccountView() {
               )}
               {bk.amount_paid_inr != null && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     Payment
                   </dt>
                   <dd className="text-ink">
@@ -340,7 +340,7 @@ export function AccountView() {
 
             {/* Travellers / guests on this booking */}
             <div className="mt-3">
-              <p className="flex items-center gap-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+              <p className="flex items-center gap-1.5 text-meta font-bold uppercase tracking-wide text-muted">
                 <Users size={13} aria-hidden />{" "}
                 {bk.kind === "hotel" ? "Guests" : "Passengers"}
               </p>
@@ -362,7 +362,7 @@ export function AccountView() {
                           .filter(Boolean)
                           .join(" ")}
                       </span>
-                      <span className="text-[0.78rem] text-muted">
+                      <span className="text-meta text-muted">
                         {PAX_TYPE[p.pax_type ?? 0] ?? ""}
                         {p.is_lead ? " · Lead" : ""}
                         {p.ticket_number ? ` · Ticket ${p.ticket_number}` : ""}
@@ -378,7 +378,7 @@ export function AccountView() {
               {bk.kind === "hotel" && bk.booking_id != null && (
                 <Link
                   href={`/hotels/voucher/${bk.booking_id}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-navy/50 px-4 py-2 text-[0.8rem] font-semibold text-navy transition-colors hover:bg-navy/5"
+                  className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-navy/50 px-4 py-2 text-body font-semibold text-navy transition-colors hover:bg-navy/5"
                 >
                   <FileText size={14} aria-hidden /> View voucher
                 </Link>
@@ -400,7 +400,7 @@ export function AccountView() {
                     href={flightCancelHref(bk).href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-red/60 px-4 py-2 text-[0.8rem] font-semibold text-red transition-colors hover:bg-red/5"
+                    className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-red/60 px-4 py-2 text-body font-semibold text-red transition-colors hover:bg-red/5"
                   >
                     <MessageCircle size={14} aria-hidden /> Request cancellation
                   </a>
@@ -418,7 +418,7 @@ export function AccountView() {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[0.8rem] font-semibold text-ink underline underline-offset-4 hover:text-red"
+                className="text-body font-semibold text-ink underline underline-offset-4 hover:text-red"
               >
                 Get help with this booking
               </a>
@@ -451,15 +451,15 @@ export function AccountView() {
             {/* Profile */}
             <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
               <h2 className="text-[1.05rem] font-bold text-ink">Profile</h2>
-              <dl className="mt-4 space-y-3 text-[0.95rem]">
+              <dl className="mt-4 space-y-3 text-body">
                 <div>
-                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
                     Name
                   </dt>
                   <dd className="text-ink">{user.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
                     Email
                   </dt>
                   <dd className="text-ink">{user.email}</dd>
@@ -470,7 +470,7 @@ export function AccountView() {
                   logout();
                   router.push("/");
                 }}
-                className="mt-6 inline-flex items-center gap-2 rounded-full border-[1.6px] border-line px-5 py-2.5 text-[0.9rem] font-semibold text-ink transition-colors hover:border-red hover:text-red"
+                className="mt-6 inline-flex items-center gap-2 rounded-full border-[1.6px] border-line px-5 py-2.5 text-body font-semibold text-ink transition-colors hover:border-red hover:text-red"
               >
                 <LogOut size={17} aria-hidden /> Log out
               </button>
@@ -481,14 +481,14 @@ export function AccountView() {
               <h2 className="text-[1.05rem] font-bold text-ink">My bookings</h2>
 
               {bookings === null ? (
-                <p className="mt-4 text-[0.9rem] text-muted">
+                <p className="mt-4 text-body text-muted">
                   Loading your bookings…
                 </p>
               ) : bookings.length === 0 ? (
                 <div className="mt-4 flex flex-col items-center rounded-brand border border-dashed border-line bg-cream/50 px-6 py-10 text-center">
                   <Ticket className="mb-3 text-red" aria-hidden />
                   <p className="font-semibold text-ink">No bookings yet</p>
-                  <p className="mt-1 max-w-sm text-[0.9rem] text-muted">
+                  <p className="mt-1 max-w-sm text-body text-muted">
                     Flights and hotels you book will appear here with your
                     tickets and confirmation numbers.
                   </p>
@@ -500,7 +500,7 @@ export function AccountView() {
                 <>
                   {upcoming.length > 0 && (
                     <>
-                      <h3 className="mt-4 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                      <h3 className="mt-4 text-meta font-bold uppercase tracking-wide text-muted">
                         Upcoming
                       </h3>
                       <ul className="mt-2 space-y-3">
@@ -510,7 +510,7 @@ export function AccountView() {
                   )}
                   {past.length > 0 && (
                     <>
-                      <h3 className="mt-6 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                      <h3 className="mt-6 text-meta font-bold uppercase tracking-wide text-muted">
                         Past
                       </h3>
                       <ul className="mt-2 space-y-3">
@@ -518,7 +518,7 @@ export function AccountView() {
                       </ul>
                     </>
                   )}
-                  <p className="mt-5 text-[0.78rem] text-muted">
+                  <p className="mt-5 text-meta text-muted">
                     Tap a booking for its travellers, tickets and payment
                     details. Need a change? Every booking has a help link — we
                     handle changes personally.

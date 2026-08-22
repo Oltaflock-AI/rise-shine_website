@@ -12,6 +12,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { BookingDetailCheck } from "./BookingDetailCheck";
 import { formatDate } from "@/lib/format-date";
+import {
+  cancellationHeadline,
+  cancellationWindows,
+} from "@/lib/hotel-cancellation";
+import { formatDeadline, perNightFare } from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
 import { controlClass, DateField, Select } from "@/components/ui/form-controls";
 import {
@@ -185,6 +190,12 @@ export function HotelBookingForm({
   // NetAmount is TBO's charge to the agency, is never displayed, and rides only
   // in the Book RQ (checkpoint 31).
   const amountInr = quote?.totalFare ?? Number(b.fare || 0);
+  // Windows that have already closed are dropped, so this can never promise a
+  // refund deadline that passed before the guest reached the page.
+  const cancelHeadline = cancellationHeadline(
+    cancellationWindows(quote?.cancelPolicies),
+    formatDeadline,
+  );
 
   const setGuest = (i: number, patch: Partial<Guest>) =>
     setGuests((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
@@ -421,7 +432,7 @@ export function HotelBookingForm({
         <p className="mb-6 text-muted">
           {b.hotel} · {formatDate(b.checkIn)} → {formatDate(b.checkOut)}
         </p>
-        <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-[0.9rem]">
+        <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-body">
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Confirmation no.</dt>
             <dd className="font-bold tracking-wide text-navy">
@@ -466,13 +477,13 @@ export function HotelBookingForm({
       {/* ── guests ── */}
       <div className="space-y-6">
         {quote.isPriceChanged && (
-          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
+          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-body text-ink">
             The hotel re-priced this rate. The total shown is the confirmed
             price.
           </p>
         )}
         {quote.isCancellationPolicyChanged && (
-          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
+          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-body text-ink">
             The cancellation policy for this rate was updated — please review it
             below before paying.
           </p>
@@ -488,7 +499,7 @@ export function HotelBookingForm({
             key={r}
             className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm"
           >
-            <h3 className="mb-4 text-[0.95rem] font-bold text-ink">
+            <h3 className="mb-4 text-lead font-bold text-ink">
               Room {r + 1}
             </h3>
             <div className="space-y-4">
@@ -498,7 +509,7 @@ export function HotelBookingForm({
                     key={i}
                     className="border-t border-dashed border-line pt-4 first:border-0 first:pt-0"
                   >
-                    <p className="mb-2 text-[0.8rem] font-semibold text-muted">
+                    <p className="mb-2 text-meta font-semibold text-muted">
                       Guest{" "}
                       {guests.filter((x) => x.roomIndex === r).indexOf(g) + 1}
                       {g.childAge != null && (
@@ -613,7 +624,7 @@ export function HotelBookingForm({
         ))}
 
         {v?.panMandatory && (
-          <p className="text-[0.8rem] text-muted">
+          <p className="text-meta text-muted">
             This rate requires PAN
             {v.panCountRequired && v.panCountRequired > 1
               ? ` (${v.panCountRequired} guests)`
@@ -625,22 +636,61 @@ export function HotelBookingForm({
 
       {/* ── summary / pay ── */}
       <aside className="h-fit rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm lg:sticky lg:top-24">
-        <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
-          Price summary
-        </h3>
-        <div className="flex items-baseline justify-between border-b border-line pb-3">
-          <span className="text-muted">Total</span>
-          <span className="text-[1.4rem] font-extrabold text-navy">
-            {money.format(amountInr)}
-          </span>
-        </div>
-        <p className="mt-2 text-[0.75rem] text-muted">
-          {b.nights} night{Number(b.nights) > 1 ? "s" : ""} · {rooms} room
-          {rooms > 1 ? "s" : ""} · taxes included
-        </p>
+        <h3 className="mb-3 text-lead font-bold text-ink">Price summary</h3>
+        {/* The total alone left the guest doing the arithmetic that decides
+            whether the stay is worth it. Show the working, then the total. */}
+        <dl className="space-y-1.5 border-b border-line pb-3 text-meta">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted">
+              Room rate · {b.nights} night{Number(b.nights) > 1 ? "s" : ""}
+            </dt>
+            <dd className="tabular-nums text-ink">
+              {money.format(perNightFare(amountInr, Number(b.nights || 1)))} /
+              night
+            </dd>
+          </div>
+          {rooms > 1 && (
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-muted">Rooms</dt>
+              <dd className="tabular-nums text-ink">{rooms}</dd>
+            </div>
+          )}
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted">Taxes &amp; fees</dt>
+            <dd className="text-ink">Included</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 pt-1.5">
+            <dt className="text-body font-semibold text-ink">Total payable now</dt>
+            <dd className="text-[1.4rem] font-extrabold tabular-nums text-navy">
+              {money.format(amountInr)}
+            </dd>
+          </div>
+        </dl>
+
+        {/* The pay-at-hotel charges are set out in full under "Room & rate
+            terms"; the guest deciding whether to press Pay is looking HERE, so
+            the total must not read as the whole cost of the stay. */}
+        {(quote.supplements ?? []).length > 0 && (
+          <p className="mt-2 rounded-brand border border-amber-300 bg-amber-50 px-3 py-2 text-meta text-amber-900">
+            Plus charges payable directly at the hotel — see “Room &amp; rate
+            terms”.
+          </p>
+        )}
+        {cancelHeadline && (
+          <p
+            className={cn(
+              "mt-2 text-meta font-medium",
+              cancelHeadline.startsWith("Free")
+                ? "text-green-700"
+                : "text-muted",
+            )}
+          >
+            {cancelHeadline}
+          </p>
+        )}
 
         {booked && !booked.ok && (
-          <p className="mt-4 rounded-brand border border-red/30 bg-red/5 px-3 py-2 text-[0.82rem] text-red">
+          <p className="mt-4 rounded-brand border border-red/30 bg-red/5 px-3 py-2 text-meta text-red">
             {booked.error}
           </p>
         )}
@@ -649,7 +699,7 @@ export function HotelBookingForm({
           type="button"
           onClick={submit}
           disabled={booking}
-          className="grad-red mt-4 hidden w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition disabled:opacity-60 lg:inline-flex"
+          className="grad-red mt-4 hidden w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-body font-semibold text-white shadow-brand-red transition disabled:opacity-60 lg:inline-flex"
         >
           {booking ? (
             <>
@@ -660,7 +710,7 @@ export function HotelBookingForm({
             <>Pay &amp; Book</>
           )}
         </button>
-        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[0.72rem] text-muted">
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-meta text-muted">
           <ShieldCheck size={12} aria-hidden /> Secure payment · confirmed
           instantly
         </p>
@@ -670,7 +720,7 @@ export function HotelBookingForm({
           screens, so surface the total + CTA without scrolling past it. */}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+          <p className="text-meta font-bold uppercase tracking-wide text-muted">
             Total
           </p>
           <p className="truncate text-[1.05rem] font-extrabold text-navy">
@@ -681,7 +731,7 @@ export function HotelBookingForm({
           type="button"
           onClick={submit}
           disabled={booking}
-          className="grad-red inline-flex min-h-11 flex-none items-center justify-center gap-2 rounded-full px-5 text-[0.9rem] font-semibold text-white shadow-brand-red disabled:opacity-60"
+          className="grad-red inline-flex min-h-11 flex-none items-center justify-center gap-2 rounded-full px-5 text-body font-semibold text-white shadow-brand-red disabled:opacity-60"
         >
           {booking ? (
             <>
@@ -697,14 +747,8 @@ export function HotelBookingForm({
   );
 }
 
-/** TBO cancel-policy dates arrive as "DD-MM-YYYY hh:mm:ss" → ISO for formatDate. */
-function tboDateToISO(s: string): string {
-  const m = /^(\d{2})-(\d{2})-(\d{4})/.exec(s || "");
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
-}
-
 function cancelCharge(
-  p: NonNullable<Quote["cancelPolicies"]>[number],
+  p: { chargeType?: string | number; charge: number },
   currency: string,
 ): string {
   const t = String(p.chargeType ?? "").toLowerCase();
@@ -730,7 +774,7 @@ function RateTerms({ quote }: { quote: Quote }) {
   const conditions = quote.rateConditions ?? [];
   const promos = quote.roomPromotions ?? [];
   const supplements = quote.supplements ?? [];
-  const policies = quote.cancelPolicies ?? [];
+  const windows = cancellationWindows(quote.cancelPolicies);
   const amenities = quote.amenities ?? [];
   const [showAll, setShowAll] = useState(false);
   // Never returns null: TBO's verifier must be able to find the rate's terms on the
@@ -739,10 +783,10 @@ function RateTerms({ quote }: { quote: Quote }) {
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-      <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
+      <h3 className="mb-3 text-lead font-bold text-ink">
         Room &amp; rate terms
       </h3>
-      <div className="space-y-3 text-[0.83rem] text-ink">
+      <div className="space-y-3 text-body text-ink">
         {quote.mealType && (
           <p>
             <span className="font-semibold">Meal plan:</span>{" "}
@@ -787,19 +831,23 @@ function RateTerms({ quote }: { quote: Quote }) {
             </ul>
           </div>
         )}
-        {policies.length > 0 && (
+        {windows.length > 0 && (
           <div>
             <p className="font-semibold">Cancellation policy:</p>
+            {/* Windows the guest can still choose, not TBO's raw rows. Rendered
+                literally, those rows read "From 21-08-26: No charge" on a stay
+                booked on the 23rd — a refund window that shut two days ago,
+                printed as though it were on offer. */}
             <ul className="mt-1 list-disc pl-5">
-              {policies.map((p, i) => {
-                const iso = tboDateToISO(p.fromDate);
-                return (
-                  <li key={i}>
-                    From {iso ? formatDate(iso) : p.fromDate}:{" "}
-                    {cancelCharge(p, currency)}
-                  </li>
-                );
-              })}
+              {windows.map((w, i) => (
+                <li key={i} className={w.active ? "font-medium text-ink" : ""}>
+                  {w.untilISO
+                    ? `Until ${formatDeadline(w.untilISO)}`
+                    : `From ${formatDeadline(w.fromISO)}`}
+                  : {cancelCharge(w, currency)}
+                  {w.active ? " — applies if you cancel now" : ""}
+                </li>
+              ))}
             </ul>
           </div>
         )}

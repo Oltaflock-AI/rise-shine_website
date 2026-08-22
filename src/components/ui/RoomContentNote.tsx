@@ -1,4 +1,4 @@
-import { Maximize2, BedDouble } from "lucide-react";
+import { Maximize2, BedDouble, ChevronDown } from "lucide-react";
 import type { RoomContent } from "@/lib/hotel-room-match";
 
 /**
@@ -18,21 +18,23 @@ export function RoomContentNote({ content }: { content: RoomContent | undefined 
   return (
     <div className="mt-2">
       {content.size && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-[0.75rem] font-semibold text-ink">
+        <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-meta font-semibold text-ink">
           <Maximize2 size={12} className="text-red" aria-hidden />
           {content.size}
         </span>
       )}
       {content.description && (
         <details className="group mt-1.5">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[0.78rem] font-semibold text-navy hover:text-red">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-meta font-semibold text-navy hover:text-red">
             <BedDouble size={13} aria-hidden />
             What&apos;s in this room
-            <span className="text-muted transition-transform group-open:rotate-180" aria-hidden>
-              ▾
-            </span>
+            <ChevronDown
+              size={13}
+              className="text-muted transition-transform group-open:rotate-180"
+              aria-hidden
+            />
           </summary>
-          <p className="mt-1.5 max-w-prose text-[0.8rem] leading-relaxed text-muted">
+          <p className="mt-1.5 max-w-prose text-body leading-relaxed text-muted">
             {content.description}
           </p>
         </details>

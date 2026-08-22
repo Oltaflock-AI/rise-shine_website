@@ -57,14 +57,14 @@ export function HotelCheckoutView() {
     <>
       <section className="bg-navy pb-8 pt-28 text-white sm:pt-32">
         <Container>
-          <nav className="mb-3 text-[0.85rem] font-medium text-white/70">
+          <nav className="mb-3 text-meta font-medium text-white/80">
             <Link href="/hotels" className="hover:text-white">
               Hotels
             </Link>{" "}
             / <span className="text-white">Checkout</span>
           </nav>
           <h1 className="h-md text-white">Guest details</h1>
-          <p className="mt-2 flex items-center gap-1.5 text-[0.9rem] text-white/75">
+          <p className="mt-2 flex items-center gap-1.5 text-body text-white/80">
             <ShieldCheck size={15} aria-hidden /> Secure checkout{user ? ` · signed in as ${user.email}` : ""}
           </p>
         </Container>
@@ -78,10 +78,10 @@ export function HotelCheckoutView() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[1.15rem] font-extrabold text-ink">
                   <BedDouble size={18} className="flex-none text-red" aria-hidden />
-                  <span className="truncate">{b.hotel}</span>
+                  <span className="line-clamp-2">{b.hotel}</span>
                 </div>
-                {b.city && <div className="mt-1 text-[0.85rem] font-medium text-muted">{b.city}</div>}
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-muted">
+                {b.city && <div className="mt-1 text-meta font-medium text-muted">{b.city}</div>}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted">
                   <span className="inline-flex items-center gap-1.5">
                     <CalendarDays size={14} className="text-red" aria-hidden />
                     {fmtDate(b.checkIn)} → {fmtDate(b.checkOut)}
@@ -95,8 +95,18 @@ export function HotelCheckoutView() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[1.4rem] font-extrabold tabular-nums text-navy">{money.format(Number(b.fare || 0))}</div>
-                <div className="text-[0.72rem] text-muted">total · at search</div>
+                <div className="text-[1.4rem] font-extrabold tabular-nums text-navy">
+                  {money.format(Number(b.fare || 0))}
+                </div>
+                {/* "at search" alone read as a disclaimer without saying what
+                    happens next. The rate is re-priced by PreBook below, and a
+                    change is called out there — say so. */}
+                <div className="text-meta text-muted">
+                  total · {nights} night{nights > 1 ? "s" : ""}
+                </div>
+                <div className="text-meta text-muted">
+                  re-confirmed with the hotel below
+                </div>
               </div>
             </div>
           </div>

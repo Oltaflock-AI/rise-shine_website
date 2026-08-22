@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/HotelResultsClient";
 import { searchCityHotels, CITY_SEARCH_CODE_CEILING } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
+import { curateAmenities } from "@/lib/hotel-amenities";
 import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { RecentSearches } from "@/components/ui/RecentSearches";
@@ -241,12 +242,6 @@ export default async function HotelsPage({
     );
   }
 
-  const chip = (active: boolean) =>
-    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
-      active
-        ? "border-red bg-red/10 text-red"
-        : "border-line text-ink hover:border-red/50"
-    }`;
 
   // Re-suspend (show the searching fallback) whenever the search itself changes.
   // Sorting is client-side (HotelResultsClient) and never re-triggers this.
@@ -267,31 +262,6 @@ export default async function HotelsPage({
       {header}
       <section className="py-12 sm:py-16">
         <Container>
-          {/* Filter / sort rail — outside the Suspense boundary so it paints
-              instantly and stays clickable while a (re)search streams in. */}
-          <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Link
-                href={qs({ refundable: refundableOnly ? "" : "1" })}
-                className={chip(refundableOnly)}
-              >
-                Free cancellation
-              </Link>
-              <Link
-                href={qs({ meal: meal === "WithMeal" ? "" : "WithMeal" })}
-                className={chip(meal === "WithMeal")}
-              >
-                With breakfast
-              </Link>
-              <Link
-                href={qs({ meal: meal === "RoomOnly" ? "" : "RoomOnly" })}
-                className={chip(meal === "RoomOnly")}
-              >
-                Room only
-              </Link>
-            </div>
-          </div>
-
           <Suspense
             key={searchKey}
             fallback={<HotelResultsFallback cityLabel={city.label} />}
@@ -308,6 +278,23 @@ export default async function HotelsPage({
               refundableOnly={refundableOnly}
               meal={meal}
               clearFiltersHref={qs({ stars: "", refundable: "", meal: "" })}
+              rateFilters={[
+                {
+                  label: "Free cancellation",
+                  href: qs({ refundable: refundableOnly ? "" : "1" }),
+                  active: refundableOnly,
+                },
+                {
+                  label: "With breakfast",
+                  href: qs({ meal: meal === "WithMeal" ? "" : "WithMeal" }),
+                  active: meal === "WithMeal",
+                },
+                {
+                  label: "Room only",
+                  href: qs({ meal: meal === "RoomOnly" ? "" : "RoomOnly" }),
+                  active: meal === "RoomOnly",
+                },
+              ]}
             />
           </Suspense>
         </Container>
@@ -333,6 +320,7 @@ async function HotelResults({
   refundableOnly,
   meal,
   clearFiltersHref,
+  rateFilters,
 }: {
   sp: Record<string, string | undefined>;
   city: { label: string; cityCode: string; countryCode: string };
@@ -345,6 +333,8 @@ async function HotelResults({
   refundableOnly: boolean;
   meal?: "WithMeal" | "RoomOnly";
   clearFiltersHref: string;
+  /** Rate-type filters TBO applies server-side, rendered in the filter panel. */
+  rateFilters: { label: string; href: string; active: boolean }[];
 }) {
   // Resolve this city's hotels (static data) and price them ALL — TBO caps one
   // Search RQ at 100 HotelCodes, so the city is covered by **parallel** ≤100-code
@@ -506,6 +496,9 @@ async function HotelResults({
             image:
               infoMap.get(o.hotelCode)?.heroImage ??
               infoMap.get(o.hotelCode)?.images?.[0],
+            // Three facts, not thirty: enough for the guest to rule a hotel in
+            // or out from the list instead of opening every one of them.
+            amenities: curateAmenities(infoMap.get(o.hotelCode)?.facilities, 3),
             detailHref: `/hotels/${o.hotelCode}?${occupancyQS}`,
           }))}
           nights={nights}
@@ -518,6 +511,7 @@ async function HotelResults({
           countryCode={city.countryCode}
           initialSort={sp.sort}
           initialMinStars={initialMinStars}
+          rateFilters={rateFilters}
         />
       )}
 
