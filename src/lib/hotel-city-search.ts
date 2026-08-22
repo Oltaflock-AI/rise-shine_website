@@ -8,12 +8,26 @@ import "server-only";
  * dataset makes autocomplete instant and deterministic on serverless — no
  * cold-start TBO round-trips — at the cost of a re-run when coverage changes.
  */
-import { HOTEL_CITY_DATA, type HotelCityRow as Row } from "@/data/hotel-cities.generated";
+import {
+  HOTEL_CITY_DATA,
+  type HotelCityRow as Row,
+} from "@/data/hotel-cities.generated";
 import { POPULAR_CITIES, type HotelCity } from "@/data/hotel-cities";
+import { displayPlaceName } from "./place-names";
 
 const DATA: Row[] = HOTEL_CITY_DATA;
 
-const toCity = (r: Row): HotelCity => ({ label: r.n, cityCode: r.c, countryCode: r.cc });
+/**
+ * The CODE stays TBO's; only the label is cleaned. TBO writes Mumbai as
+ * "Mumbai/Bombay, Maharashtra", and a picker offering a traveller "Bombay"
+ * reads as a stale database. Matching still runs against TBO's raw name, so
+ * someone who types "Bombay" still finds the city.
+ */
+const toCity = (r: Row): HotelCity => ({
+  label: displayPlaceName(r.n),
+  cityCode: r.c,
+  countryCode: r.cc,
+});
 
 /** Case/diacritic-insensitive normalize for matching. */
 function norm(s: string): string {
@@ -38,7 +52,12 @@ export function searchCities(q: string, limit = 12): HotelCity[] {
     if (r.cc !== "IN") score += 0.5;
     scored.push({ r, score });
   }
-  scored.sort((a, b) => a.score - b.score || a.r.n.length - b.r.n.length || a.r.n.localeCompare(b.r.n));
+  scored.sort(
+    (a, b) =>
+      a.score - b.score ||
+      a.r.n.length - b.r.n.length ||
+      a.r.n.localeCompare(b.r.n),
+  );
   return scored.slice(0, limit).map((s) => toCity(s.r));
 }
 

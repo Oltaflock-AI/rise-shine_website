@@ -11,7 +11,9 @@ import {
   TriangleAlert,
   BedDouble,
   BadgePercent,
+  CarFront,
   Check,
+  Package,
 } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +23,7 @@ import { RoomRateDetails } from "@/components/ui/RoomRateDetails";
 import { HotelGallery } from "@/components/ui/HotelGallery";
 import { RoomContentNote } from "@/components/ui/RoomContentNote";
 import { HotelAmenities } from "@/components/ui/HotelAmenities";
+import { HotelFees } from "@/components/ui/HotelFees";
 import { HotelAbout } from "@/components/ui/HotelAbout";
 import { HotelLocation } from "@/components/ui/HotelLocation";
 import { matchRoomContent, type RoomContent } from "@/lib/hotel-room-match";
@@ -243,12 +246,16 @@ export default async function HotelDetailPage({
 
               <HotelAmenities facilities={info?.facilities} />
 
+              <HotelFees fees={info?.fees} />
+
               <HotelLocation
                 name={name}
                 address={info?.address}
                 lat={info?.lat}
                 lng={info?.lng}
                 attractions={info?.attractions}
+                phone={info?.phone}
+                website={info?.website}
               />
 
               <HotelAbout description={info?.description} />
@@ -407,6 +414,23 @@ async function RoomOptions({
                           : "Non-refundable"}
                     </span>
                   </div>
+                  {/* Both flags ride along on every TBO rate and were never
+                      shown; "transfers included" is exactly the kind of thing
+                      that decides between two otherwise identical rooms. */}
+                  {(room.withTransfers || room.packageFare) && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {room.withTransfers && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[0.76rem] font-semibold text-sky-800">
+                          <CarFront size={11} aria-hidden /> Transfers included
+                        </span>
+                      )}
+                      {room.packageFare && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-0.5 text-[0.76rem] font-semibold text-violet-800">
+                          <Package size={11} aria-hidden /> Package rate
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <RoomContentNote
                     content={matchRoomContent(room.name, roomContent)}
                   />

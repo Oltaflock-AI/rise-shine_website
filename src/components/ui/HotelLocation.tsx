@@ -1,4 +1,4 @@
-import { MapPin, Navigation, Landmark } from "lucide-react";
+import { MapPin, Navigation, Landmark, Phone, Globe } from "lucide-react";
 
 /**
  * Where the hotel is, and what is near it.
@@ -19,19 +19,24 @@ export function HotelLocation({
   lat,
   lng,
   attractions,
+  phone,
+  website,
 }: {
   name: string;
   address?: string;
   lat?: string;
   lng?: string;
   attractions?: string[];
+  /** The hotel's own line and site — TBO sends both; useful once booked. */
+  phone?: string;
+  website?: string;
 }) {
   const la = Number(lat);
   const ln = Number(lng);
   const hasPoint =
     Number.isFinite(la) && Number.isFinite(ln) && (la !== 0 || ln !== 0);
   const near = (attractions ?? []).slice(0, 8);
-  if (!hasPoint && !near.length && !address) return null;
+  if (!hasPoint && !near.length && !address && !phone && !website) return null;
 
   // A small box around the point — OSM's embed frames by bounding box, not zoom.
   const d = 0.008;
@@ -75,6 +80,31 @@ export function HotelLocation({
           referrerPolicy="no-referrer-when-downgrade"
           className="block h-64 w-full border-0 border-y border-line"
         />
+      )}
+
+      {(phone || website) && (
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-5 pt-4 text-[0.88rem]">
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/[^+\d]/g, "")}`}
+              className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-red"
+            >
+              <Phone size={13} className="text-red" aria-hidden />
+              {phone}
+            </a>
+          )}
+          {website && (
+            <a
+              href={website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-red"
+            >
+              <Globe size={13} className="text-red" aria-hidden />
+              Hotel website
+            </a>
+          )}
+        </div>
       )}
 
       {near.length > 0 && (

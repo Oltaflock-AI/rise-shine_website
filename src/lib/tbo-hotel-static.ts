@@ -269,6 +269,25 @@ export type TboHotelInfo = {
    * that shows a price and a photo.
    */
   rooms?: RoomContent[];
+  /** Direct line to the hotel, for a guest who needs to reach it. */
+  phone?: string;
+  website?: string;
+  /**
+   * Charges the hotel levies that are NOT in the room rate. `mandatory` is money
+   * the guest WILL pay at the desk; `optional` is what they may choose to buy.
+   * TBO has always sent these and no page has ever shown them, so a resort fee
+   * or a AED 105 breakfast was a surprise on arrival.
+   */
+  fees?: { mandatory: HotelFee[]; optional: HotelFee[] };
+};
+
+export type HotelFee = {
+  /** e.g. "Buffet Breakfast Fee". */
+  label: string;
+  amount?: number;
+  currency?: string;
+  /** e.g. "per person", "per night" — TBO free text. */
+  basis?: string;
 };
 
 const infoCache = new Map<string, { data: TboHotelInfo; exp: number }>();
@@ -319,6 +338,14 @@ function mapInfo(
     facilities: arr(raw.HotelFacilities),
     images: imgs(raw.Images),
     heroImage: normaliseImageUrl(s(raw.Image)) || imgs(raw.Images)[0],
+    ...(s(raw.PhoneNumber).trim() ? { phone: s(raw.PhoneNumber).trim() } : {}),
+    ...(s(raw.HotelWebsiteUrl).trim()
+      ? { website: s(raw.HotelWebsiteUrl).trim() }
+      : {}),
+    ...(() => {
+      const fees = mapFees(raw.HotelFees);
+      return fees.mandatory.length || fees.optional.length ? { fees } : {};
+    })(),
     attractions: mapAttractions(raw.Attractions),
     address: s(raw.Address),
     cityName: s(raw.CityName) || undefined,
@@ -340,6 +367,35 @@ function mapInfo(
  * `Object.values` alone would trust JS insertion order for what is really a
  * numbered list, so the index is parsed out of the key and sorted on.
  */
+/** `HotelFees` → `{ mandatory, optional }`, dropping rows with nothing to say. */
+function mapFees(raw: unknown): {
+  mandatory: HotelFee[];
+  optional: HotelFee[];
+} {
+  const pick = (list: unknown): HotelFee[] => {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((row) => {
+        const r = (row ?? {}) as Record<string, unknown>;
+        const label = typeof r.FeesType === "string" ? r.FeesType.trim() : "";
+        const amount = Number(r.FeesValue);
+        const currency =
+          typeof r.Currency === "string" ? r.Currency.trim() : "";
+        const basis =
+          typeof r.ChargeType === "string" ? r.ChargeType.trim() : "";
+        return {
+          label,
+          ...(Number.isFinite(amount) && amount > 0 ? { amount } : {}),
+          ...(currency ? { currency } : {}),
+          ...(basis ? { basis } : {}),
+        };
+      })
+      .filter((f) => f.label);
+  };
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return { mandatory: pick(r.Mandatory), optional: pick(r.Optional) };
+}
+
 function mapAttractions(raw: unknown): string[] {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
   return Object.entries(raw as Record<string, unknown>)

@@ -22,14 +22,17 @@ import { tboFetch } from "./tbo-fetch";
 const DEFAULT_BASE = "https://affiliate.tektravels.com/HotelAPI";
 
 function cfg() {
-  const username = process.env.TBO_HOTEL_USERNAME || process.env.TBO_USERNAME || "";
-  const password = process.env.TBO_HOTEL_PASSWORD || process.env.TBO_PASSWORD || "";
+  const username =
+    process.env.TBO_HOTEL_USERNAME || process.env.TBO_USERNAME || "";
+  const password =
+    process.env.TBO_HOTEL_PASSWORD || process.env.TBO_PASSWORD || "";
   return {
     base: (process.env.TBO_HOTEL_URL || DEFAULT_BASE).replace(/\/+$/, ""),
     username,
     password,
     /** The flight login is standing in because no hotel-specific one is set. */
-    usingFlightCredentials: !process.env.TBO_HOTEL_USERNAME || !process.env.TBO_HOTEL_PASSWORD,
+    usingFlightCredentials:
+      !process.env.TBO_HOTEL_USERNAME || !process.env.TBO_HOTEL_PASSWORD,
     ip: process.env.TBO_END_USER_IP || "115.112.175.13",
   };
 }
@@ -42,7 +45,9 @@ export function hotelBookingConfigured(): boolean {
 
 function authHeader(): string {
   const c = cfg();
-  return "Basic " + Buffer.from(`${c.username}:${c.password}`).toString("base64");
+  return (
+    "Basic " + Buffer.from(`${c.username}:${c.password}`).toString("base64")
+  );
 }
 
 type TboStatus = { Code?: number; Description?: string };
@@ -87,7 +92,10 @@ export async function bookingCall<T extends { Status?: TboStatus }>(
   try {
     json = (await res.json()) as T;
   } catch {
-    throw new TboHotelError(`${method} returned a non-JSON response (HTTP ${res.status}).`, res.status);
+    throw new TboHotelError(
+      `${method} returned a non-JSON response (HTTP ${res.status}).`,
+      res.status,
+    );
   }
   const code = json?.Status?.Code;
   if (code !== undefined && code !== 200) {
@@ -103,7 +111,10 @@ export async function bookingCall<T extends { Status?: TboStatus }>(
           "Set the hotel-specific credentials.",
       );
     }
-    throw new TboHotelError(json.Status?.Description || `${method} failed (Status ${code}).`, code);
+    throw new TboHotelError(
+      json.Status?.Description || `${method} failed (Status ${code}).`,
+      code,
+    );
   }
   return json;
 }
@@ -162,6 +173,11 @@ export type HotelRoomOffer = {
   supplements?: HotelSupplement[];
   /** TBO's bedding caveat, when the rate carries one. */
   beddingNote?: string;
+  /** The rate bundles airport/city transfers — a real differentiator, and free
+   *  to surface: TBO has always sent it. */
+  withTransfers?: boolean;
+  /** A package rate rather than a room-only one. */
+  packageFare?: boolean;
 };
 
 /** A charge payable at the hotel (Search/PreBook `Supplements`) — local currency. */
@@ -207,15 +223,34 @@ type RawRoom = {
   RoomPromotion?: string[] | string;
   BeddingGroup?: string;
   /** TBO nests supplements per room as an array of arrays. */
-  Supplements?: Array<Array<{ Type?: string; Description?: string; Price?: number; Currency?: string }>>;
-  CancelPolicies?: Array<{ FromDate?: string; ChargeType?: string | number; CancellationCharge?: number }>;
+  Supplements?: Array<
+    Array<{
+      Type?: string;
+      Description?: string;
+      Price?: number;
+      Currency?: string;
+    }>
+  >;
+  CancelPolicies?: Array<{
+    FromDate?: string;
+    ChargeType?: string | number;
+    CancellationCharge?: number;
+  }>;
+  WithTransfers?: boolean;
+  PackageFare?: boolean;
 };
-type RawHotelResult = { HotelCode?: string | number; Currency?: string; Rooms?: RawRoom[] };
+type RawHotelResult = {
+  HotelCode?: string | number;
+  Currency?: string;
+  Rooms?: RawRoom[];
+};
 
 /** TBO returns these as either a string or a string[] depending on the method. */
 function strList(v: string[] | string | undefined): string[] {
   if (!v) return [];
-  return (Array.isArray(v) ? v : [v]).map((s) => String(s).trim()).filter(Boolean);
+  return (Array.isArray(v) ? v : [v])
+    .map((s) => String(s).trim())
+    .filter(Boolean);
 }
 
 /**
@@ -226,7 +261,11 @@ function strList(v: string[] | string | undefined): string[] {
  * adjustment is the B2C floor: a selling price may never sit below the
  * RecommendedSellingRate. No rounding — TBO checks the exact fare.
  */
-export function sellingFare(r: { TotalFare?: number; RecommendedSellingRate?: number; RecommendedSellingPrice?: number }): number {
+export function sellingFare(r: {
+  TotalFare?: number;
+  RecommendedSellingRate?: number;
+  RecommendedSellingPrice?: number;
+}): number {
   const rsp = r.RecommendedSellingRate ?? r.RecommendedSellingPrice ?? 0;
   return Math.max(r.TotalFare ?? 0, rsp);
 }
@@ -247,8 +286,12 @@ function mapRoom(r: RawRoom): HotelRoomOffer {
       charge: p.CancellationCharge ?? 0,
     })),
     ...(amenities.length ? { amenities: [...new Set(amenities)] } : {}),
-    ...(strList(r.RoomPromotion).length ? { roomPromotions: strList(r.RoomPromotion) } : {}),
+    ...(strList(r.RoomPromotion).length
+      ? { roomPromotions: strList(r.RoomPromotion) }
+      : {}),
     ...(r.BeddingGroup ? { beddingNote: r.BeddingGroup } : {}),
+    ...(r.WithTransfers ? { withTransfers: true } : {}),
+    ...(r.PackageFare ? { packageFare: true } : {}),
     // Verified live against TBO's own sample HotelCodes: Search (not just
     // PreBook) returns mandatory Supplements, so the guest can see the
     // pay-at-hotel charges on the room page — portal checkpoint 19.
@@ -275,7 +318,9 @@ const SEARCH_TTL = 5 * 60 * 1000;
  * result the caller can degrade on. Never throws for a normal supplier "no
  * rooms" — only wraps hard config/network faults.
  */
-export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchResult> {
+export async function searchHotels(
+  args: HotelSearchArgs,
+): Promise<HotelSearchResult> {
   const base: Omit<HotelSearchResult, "ok" | "source" | "offers"> = {
     checkInISO: args.checkInISO,
     checkOutISO: args.checkOutISO,
@@ -331,7 +376,10 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     // TBO wants ResponseTime scaled to the request size (allowed 5–23s):
     // a single-hotel reprice shouldn't ask for the full 23s a 100-code
     // city sweep needs.
-    ResponseTime: Math.min(23, Math.max(5, Math.ceil(args.hotelCodes.length / 5))),
+    ResponseTime: Math.min(
+      23,
+      Math.max(5, Math.ceil(args.hotelCodes.length / 5)),
+    ),
     // Detailed only where we render the extra content (single-hotel room page)
     // — a 100-code city sweep would pay for detail it never shows.
     IsDetailedResponse: Boolean(args.detailed),
@@ -350,7 +398,10 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
   // more than once (multi-supplier inventory), so merge duplicate HotelCodes
   // into one offer and collapse room options that are the same room + board at
   // the same fare, keeping the cheapest set. A hotel is never rendered twice.
-  const byCode = new Map<string, { currency: string; rooms: HotelRoomOffer[] }>();
+  const byCode = new Map<
+    string,
+    { currency: string; rooms: HotelRoomOffer[] }
+  >();
   for (const h of j.HotelResult ?? []) {
     const code = String(h.HotelCode ?? "");
     const rooms = (h.Rooms ?? []).map(mapRoom);
@@ -370,7 +421,12 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
           seen.add(key);
           return true;
         });
-      return { hotelCode, currency, rooms: deduped, cheapestFare: deduped[0]?.totalFare ?? 0 };
+      return {
+        hotelCode,
+        currency,
+        rooms: deduped,
+        cheapestFare: deduped[0]?.totalFare ?? 0,
+      };
     })
     .sort((a, b) => a.cheapestFare - b.cheapestFare);
 
@@ -402,7 +458,8 @@ export async function searchCityHotels(
 ): Promise<HotelSearchResult> {
   const { hotelCodes, ...rest } = args;
   const chunks: string[][] = [];
-  for (let i = 0; i < hotelCodes.length; i += 100) chunks.push(hotelCodes.slice(i, i + 100));
+  for (let i = 0; i < hotelCodes.length; i += 100)
+    chunks.push(hotelCodes.slice(i, i + 100));
 
   if (!chunks.length) {
     return {
@@ -427,13 +484,17 @@ export async function searchCityHotels(
       });
     }),
   );
-  console.info(`[tbo-hotel] ${chunks.length} parallel batches finished in ${Date.now() - t0}ms`);
+  console.info(
+    `[tbo-hotel] ${chunks.length} parallel batches finished in ${Date.now() - t0}ms`,
+  );
 
   const live = settled.filter((r) => r.ok);
   if (!live.length) return settled[0];
   return {
     ...live[0],
-    offers: live.flatMap((r) => r.offers).sort((a, b) => a.cheapestFare - b.cheapestFare),
+    offers: live
+      .flatMap((r) => r.offers)
+      .sort((a, b) => a.cheapestFare - b.cheapestFare),
   };
 }
 
@@ -482,7 +543,11 @@ export async function preBookHotel(args: {
   bookingCode: string;
   paymentMode?: string;
 }): Promise<PreBookResult> {
-  const fail = (error: string): PreBookResult => ({ ok: false, bookingCode: args.bookingCode, error });
+  const fail = (error: string): PreBookResult => ({
+    ok: false,
+    bookingCode: args.bookingCode,
+    error,
+  });
   if (!hotelBookingConfigured()) return fail("not-configured");
 
   type RawVI = {
@@ -522,7 +587,10 @@ export async function preBookHotel(args: {
   try {
     j = await bookingCall<Resp>(
       "PreBook",
-      { BookingCode: args.bookingCode, PaymentMode: args.paymentMode ?? "Limit" },
+      {
+        BookingCode: args.bookingCode,
+        PaymentMode: args.paymentMode ?? "Limit",
+      },
       60_000,
     );
   } catch (e) {
@@ -531,7 +599,8 @@ export async function preBookHotel(args: {
 
   const hr = j.HotelResult?.[0];
   const room = hr?.Rooms?.[0];
-  if (!room) return fail("PreBook returned no room — the rate is no longer available.");
+  if (!room)
+    return fail("PreBook returned no room — the rate is no longer available.");
   const vi = room.ValidationInfo ?? {};
 
   // TBO portal checkpoint 30: the portal must show TotalFare throughout the
@@ -559,7 +628,9 @@ export async function preBookHotel(args: {
     roomPromotions: strList(room.RoomPromotion),
     // Verified live: PreBook returns a room-level Amenities list (Search does not),
     // which is what TBO's portal checkpoint 24 looks for on the room/book pages.
-    amenities: strList(room.Amenities).length ? strList(room.Amenities) : undefined,
+    amenities: strList(room.Amenities).length
+      ? strList(room.Amenities)
+      : undefined,
     lastCancellationDeadline: room.LastCancellationDeadline,
     supplements: (room.Supplements ?? []).flat().map((s) => ({
       type: s.Type,

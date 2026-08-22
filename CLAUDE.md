@@ -195,6 +195,38 @@ then `TicketReIssue`), LCC-only. Researched and **parked** on 2026-08-22 —
 findings, live numbers and the re-run script are in
 `platform_docs/tbo-flight-ancillaries.md` (`scripts/ssr-probe.mts`).
 
+### Fields TBO sends that the pages now use
+
+`scripts/unused-fields-probe.mts` diffs every raw response against the code and
+lists what we receive and never read. Re-run it after any TBO version bump.
+
+Where things live matters and is not obvious:
+
+| Field | Lives on | Used for |
+|---|---|---|
+| `FareClassification` | flight **result** | fare badge, with TBO's own colour as a tint |
+| `NoOfSeatAvailable` | flight **segment**, not the result | "3 seats left" — the tightest leg wins |
+| `SmartChoiceRanking` · `NonStopFirstRanking` | result | the "Recommended" sort |
+| `Craft` · `AirportName` · `StopPoint` | segment | aircraft type, airport names, technical stops |
+| `HotelFees` | HotelDetails | "Charges at the hotel" |
+| `WithTransfers` · `PackageFare` | hotel **room** | rate chips |
+
+**Never display the agency's economics.** `CommissionEarned`, `IncentiveEarned`,
+`PLBEarned`, `TdsOn*`, `ChargeBU`, `PGCharge`, `AgentCommission`, `NetTax` all
+arrive on live responses and belong in the same locked drawer as `NetAmount`.
+
+**`SmartChoiceRanking` is not price-ordered.** On a live 472-result DEL-BOM
+search its top pick was ₹760 above the cheapest non-stop of the same duration,
+so it is its own sort option, never folded into our "Best". Both rankings are
+dense 1..N, 1 = best.
+
+**TBO's place names are part current, part historical.** Its hotel city list
+says "Mumbai/Bombay, Maharashtra" and its flight responses call CCU "Calcutta"
+while calling the city Kolkata. Display names go through
+`displayPlaceName` / `displayAirportName` (`lib/place-names.ts`); codes and
+anything sent BACK to TBO keep TBO's own strings, and search still matches the
+raw name so "Bombay" finds Mumbai.
+
 ### Multi-city flights — supported by TBO, not built here
 
 TBO's `JourneyType 3` accepts N `Segments` and returns a **single through-fare

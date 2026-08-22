@@ -330,6 +330,7 @@ function specialReturnPairs(wantLCC: boolean): FlightOffer[] {
       from: "", fromCity: "", fromTerminal: "", to: "", toCity: "", toTerminal: "",
       depTime: "", arrTime: "", durationMin: 0, baggage: "", cabinBaggage: "",
       cabinClass: "", fareClass: "", operatedBy: "",
+      fromAirportName: "", toAirportName: "", aircraftCode: "",
     };
   };
   const pairs: FlightOffer[] = [];
@@ -352,6 +353,7 @@ function specialReturnPairs(wantLCC: boolean): FlightOffer[] {
         segments: [seg(ob)],
         fareInclusions: [],
         miniRules: [],
+        freeMeal: false,
       });
     }
   }

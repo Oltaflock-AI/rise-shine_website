@@ -32,12 +32,29 @@ import { Button } from "./Button";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
-type SortKey = "best" | "price" | "dur" | "dep";
+type SortKey = "best" | "price" | "dur" | "dep" | "tbo";
 type Direction = "out" | "in";
 
-/** Sort a result list. "best" blends price (60%), journey time (30%) and stops (10%). */
+/**
+ * Sort a result list. "best" blends price (60%), journey time (30%) and stops
+ * (10%); "tbo" defers to the airline system's own ordering.
+ *
+ * The two are kept separate on purpose. TBO's `SmartChoiceRanking` is a dense
+ * 1..N ordering over the whole result set, but it is NOT price-ordered — on a
+ * live 472-result DEL-BOM search its top pick was ₹760 above the cheapest
+ * non-stop of the same duration. Folding that into "Best" would quietly change
+ * what we recommend to something we cannot explain, so it is offered as its own
+ * option, labelled as the booking system's pick, and falls back to
+ * `NonStopFirstRanking` (non-stops first, then price) where the smart rank is
+ * missing.
+ */
 function bySort(list: FlightOffer[], key: SortKey): FlightOffer[] {
   if (list.length < 2) return list;
+  if (key === "tbo") {
+    const rank = (o: FlightOffer) =>
+      o.smartRank ?? o.nonStopRank ?? Number.MAX_SAFE_INTEGER;
+    return [...list].sort((a, b) => rank(a) - rank(b) || a.fareINR - b.fareINR);
+  }
   if (key === "price")
     return [...list].sort(
       (a, b) => a.fareINR - b.fareINR || a.durationMin - b.durationMin,
@@ -104,6 +121,15 @@ const SORT_OPTIONS: {
     chip: "bg-amber-100 text-amber-700",
     banner: "The quickest journeys first",
     bannerClass: "border-amber-200 bg-amber-50 text-amber-900",
+  },
+  {
+    key: "tbo",
+    label: "Recommended",
+    menuLabel: "Recommended by the airline system",
+    icon: Sparkles,
+    chip: "bg-violet-100 text-violet-700",
+    banner: "Ranked by our booking system's own recommendation, not by price",
+    bannerClass: "border-violet-200 bg-violet-50 text-violet-900",
   },
   {
     key: "dep",
@@ -273,7 +299,10 @@ export function FlightResultsClient({
   }, [all]);
 
   const [sort, setSort] = useState<SortKey>(
-    initialSort === "dur" || initialSort === "dep" || initialSort === "price"
+    initialSort === "dur" ||
+      initialSort === "dep" ||
+      initialSort === "price" ||
+      initialSort === "tbo"
       ? initialSort
       : "best",
   );

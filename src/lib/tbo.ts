@@ -12,6 +12,7 @@
 import { TboValidationError, validateSearch } from "./tbo-validate";
 import { tboFetch } from "./tbo-fetch";
 import { todayInIndiaISO } from "./stay-dates";
+import { displayAirportName, displayPlaceName } from "./place-names";
 
 // Live and staging are wholly different hosts, not just different credentials, so
 // both bases are env-driven. Unset = staging. Live (issued 2026-08-11):
@@ -20,7 +21,8 @@ import { todayInIndiaISO } from "./stay-dates";
 const trimSlash = (u: string) => u.replace(/\/+$/, "");
 
 const AUTH_URL = `${trimSlash(
-  process.env.TBO_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest",
+  process.env.TBO_AUTH_URL ||
+    "http://Sharedapi.tektravels.com/SharedData.svc/rest",
 )}/Authenticate`;
 // Search lives on the Air service; Book/Ticket use the separate AirBook service
 // (see tbo-book.ts) — TBO requires each method to go to its own URL.
@@ -67,6 +69,20 @@ export type FlightSegment = {
   fareClass: string;
   /** Operating carrier code when the flight is code-shared (empty otherwise). */
   operatedBy: string;
+  /** Full airport names, e.g. "Indira Gandhi Airport" (empty when TBO omits). */
+  fromAirportName: string;
+  toAirportName: string;
+  /** IATA aircraft code as TBO sends it, e.g. "7M8". */
+  aircraftCode: string;
+  /** Seats left on this leg (undefined when TBO omits it). */
+  seatsLeft?: number;
+  /**
+   * A technical stop — the aircraft lands but the flight number does not change
+   * and the passenger does not deplane. Distinct from a connection, which is a
+   * separate segment, and worth saying: a "non-stop" that refuels somewhere is
+   * otherwise indistinguishable from one that does not.
+   */
+  stopPoint?: string;
 };
 
 /**
@@ -106,6 +122,26 @@ export type FlightOffer = {
   fareInclusions: string[];
   /** Cancellation / date-change penalties as TBO reports them (may be empty). */
   miniRules: MiniFareRule[];
+  /**
+   * The airline's OWN name for this fare — "Corporate Value", "Spice Max",
+   * "Flexi Plus", "UpFront" — with the colour TBO ships alongside it. 21
+   * distinct types on a single DEL-BOM search, and the only thing that explains
+   * why two seats on the same aircraft cost different amounts.
+   */
+  fareType?: { label: string; color?: string };
+  /** Fewest seats left across the legs — the real constraint on the booking. */
+  seatsLeft?: number;
+  /** The airline includes a meal in this fare at no charge. */
+  freeMeal: boolean;
+  /**
+   * TBO's own orderings, 1 = best, dense over the whole result set.
+   * `nonStopRank` puts non-stops first and then sorts by price; `smartRank` is
+   * TBO's blended "smart choice", which is NOT price-ordered — on a live
+   * DEL-BOM search its top pick was ₹760 above the cheapest non-stop of the
+   * same duration. Offered as its own sort, never silently folded into ours.
+   */
+  smartRank?: number;
+  nonStopRank?: number;
 };
 
 export type FlightSearch = {
@@ -133,7 +169,8 @@ export type FlightSearch = {
 let tokenCache: { token: string; exp: number } | null = null;
 
 async function authenticate(force = false): Promise<string | null> {
-  if (!force && tokenCache && tokenCache.exp > Date.now()) return tokenCache.token;
+  if (!force && tokenCache && tokenCache.exp > Date.now())
+    return tokenCache.token;
   if (!tboConfigured()) return null;
   const c = cfg();
   try {
@@ -167,14 +204,46 @@ export async function getAuthToken(force = false): Promise<string | null> {
 }
 
 type RawSeg = {
-  Airline?: { AirlineCode?: string; AirlineName?: string; FlightNumber?: string; FareClass?: string; OperatingCarrier?: string };
+  Airline?: {
+    AirlineCode?: string;
+    AirlineName?: string;
+    FlightNumber?: string;
+    FareClass?: string;
+    OperatingCarrier?: string;
+  };
   CabinClass?: number;
-  Origin?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; DepTime?: string };
-  Destination?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; ArrTime?: string };
+  Origin?: {
+    Airport?: {
+      AirportCode?: string;
+      AirportName?: string;
+      CityName?: string;
+      Terminal?: string;
+    };
+    DepTime?: string;
+  };
+  Destination?: {
+    Airport?: {
+      AirportCode?: string;
+      AirportName?: string;
+      CityName?: string;
+      Terminal?: string;
+    };
+    ArrTime?: string;
+  };
   Duration?: number;
   GroundTime?: number;
   Baggage?: string;
   CabinBaggage?: string;
+  /** Remaining inventory on THIS leg — TBO reports 1-135 in practice. */
+  NoOfSeatAvailable?: number;
+  /** IATA aircraft code, e.g. "7M8" = 737 MAX 8. */
+  Craft?: string;
+  IsETicketEligible?: boolean;
+  /** A technical stop that is NOT a connection — same flight number, no change. */
+  StopOver?: boolean;
+  StopPoint?: string;
+  StopPointArrivalTime?: string;
+  StopPointDepartureTime?: string;
 };
 
 /** One row of TBO's MiniFareRules — the airline's cancellation / date-change penalty grid. */
@@ -221,6 +290,12 @@ type RawResult = {
   FareInclusions?: string[] | null;
   // TBO nests this one level deep (per journey) on Search, flat on some sources.
   MiniFareRules?: RawMiniRule[][] | RawMiniRule[] | null;
+  /** The airline's own fare-family name and TBO's colour for it. */
+  FareClassification?: { Type?: string; Color?: string };
+  IsFreeMealAvailable?: boolean;
+  /** TBO's own result orderings, 1 = best. See FlightOffer for the caveat. */
+  SmartChoiceRanking?: number;
+  NonStopFirstRanking?: number;
 };
 
 function mapSegment(s: RawSeg): FlightSegment {
@@ -230,10 +305,10 @@ function mapSegment(s: RawSeg): FlightSegment {
     airlineName: a.AirlineName ?? a.AirlineCode ?? "",
     flightNumber: `${a.AirlineCode ?? ""} ${a.FlightNumber ?? ""}`.trim(),
     from: s.Origin?.Airport?.AirportCode ?? "",
-    fromCity: s.Origin?.Airport?.CityName ?? "",
+    fromCity: displayPlaceName(s.Origin?.Airport?.CityName),
     fromTerminal: s.Origin?.Airport?.Terminal ?? "",
     to: s.Destination?.Airport?.AirportCode ?? "",
-    toCity: s.Destination?.Airport?.CityName ?? "",
+    toCity: displayPlaceName(s.Destination?.Airport?.CityName),
     toTerminal: s.Destination?.Airport?.Terminal ?? "",
     depTime: s.Origin?.DepTime ?? "",
     arrTime: s.Destination?.ArrTime ?? "",
@@ -243,7 +318,16 @@ function mapSegment(s: RawSeg): FlightSegment {
     cabinClass: CABIN_NAME[s.CabinClass ?? 0] ?? "",
     fareClass: a.FareClass ?? "",
     operatedBy:
-      a.OperatingCarrier && a.OperatingCarrier !== a.AirlineCode ? a.OperatingCarrier : "",
+      a.OperatingCarrier && a.OperatingCarrier !== a.AirlineCode
+        ? a.OperatingCarrier
+        : "",
+    fromAirportName: displayAirportName(s.Origin?.Airport?.AirportName),
+    toAirportName: displayAirportName(s.Destination?.Airport?.AirportName),
+    aircraftCode: (s.Craft ?? "").trim(),
+    ...(typeof s.NoOfSeatAvailable === "number" && s.NoOfSeatAvailable > 0
+      ? { seatsLeft: s.NoOfSeatAvailable }
+      : {}),
+    ...(s.StopOver && s.StopPoint ? { stopPoint: s.StopPoint.trim() } : {}),
   };
 }
 
@@ -353,13 +437,23 @@ export function mapResult(r: RawResult, adults: number): FlightOffer {
   // breakdown for others. Read both so a card never shows a blank allowance when
   // TBO did in fact tell us one.
   const paxSegs =
-    r.FareBreakdown?.find((b) => (b.PassengerType ?? 0) === 1)?.SegmentDetails ?? [];
+    r.FareBreakdown?.find((b) => (b.PassengerType ?? 0) === 1)
+      ?.SegmentDetails ?? [];
   const segments = legs.map((s, i) => {
     const seg = mapSegment(s);
-    if (!seg.baggage) seg.baggage = paxSegs[i]?.CheckedInBaggage?.FreeText?.trim() ?? "";
-    if (!seg.cabinBaggage) seg.cabinBaggage = paxSegs[i]?.CabinBaggage?.FreeText?.trim() ?? "";
+    if (!seg.baggage)
+      seg.baggage = paxSegs[i]?.CheckedInBaggage?.FreeText?.trim() ?? "";
+    if (!seg.cabinBaggage)
+      seg.cabinBaggage = paxSegs[i]?.CabinBaggage?.FreeText?.trim() ?? "";
     return seg;
   });
+  // The binding constraint is the tightest leg: nine seats on the first leg is
+  // no comfort if the second has one.
+  const seatCounts = segments
+    .map((x) => x.seatsLeft)
+    .filter((n): n is number => n != null);
+  const seatsLeft = seatCounts.length ? Math.min(...seatCounts) : undefined;
+
   return {
     id: r.ResultIndex,
     airlineCode: r.AirlineCode ?? legs[0]?.Airline?.AirlineCode ?? "",
@@ -372,8 +466,28 @@ export function mapResult(r: RawResult, adults: number): FlightOffer {
     baseINR: fare.baseINR,
     taxINR: fare.taxINR,
     segments,
-    fareInclusions: (r.FareInclusions ?? []).map((t) => String(t).trim()).filter(Boolean),
+    fareInclusions: (r.FareInclusions ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean),
     miniRules: mapMiniRules(r.MiniFareRules),
+    ...(r.FareClassification?.Type
+      ? {
+          fareType: {
+            label: String(r.FareClassification.Type).trim(),
+            ...(r.FareClassification.Color
+              ? { color: r.FareClassification.Color }
+              : {}),
+          },
+        }
+      : {}),
+    ...(seatsLeft != null ? { seatsLeft } : {}),
+    freeMeal: Boolean(r.IsFreeMealAvailable),
+    ...(typeof r.SmartChoiceRanking === "number"
+      ? { smartRank: r.SmartChoiceRanking }
+      : {}),
+    ...(typeof r.NonStopFirstRanking === "number"
+      ? { nonStopRank: r.NonStopFirstRanking }
+      : {}),
   };
 }
 
@@ -381,7 +495,9 @@ export function mapResult(r: RawResult, adults: number): FlightOffer {
 function dedupe(offers: FlightOffer[]): FlightOffer[] {
   const seen = new Set<string>();
   return offers.filter((o) => {
-    const key = o.segments.map((s) => `${s.flightNumber}@${s.depTime}`).join(">");
+    const key = o.segments
+      .map((s) => `${s.flightNumber}@${s.depTime}`)
+      .join(">");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -390,10 +506,10 @@ function dedupe(offers: FlightOffer[]): FlightOffer[] {
 
 /** Cabin display name → TBO FlightCabinClass code (1=All, 2=Economy, …). */
 const CABIN_CODE: Record<string, string> = {
-  "Economy": "2",
+  Economy: "2",
   "Premium Economy": "3",
-  "Business": "4",
-  "First": "6",
+  Business: "4",
+  First: "6",
 };
 
 type RawSearchOpts = {
@@ -504,7 +620,9 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
   const specialReturn = Boolean(args.specialReturn && args.returnISO);
   const sources = args.sources && args.sources.length ? args.sources : null;
   const preferredAirlines =
-    args.preferredAirlines && args.preferredAirlines.length ? args.preferredAirlines : null;
+    args.preferredAirlines && args.preferredAirlines.length
+      ? args.preferredAirlines
+      : null;
   const base: Omit<FlightSearch, "ok" | "source" | "outbound"> = {
     from,
     to,
@@ -585,10 +703,16 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
 
   const groups = R.Results;
   const outbound = dedupe(
-    groups[0].map((r) => mapResult(r, adults)).sort((a, b) => a.fareINR - b.fareINR),
+    groups[0]
+      .map((r) => mapResult(r, adults))
+      .sort((a, b) => a.fareINR - b.fareINR),
   );
   const inbound = groups[1]
-    ? dedupe(groups[1].map((r) => mapResult(r, adults)).sort((a, b) => a.fareINR - b.fareINR))
+    ? dedupe(
+        groups[1]
+          .map((r) => mapResult(r, adults))
+          .sort((a, b) => a.fareINR - b.fareINR),
+      )
     : undefined;
   const cheapestINR =
     args.returnISO && inbound?.length
@@ -621,7 +745,10 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
  * to *today* in IST for every request placed between 18:30 and midnight UTC,
  * and TBO rejects a same-day search once the day's flights have gone.
  */
-export function defaultDates(nights = 7): { departISO: string; returnISO: string } {
+export function defaultDates(nights = 7): {
+  departISO: string;
+  returnISO: string;
+} {
   const [y, m, day] = todayInIndiaISO().split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1, day));
   d.setUTCDate(d.getUTCDate() + 1);

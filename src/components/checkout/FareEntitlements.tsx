@@ -10,8 +10,21 @@
  */
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, FileText, Info, Luggage, ShieldAlert } from "lucide-react";
-import { BaggageSummary, FareInclusions, FarePolicyTable } from "@/components/ui/fare-info";
+import {
+  ChevronDown,
+  FileText,
+  Flame,
+  Info,
+  Luggage,
+  ShieldAlert,
+  TicketCheck,
+  UtensilsCrossed,
+} from "lucide-react";
+import {
+  BaggageSummary,
+  FareInclusions,
+  FarePolicyTable,
+} from "@/components/ui/fare-info";
 import { formatDate } from "@/lib/format-date";
 import type { QuoteDetails } from "@/lib/tbo-book";
 import { cn } from "@/lib/cn";
@@ -22,12 +35,74 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
   const [rulesOpen, setRulesOpen] = useState(false);
   const hasRuleDocs = details.fareRules.length > 0;
 
+  const scarce = details.seatsLeft != null && details.seatsLeft <= 4;
+
   return (
     <div className="space-y-6">
+      {/* What the airline calls this fare, and anything about it that should
+          change a decision BEFORE the passenger form. Seat counts come from
+          FareQuote rather than Search, which is why they appear here and not
+          on the results card. */}
+      {(details.fareType ||
+        scarce ||
+        details.freeMeal ||
+        details.reissueCharge != null) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {details.fareType && (
+            <span
+              className="inline-flex items-center rounded-full border px-3 py-1 text-[0.82rem] font-semibold text-ink"
+              style={
+                details.fareType.color
+                  ? {
+                      borderColor: details.fareType.color,
+                      background: `${details.fareType.color}22`,
+                    }
+                  : undefined
+              }
+            >
+              {details.fareType.label}
+            </span>
+          )}
+          {details.freeMeal && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[0.82rem] font-semibold text-emerald-700">
+              <UtensilsCrossed className="h-3.5 w-3.5" aria-hidden /> Meal
+              included
+            </span>
+          )}
+          {scarce && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red/10 px-3 py-1 text-[0.82rem] font-semibold text-red">
+              <Flame className="h-3.5 w-3.5" aria-hidden />
+              {details.seatsLeft === 1
+                ? "1 seat left at this fare"
+                : `${details.seatsLeft} seats left at this fare`}
+            </span>
+          )}
+          {details.eTicket && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1 text-[0.82rem] font-semibold text-ink">
+              <TicketCheck className="h-3.5 w-3.5 text-navy" aria-hidden />{" "}
+              E-ticket
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* A supplier reissue charge sits ON TOP of any airline penalty in the
+          fare rules below, so it has to be stated separately or the two get
+          read as the same number. */}
+      {details.reissueCharge != null && (
+        <p className="flex items-start gap-2 rounded-brand border border-amber-300 bg-amber-50 px-3 py-2 text-[0.88rem] text-amber-900">
+          <Info className="mt-[2px] h-3.5 w-3.5 flex-none" aria-hidden />
+          Changing this booking carries a ₹
+          {details.reissueCharge.toLocaleString("en-IN")} service charge in
+          addition to the airline&apos;s own penalty below.
+        </p>
+      )}
+
       {/* ── baggage ── */}
       <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
         <h3 className="mb-1 flex items-center gap-2 text-[0.95rem] font-bold text-ink">
-          <Luggage className="h-4 w-4 text-red" aria-hidden /> Baggage &amp; what&apos;s included
+          <Luggage className="h-4 w-4 text-red" aria-hidden /> Baggage &amp;
+          what&apos;s included
         </h3>
         <p className="mb-4 text-[0.88rem] text-muted">
           Allowance is per passenger, as confirmed by the airline for this fare.
@@ -35,7 +110,10 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
 
         <ul className="space-y-3">
           {details.segments.map((s, i) => (
-            <li key={`${s.flightNumber}-${i}`} className="rounded-brand border border-line p-3">
+            <li
+              key={`${s.flightNumber}-${i}`}
+              className="rounded-brand border border-line p-3"
+            >
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="text-[0.9rem] font-semibold text-ink">
                   {s.from} → {s.to}
@@ -43,10 +121,16 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
                 <span className="text-[0.82rem] text-muted">
                   {s.flightNumber}
                   {s.cabinClass ? ` · ${s.cabinClass}` : ""}
-                  {s.depTime ? ` · ${fmtTime(s.depTime)}–${fmtTime(s.arrTime)}` : ""}
+                  {s.depTime
+                    ? ` · ${fmtTime(s.depTime)}–${fmtTime(s.arrTime)}`
+                    : ""}
                 </span>
               </div>
-              <BaggageSummary className="mt-2" checkedIn={s.checkedIn} cabin={s.cabin} />
+              <BaggageSummary
+                className="mt-2"
+                checkedIn={s.checkedIn}
+                cabin={s.cabin}
+              />
             </li>
           ))}
         </ul>
@@ -59,21 +143,26 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
 
         {details.ticketAdvisory && (
           <p className="mt-4 flex items-start gap-2 rounded-brand bg-cream-2 px-3 py-2 text-[0.88rem] text-ink">
-            <Info className="mt-[2px] h-3.5 w-3.5 flex-none text-muted" aria-hidden />
+            <Info
+              className="mt-[2px] h-3.5 w-3.5 flex-none text-muted"
+              aria-hidden
+            />
             {details.ticketAdvisory}
           </p>
         )}
 
         <p className="mt-4 text-[0.82rem] text-muted">
-          Extra baggage can be added by the airline at the airport, at their published
-          rates. Need more allowance booked in advance? Call us before you pay.
+          Extra baggage can be added by the airline at the airport, at their
+          published rates. Need more allowance booked in advance? Call us before
+          you pay.
         </p>
       </div>
 
       {/* ── refund / change rules ── */}
       <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
         <h3 className="mb-1 flex items-center gap-2 text-[0.95rem] font-bold text-ink">
-          <ShieldAlert className="h-4 w-4 text-red" aria-hidden /> Cancellation &amp; date change
+          <ShieldAlert className="h-4 w-4 text-red" aria-hidden /> Cancellation
+          &amp; date change
         </h3>
         <p className="mb-4 text-[0.88rem] text-muted">
           {details.isRefundable
@@ -85,21 +174,21 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
           <FarePolicyTable rules={details.miniRules} />
         ) : hasRuleDocs ? (
           <p className="text-[0.88rem] text-muted">
-            The airline published no penalty grid for this fare — the full rules below
-            are the binding version.
+            The airline published no penalty grid for this fare — the full rules
+            below are the binding version.
           </p>
         ) : (
           <p className="text-[0.88rem] text-muted">
-            The airline has not published its cancellation charges through our booking
-            system for this fare. Call us before you pay and we will confirm them with
-            the airline.
+            The airline has not published its cancellation charges through our
+            booking system for this fare. Call us before you pay and we will
+            confirm them with the airline.
           </p>
         )}
 
         {details.lastTicketDate && (
           <p className="mt-3 text-[0.82rem] text-muted">
-            Hold expires {formatDate(details.lastTicketDate)} — after that the airline may
-            re-price this fare.
+            Hold expires {formatDate(details.lastTicketDate)} — after that the
+            airline may re-price this fare.
           </p>
         )}
 
@@ -112,20 +201,30 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
               className="mt-4 inline-flex items-center gap-1.5 text-[0.88rem] font-semibold text-red hover:underline"
             >
               <FileText className="h-4 w-4" aria-hidden />
-              {rulesOpen ? "Hide the airline's full fare rules" : "Read the airline's full fare rules"}
+              {rulesOpen
+                ? "Hide the airline's full fare rules"
+                : "Read the airline's full fare rules"}
               <ChevronDown
-                className={cn("h-4 w-4 transition-transform", rulesOpen && "rotate-180")}
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  rulesOpen && "rotate-180",
+                )}
                 aria-hidden
               />
             </button>
             {rulesOpen && (
               <div className="mt-3 space-y-4">
                 {details.fareRules.map((r, i) => (
-                  <div key={i} className="rounded-brand border border-line bg-cream-2/60 p-3">
+                  <div
+                    key={i}
+                    className="rounded-brand border border-line bg-cream-2/60 p-3"
+                  >
                     <p className="mb-2 text-[0.88rem] font-semibold text-ink">
                       {r.origin} → {r.destination}
                       {r.airline ? ` · ${r.airline}` : ""}
-                      {r.fareBasisCode ? ` · fare basis ${r.fareBasisCode}` : ""}
+                      {r.fareBasisCode
+                        ? ` · fare basis ${r.fareBasisCode}`
+                        : ""}
                     </p>
                     {/* Sanitised server-side by lib/fare-rules.ts — allowlisted tags only. */}
                     <div
@@ -141,11 +240,17 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
 
         <p className="mt-4 text-[0.82rem] text-muted">
           Airline charges above are in addition to our service fee. See our{" "}
-          <Link href="/refund-policy" className="font-semibold text-red hover:underline">
+          <Link
+            href="/refund-policy"
+            className="font-semibold text-red hover:underline"
+          >
             cancellation &amp; refund policy
           </Link>{" "}
           and{" "}
-          <Link href="/terms" className="font-semibold text-red hover:underline">
+          <Link
+            href="/terms"
+            className="font-semibold text-red hover:underline"
+          >
             terms
           </Link>
           .

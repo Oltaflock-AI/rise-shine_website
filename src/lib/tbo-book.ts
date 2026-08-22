@@ -12,6 +12,7 @@
  *
  * Reference: https://apidoc.tektravels.com/flight/apivalidation.aspx
  */
+import { displayAirportName } from "./place-names";
 import { tboFetch } from "./tbo-fetch";
 import { isEmptyFareRule, sanitizeFareRuleHtml } from "./fare-rules";
 import type { MiniFareRule } from "./tbo";
@@ -37,7 +38,8 @@ import {
 // Staging and live are different hosts entirely — see tbo.ts for the live values.
 const trimSlash = (u: string) => u.replace(/\/+$/, "");
 const AUTH_URL = trimSlash(
-  process.env.TBO_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest",
+  process.env.TBO_AUTH_URL ||
+    "http://Sharedapi.tektravels.com/SharedData.svc/rest",
 );
 /** Search / FareRule / FareQuote / SSR / GetCalendarFare live on the Air service. */
 const SEARCH_SVC = trimSlash(
@@ -102,15 +104,21 @@ export class TboError extends Error {
 let tokenCache: { token: string; exp: number } | null = null;
 
 async function authenticate(force = false): Promise<string> {
-  if (!force && tokenCache && tokenCache.exp > Date.now()) return tokenCache.token;
+  if (!force && tokenCache && tokenCache.exp > Date.now())
+    return tokenCache.token;
   const c = cfg();
-  const r = await post(`${AUTH_URL}/Authenticate`, {
-    ClientId: c.clientId,
-    UserName: c.username,
-    Password: c.password,
-    EndUserIp: c.ip,
-  }, TIMEOUT_OTHER);
-  if (r?.Status !== 1 || !r?.TokenId) throw new TboError(r?.Error?.ErrorMessage || "TBO authentication failed");
+  const r = await post(
+    `${AUTH_URL}/Authenticate`,
+    {
+      ClientId: c.clientId,
+      UserName: c.username,
+      Password: c.password,
+      EndUserIp: c.ip,
+    },
+    TIMEOUT_OTHER,
+  );
+  if (r?.Status !== 1 || !r?.TokenId)
+    throw new TboError(r?.Error?.ErrorMessage || "TBO authentication failed");
   tokenCache = { token: r.TokenId, exp: Date.now() + 20 * 60 * 1000 };
   return r.TokenId;
 }
@@ -149,7 +157,9 @@ async function post(url: string, body: Json, timeoutMs: number): Promise<Json> {
     text = await r.text();
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new TboTimeoutError(`TBO did not respond within ${Math.round(timeoutMs / 1000)}s.`);
+      throw new TboTimeoutError(
+        `TBO did not respond within ${Math.round(timeoutMs / 1000)}s.`,
+      );
     }
     throw e;
   } finally {
@@ -176,24 +186,39 @@ function isTransient(res: Json): boolean {
  * supplier error or timeout. Book/Ticket are NEVER auto-retried — a retry there could
  * double-book; that path goes through recoverFromTimeout() instead.
  */
-async function call(url: string, body: Json, timeoutMs = TIMEOUT_OTHER, retries = 0): Promise<Json> {
+async function call(
+  url: string,
+  body: Json,
+  timeoutMs = TIMEOUT_OTHER,
+  retries = 0,
+): Promise<Json> {
   const method = url.split("/").pop() || "TBO";
   for (let attempt = 0; ; attempt++) {
     const token = await authenticate(attempt > 0);
     let res: Json;
     try {
-      res = await post(url, { ...body, EndUserIp: cfg().ip, TokenId: token }, timeoutMs);
+      res = await post(
+        url,
+        { ...body, EndUserIp: cfg().ip, TokenId: token },
+        timeoutMs,
+      );
     } catch (e) {
       if (e instanceof TboTimeoutError) {
         if (attempt < retries) continue;
-        throw new TboTimeoutError(`${method} did not respond within ${Math.round(timeoutMs / 1000)}s.`);
+        throw new TboTimeoutError(
+          `${method} did not respond within ${Math.round(timeoutMs / 1000)}s.`,
+        );
       }
       throw e;
     }
     const err = res?.Response?.Error ?? res?.Error;
     if (err?.ErrorCode === TOKEN_INVALID) {
       const fresh = await authenticate(true);
-      res = await post(url, { ...body, EndUserIp: cfg().ip, TokenId: fresh }, timeoutMs);
+      res = await post(
+        url,
+        { ...body, EndUserIp: cfg().ip, TokenId: fresh },
+        timeoutMs,
+      );
     }
     if (attempt < retries && isTransient(res)) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -207,7 +232,11 @@ async function call(url: string, body: Json, timeoutMs = TIMEOUT_OTHER, retries 
  * Book / Ticket / GetBookingDetails: address the AirBook service, falling back to the
  * Air service when AirBook isn't provisioned for this account (staging today).
  */
-async function bookCall(method: string, body: Json, timeoutMs = TIMEOUT_OTHER): Promise<Json> {
+async function bookCall(
+  method: string,
+  body: Json,
+  timeoutMs = TIMEOUT_OTHER,
+): Promise<Json> {
   if (!bookSvcUnavailable) {
     try {
       return await call(`${BOOK_SVC}/${method}`, body, timeoutMs);
@@ -231,7 +260,10 @@ function assertOk(res: Json, what: string): Json {
   const R = res?.Response;
   const e = errOf(res);
   if (R?.ResponseStatus !== 1 || e.code) {
-    throw new TboError(e.message || `${what} failed (status ${R?.ResponseStatus})`, e.code);
+    throw new TboError(
+      e.message || `${what} failed (status ${R?.ResponseStatus})`,
+      e.code,
+    );
   }
   return R;
 }
@@ -288,12 +320,20 @@ function assertTraceAlive(searchedAt: number): void {
  * stops reporting "booking under process", otherwise we risk a double booking
  * (and a double charge).
  */
-async function recoverFromTimeout(traceId: string, bookingId?: number, pnr?: string): Promise<Json | null> {
+async function recoverFromTimeout(
+  traceId: string,
+  bookingId?: number,
+  pnr?: string,
+): Promise<Json | null> {
   if (!bookingId && !pnr) return null;
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 12_000)); // 10–15s cadence per TBO
     try {
-      const res = await bookCall("GetBookingDetails", { TraceId: traceId, BookingId: bookingId, PNR: pnr }, TIMEOUT_OTHER);
+      const res = await bookCall(
+        "GetBookingDetails",
+        { TraceId: traceId, BookingId: bookingId, PNR: pnr },
+        TIMEOUT_OTHER,
+      );
       const msg = errOf(res).message;
       if (/booking under process/i.test(msg)) continue;
       if (res?.Response?.FlightItinerary) return res.Response;
@@ -337,6 +377,13 @@ export type QuoteDetails = {
     /** Cabin allowance, e.g. "7 KG". */
     cabin: string;
     cabinClass: string;
+    /** Full airport names, e.g. "Indira Gandhi Airport". */
+    fromAirportName: string;
+    toAirportName: string;
+    /** IATA aircraft code, e.g. "7M8". */
+    aircraftCode: string;
+    /** Seats the airline still has on this leg. */
+    seatsLeft?: number;
   }[];
   /**
    * All-passenger fare split from FareQuote — the numbers behind the total charged.
@@ -353,6 +400,20 @@ export type QuoteDetails = {
   ticketAdvisory: string;
   /** ISO datetime after which the held fare can no longer be ticketed. */
   lastTicketDate: string;
+  /** The airline's own name for this fare, e.g. "Corporate Value". */
+  fareType?: { label: string; color?: string };
+  /** Fewest seats left across the legs — the binding constraint on the booking. */
+  seatsLeft?: number;
+  /** The fare includes a meal at no charge. */
+  freeMeal: boolean;
+  /** Every leg can be issued as an e-ticket. */
+  eTicket: boolean;
+  /**
+   * What the SUPPLIER charges to reissue, on top of any airline penalty in
+   * MiniFareRules. Zero on most fares; when it is not, the guest is entitled to
+   * see it before paying.
+   */
+  reissueCharge?: number;
 };
 
 export type QuoteResult = {
@@ -379,7 +440,9 @@ const CABIN_NAME: Record<number, string> = {
 
 /** Flatten FareQuote's per-journey MiniFareRules grid into displayable rows. */
 function quoteMiniRules(raw: unknown): MiniFareRule[] {
-  const flat = (Array.isArray(raw) ? raw : []).flatMap((r) => (Array.isArray(r) ? r : [r]));
+  const flat = (Array.isArray(raw) ? raw : []).flatMap((r) =>
+    Array.isArray(r) ? r : [r],
+  );
   const seen = new Set<string>();
   const out: MiniFareRule[] = [];
   for (const r of flat as Json[]) {
@@ -418,11 +481,15 @@ function realDate(v: unknown): string {
   return Number.isFinite(year) && year >= 1900 ? t : "";
 }
 
-export function quoteDetails(quoted: Json, fareRuleRes: Json | null): QuoteDetails {
+export function quoteDetails(
+  quoted: Json,
+  fareRuleRes: Json | null,
+): QuoteDetails {
   const legs: Json[] = (quoted.Segments?.[0] as Json[]) ?? [];
   const paxSegs: Json[] =
-    ((quoted.FareBreakdown as Json[] | undefined)?.find((b) => (b?.PassengerType ?? 0) === 1)
-      ?.SegmentDetails as Json[] | undefined) ?? [];
+    ((quoted.FareBreakdown as Json[] | undefined)?.find(
+      (b) => (b?.PassengerType ?? 0) === 1,
+    )?.SegmentDetails as Json[] | undefined) ?? [];
 
   const segments = legs.map((s, i) => {
     const a = (s.Airline ?? {}) as Json;
@@ -433,19 +500,42 @@ export function quoteDetails(quoted: Json, fareRuleRes: Json | null): QuoteDetai
       airlineName: String(a.AirlineName ?? a.AirlineCode ?? ""),
       depTime: String(s.Origin?.DepTime ?? ""),
       arrTime: String(s.Destination?.ArrTime ?? ""),
-      checkedIn: String(s.Baggage ?? paxSegs[i]?.CheckedInBaggage?.FreeText ?? "").trim(),
-      cabin: String(s.CabinBaggage ?? paxSegs[i]?.CabinBaggage?.FreeText ?? "").trim(),
+      checkedIn: String(
+        s.Baggage ?? paxSegs[i]?.CheckedInBaggage?.FreeText ?? "",
+      ).trim(),
+      cabin: String(
+        s.CabinBaggage ?? paxSegs[i]?.CabinBaggage?.FreeText ?? "",
+      ).trim(),
       cabinClass: CABIN_NAME[Number(s.CabinClass) || 0] ?? "",
+      fromAirportName: displayAirportName(
+        String(s.Origin?.Airport?.AirportName ?? ""),
+      ),
+      toAirportName: displayAirportName(
+        String(s.Destination?.Airport?.AirportName ?? ""),
+      ),
+      aircraftCode: String(s.Craft ?? "").trim(),
+      ...(Number(s.NoOfSeatAvailable) > 0
+        ? { seatsLeft: Number(s.NoOfSeatAvailable) }
+        : {}),
     };
   });
+
+  const seatCounts = segments
+    .map((x) => x.seatsLeft)
+    .filter((n): n is number => typeof n === "number");
+  const fareClass = (quoted.FareClassification ?? {}) as Json;
+  const reissue = Number(quoted.SupplierReissueCharges ?? 0);
 
   const f = (quoted.Fare ?? {}) as Json;
   const total = Number(f.PublishedFare ?? 0);
   const tax = Number(f.Tax ?? 0);
   // base is the remainder, so the two lines always add up to the amount charged.
-  const fare = total ? { base: Math.max(0, Number((total - tax).toFixed(2))), tax, total } : undefined;
+  const fare = total
+    ? { base: Math.max(0, Number((total - tax).toFixed(2))), tax, total }
+    : undefined;
 
-  const rawRules: Json[] = (fareRuleRes?.Response?.FareRules as Json[] | undefined) ?? [];
+  const rawRules: Json[] =
+    (fareRuleRes?.Response?.FareRules as Json[] | undefined) ?? [];
   const fareRules: FareRuleDoc[] = rawRules
     .map((r) => ({
       origin: String(r?.Origin ?? ""),
@@ -466,6 +556,20 @@ export function quoteDetails(quoted: Json, fareRuleRes: Json | null): QuoteDetai
     fare,
     fareRules,
     ticketAdvisory: String(quoted.TicketAdvisory ?? "").trim(),
+    ...(fareClass.Type
+      ? {
+          fareType: {
+            label: String(fareClass.Type).trim(),
+            ...(fareClass.Color ? { color: String(fareClass.Color) } : {}),
+          },
+        }
+      : {}),
+    ...(seatCounts.length ? { seatsLeft: Math.min(...seatCounts) } : {}),
+    freeMeal: Boolean(quoted.IsFreeMealAvailable),
+    // Only meaningful when every leg can be issued electronically.
+    eTicket:
+      legs.length > 0 && legs.every((x) => x.IsETicketEligible !== false),
+    ...(reissue > 0 ? { reissueCharge: reissue } : {}),
     // TBO returns "0001-01-01T00:00:00" for "no hold" — rendering that as a date
     // tells a customer their fare expired in the year 1.
     lastTicketDate: realDate(quoted.LastTicketDate),
@@ -498,10 +602,18 @@ export async function quoteFare(args: {
     } catch {
       fareRuleRes = null;
     }
-    const res = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: args.traceId, ResultIndex: args.resultIndex }, TIMEOUT_OTHER, 2);
+    const res = await call(
+      `${SEARCH_SVC}/FareQuote`,
+      { TraceId: args.traceId, ResultIndex: args.resultIndex },
+      TIMEOUT_OTHER,
+      2,
+    );
     const FQ = assertOk(res, "FareQuote");
     const q = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
-    if (!q) throw new TboError("This fare is no longer available. Please search again.");
+    if (!q)
+      throw new TboError(
+        "This fare is no longer available. Please search again.",
+      );
     return {
       ok: true,
       isLCC: Boolean(q.IsLCC),
@@ -513,7 +625,8 @@ export async function quoteFare(args: {
         IsPanRequiredAtTicket: q.IsPanRequiredAtTicket,
         IsPassportRequiredAtBook: q.IsPassportRequiredAtBook,
         IsPassportRequiredAtTicket: q.IsPassportRequiredAtTicket,
-        IsPassportFullDetailRequiredAtBook: q.IsPassportFullDetailRequiredAtBook,
+        IsPassportFullDetailRequiredAtBook:
+          q.IsPassportFullDetailRequiredAtBook,
         IsGSTMandatory: q.IsGSTMandatory,
         IsPriceChanged: Boolean(FQ.IsPriceChanged),
         FlightDetailChangeInfo: q.FlightDetailChangeInfo,
@@ -523,8 +636,12 @@ export async function quoteFare(args: {
       details: quoteDetails(q, fareRuleRes),
     };
   } catch (e) {
-    if (e instanceof TboError || e instanceof TboTimeoutError) return { ok: false, error: e.message };
-    return { ok: false, error: e instanceof Error ? e.message : "Could not price this fare." };
+    if (e instanceof TboError || e instanceof TboTimeoutError)
+      return { ok: false, error: e.message };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not price this fare.",
+    };
   }
 }
 
@@ -557,21 +674,38 @@ async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
   assertTraceAlive(req.searchedAt);
 
   // 1. FareRule (informational, part of the mandated flow)
-  await call(`${SEARCH_SVC}/FareRule`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+  await call(
+    `${SEARCH_SVC}/FareRule`,
+    { TraceId: req.traceId, ResultIndex: req.resultIndex },
+    TIMEOUT_OTHER,
+    2,
+  );
 
   // 2. FareQuote — the source of truth for PAN/passport/GST/price-change flags
-  const fqRes = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+  const fqRes = await call(
+    `${SEARCH_SVC}/FareQuote`,
+    { TraceId: req.traceId, ResultIndex: req.resultIndex },
+    TIMEOUT_OTHER,
+    2,
+  );
   const FQ = assertOk(fqRes, "FareQuote");
-  const quoted = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
-  if (!quoted) throw new TboError("FareQuote returned no result — the fare is no longer available.");
-  const resultIndex = (quoted.ResultIndex as string | undefined) || req.resultIndex;
+  const quoted = (
+    Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results
+  ) as Json;
+  if (!quoted)
+    throw new TboError(
+      "FareQuote returned no result — the fare is no longer available.",
+    );
+  const resultIndex =
+    (quoted.ResultIndex as string | undefined) || req.resultIndex;
 
   const flags: FareQuoteFlags = {
     IsPanRequiredAtBook: quoted.IsPanRequiredAtBook,
     IsPanRequiredAtTicket: quoted.IsPanRequiredAtTicket,
     IsPassportRequiredAtBook: quoted.IsPassportRequiredAtBook,
     IsPassportRequiredAtTicket: quoted.IsPassportRequiredAtTicket,
-    IsPassportFullDetailRequiredAtBook: quoted.IsPassportFullDetailRequiredAtBook,
+    IsPassportFullDetailRequiredAtBook:
+      quoted.IsPassportFullDetailRequiredAtBook,
     IsGSTMandatory: quoted.IsGSTMandatory,
     IsPriceChanged: FQ.IsPriceChanged,
     FlightDetailChangeInfo: quoted.FlightDetailChangeInfo,
@@ -584,11 +718,19 @@ async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
   const newFare = quoted?.Fare?.PublishedFare as number | undefined;
 
   // 3. Validate everything TBO would reject at the supplier
-  validatePax(req.passengers as Pax[], { isLCC: req.isLCC, airlineCode: req.airlineCode });
+  validatePax(req.passengers as Pax[], {
+    isLCC: req.isLCC,
+    airlineCode: req.airlineCode,
+  });
   validateGst(flags, req.gst);
 
   // 4. SSR — free baggage/meal must be explicitly selected or they aren't applied
-  const ssrRes = await call(`${SEARCH_SVC}/SSR`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+  const ssrRes = await call(
+    `${SEARCH_SVC}/SSR`,
+    { TraceId: req.traceId, ResultIndex: req.resultIndex },
+    TIMEOUT_OTHER,
+    2,
+  );
   const SSR = ssrRes?.Response ?? {};
   const freeBags = pickFreeBaggage(SSR.Baggage);
   const freeMeals = pickFreeMeal(SSR.MealDynamic ?? SSR.Meal);
@@ -625,7 +767,14 @@ async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
   });
   assertNotDuplicate(dupKey, req.isLCC);
 
-  return { passengers, resultIndex, dupKey, priceChanged, newFare, publishedFare: newFare };
+  return {
+    passengers,
+    resultIndex,
+    dupKey,
+    priceChanged,
+    newFare,
+    publishedFare: newFare,
+  };
 }
 
 export type ValidateResult =
@@ -638,21 +787,35 @@ export type ValidateResult =
  * a duplicate, a mandatory-SSR fare) fails before the customer is ever charged —
  * rather than being charged and then refunded. Returns the confirmed FareQuote total.
  */
-export async function validateBooking(req: BookingRequest): Promise<ValidateResult> {
+export async function validateBooking(
+  req: BookingRequest,
+): Promise<ValidateResult> {
   try {
     const prep = await prepareBooking(req);
-    return { ok: true, publishedFare: prep.publishedFare, isLCC: req.isLCC, priceChanged: prep.priceChanged };
+    return {
+      ok: true,
+      publishedFare: prep.publishedFare,
+      isLCC: req.isLCC,
+      priceChanged: prep.priceChanged,
+    };
   } catch (e) {
-    if (e instanceof TboValidationError) return { ok: false, error: e.message, rule: e.rule };
-    if (e instanceof TboError || e instanceof TboTimeoutError) return { ok: false, error: e.message };
-    return { ok: false, error: e instanceof Error ? e.message : "Could not validate this booking." };
+    if (e instanceof TboValidationError)
+      return { ok: false, error: e.message, rule: e.rule };
+    if (e instanceof TboError || e instanceof TboTimeoutError)
+      return { ok: false, error: e.message };
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "Could not validate this booking.",
+    };
   }
 }
 
 export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
   try {
     // Re-run all pre-ticket checks (parity with the pre-charge validation) then ticket.
-    const { passengers, resultIndex, dupKey, priceChanged, newFare } = await prepareBooking(req);
+    const { passengers, resultIndex, dupKey, priceChanged, newFare } =
+      await prepareBooking(req);
 
     let bookingId: number | undefined;
     let pnr: string | undefined;
@@ -663,13 +826,21 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       try {
         res = await bookCall(
           "Ticket",
-          { TraceId: req.traceId, ResultIndex: resultIndex, Passengers: passengers, IsPriceChangeAccepted: true },
+          {
+            TraceId: req.traceId,
+            ResultIndex: resultIndex,
+            Passengers: passengers,
+            IsPriceChangeAccepted: true,
+          },
           TIMEOUT_BOOK,
         );
       } catch (e) {
         if (!(e instanceof TboTimeoutError)) throw e;
         const rec = await recoverFromTimeout(req.traceId);
-        if (!rec) throw new TboError("Ticket timed out. Check the booking queue before retrying — do not re-book.");
+        if (!rec)
+          throw new TboError(
+            "Ticket timed out. Check the booking queue before retrying — do not re-book.",
+          );
         res = { Response: rec };
       }
       const R = assertOk(res, "Ticket");
@@ -681,13 +852,20 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       try {
         bookRes = await bookCall(
           "Book",
-          { TraceId: req.traceId, ResultIndex: resultIndex, Passengers: passengers },
+          {
+            TraceId: req.traceId,
+            ResultIndex: resultIndex,
+            Passengers: passengers,
+          },
           TIMEOUT_BOOK,
         );
       } catch (e) {
         if (!(e instanceof TboTimeoutError)) throw e;
         const rec = await recoverFromTimeout(req.traceId);
-        if (!rec) throw new TboError("Book timed out. Check the booking queue before retrying — do not re-book.");
+        if (!rec)
+          throw new TboError(
+            "Book timed out. Check the booking queue before retrying — do not re-book.",
+          );
         bookRes = { Response: rec };
       }
       const B = assertOk(bookRes, "Book");
@@ -699,13 +877,21 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       try {
         tktRes = await bookCall(
           "Ticket",
-          { TraceId: req.traceId, PNR: pnr, BookingId: bookingId, IsPriceChangeAccepted: true },
+          {
+            TraceId: req.traceId,
+            PNR: pnr,
+            BookingId: bookingId,
+            IsPriceChangeAccepted: true,
+          },
           TIMEOUT_BOOK,
         );
       } catch (e) {
         if (!(e instanceof TboTimeoutError)) throw e;
         const rec = await recoverFromTimeout(req.traceId, bookingId, pnr);
-        if (!rec) throw new TboError("Ticket timed out. Check the booking queue before retrying — do not re-ticket.");
+        if (!rec)
+          throw new TboError(
+            "Ticket timed out. Check the booking queue before retrying — do not re-ticket.",
+          );
         tktRes = { Response: rec };
       }
       // A Ticket failure AFTER a successful Book leaves a HELD booking at TBO —
@@ -729,7 +915,12 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       if (T.Response?.IsPriceChanged) {
         const retry = await bookCall(
           "Ticket",
-          { TraceId: req.traceId, PNR: pnr, BookingId: bookingId, IsPriceChangeAccepted: true },
+          {
+            TraceId: req.traceId,
+            PNR: pnr,
+            BookingId: bookingId,
+            IsPriceChangeAccepted: true,
+          },
           TIMEOUT_BOOK,
         );
         try {
@@ -742,7 +933,11 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
     }
 
     // 7. GetBookingDetails — the only trustworthy confirmation
-    const gbdRes = await bookCall("GetBookingDetails", { TraceId: req.traceId, BookingId: bookingId, PNR: pnr }, TIMEOUT_OTHER);
+    const gbdRes = await bookCall(
+      "GetBookingDetails",
+      { TraceId: req.traceId, BookingId: bookingId, PNR: pnr },
+      TIMEOUT_OTHER,
+    );
     const G = assertOk(gbdRes, "GetBookingDetails");
     const itin = G.FlightItinerary as Json | undefined;
     const tickets = (itin?.Passenger ?? [])
@@ -768,8 +963,12 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
           : `Booking is held (status ${itin?.Status}) and not ticketed. Our team will confirm it manually.`,
     };
   } catch (e) {
-    if (e instanceof TboValidationError) return { ok: false, error: e.message, rule: e.rule };
+    if (e instanceof TboValidationError)
+      return { ok: false, error: e.message, rule: e.rule };
     if (e instanceof TboError) return { ok: false, error: e.message };
-    return { ok: false, error: e instanceof Error ? e.message : "Booking failed." };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Booking failed.",
+    };
   }
 }
