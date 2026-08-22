@@ -76,6 +76,15 @@ still fails. Keep the chunk small and keep the log; a silent catch here hid this
 for weeks. Per-room content (`hotelInfoWithRooms`) is single-hotel only for the
 same reason — `RoomDetails` alone is 0.63 MB on a large hotel.
 
+**TBO's photo URLs have a doubled slash** — `https://www.tboholidays.com//imageresource.aspx?img=…`
+Next's dev optimizer accepts that; **Vercel's returns `400
+INVALID_IMAGE_OPTIMIZE_REQUEST`** for every one, so photos render locally and
+are blank in production even when the markup is right. `normaliseImageUrl`
+collapses runs of slashes in the PATH only: the scheme's `//` and the query are
+left alone, because the `img=` token is base64 containing `/` and `+` and stops
+resolving if re-encoded. Checking that photo URLs appear in the HTML does NOT
+prove they render — fetch the `/_next/image?url=…` and look at the status.
+
 **TBO returns no per-room photographs.** `RoomDetails[].imageURL` is in the
 schema and empty on every room of every hotel on our account (6,879 rooms across
 23 hotels, three cities, checked 2026-08-22). The room list shows `RoomSize` and
