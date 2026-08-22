@@ -89,7 +89,7 @@ function Field({
         className,
       )}
     >
-      <span className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted">
+      <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
         {label}
       </span>
       {children}
@@ -153,7 +153,7 @@ function Stepper({
     <div className="flex items-center justify-between py-2">
       <div>
         <div className="text-[0.9rem] font-semibold text-ink">{label}</div>
-        <div className="text-[0.72rem] text-muted">{sub}</div>
+        <div className="text-[0.82rem] text-muted">{sub}</div>
       </div>
       <div className="flex items-center gap-3">
         <button
@@ -341,7 +341,7 @@ export function SearchBar({
                     type="button"
                     onClick={() => setTrip(t)}
                     className={cn(
-                      "rounded-t-lg px-4 py-2 text-[0.85rem] font-semibold transition-colors",
+                      "rounded-t-lg px-4 py-2 text-[0.9rem] font-semibold transition-colors",
                       trip === t
                         ? "bg-red/10 text-red"
                         : "text-muted hover:text-ink",
@@ -378,6 +378,7 @@ export function SearchBar({
                   <Field label="Depart">
                     <DateField
                       bare
+                      showDay
                       value={depart}
                       min={today || undefined}
                       onChange={pickDepart}
@@ -390,6 +391,7 @@ export function SearchBar({
                   >
                     <DateField
                       bare
+                      showDay
                       value={ret}
                       min={depart || today || undefined}
                       disabled={trip === "oneway"}
@@ -409,7 +411,7 @@ export function SearchBar({
                       className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
                       aria-expanded={paxOpen}
                     >
-                      <span className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted">
+                      <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
                         Travellers &amp; class
                       </span>
                       <span className="flex items-center gap-2">
@@ -422,7 +424,7 @@ export function SearchBar({
                           <span className="block text-[0.95rem] font-semibold leading-tight text-ink">
                             {paxTotal} Traveller{paxTotal > 1 ? "s" : ""}
                           </span>
-                          <span className="block text-[0.72rem] text-muted">
+                          <span className="block text-[0.82rem] text-muted">
                             {cabin}
                           </span>
                         </span>
@@ -468,7 +470,7 @@ export function SearchBar({
                           max={maxInfants}
                         />
                         <div className="mt-3 border-t border-line pt-3">
-                          <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                          <div className="mb-2 text-[0.82rem] font-bold uppercase tracking-wide text-muted">
                             Cabin class
                           </div>
                           <div className="grid grid-cols-2 gap-2">
@@ -478,7 +480,7 @@ export function SearchBar({
                                 type="button"
                                 onClick={() => setCabin(c)}
                                 className={cn(
-                                  "rounded-lg border px-2 py-2 text-[0.82rem] font-semibold transition-colors",
+                                  "rounded-lg border px-2 py-2 text-[0.88rem] font-semibold transition-colors",
                                   cabin === c
                                     ? "border-red bg-red/10 text-red"
                                     : "border-line text-ink hover:border-red/50",
@@ -528,7 +530,7 @@ export function SearchBar({
                 {sameRoute && (
                   <p
                     role="alert"
-                    className="flex items-center gap-1.5 border-t border-line bg-red/5 px-5 py-2.5 text-[0.82rem] font-semibold text-red"
+                    className="flex items-center gap-1.5 border-t border-line bg-red/5 px-5 py-2.5 text-[0.88rem] font-semibold text-red"
                   >
                     <TriangleAlert size={14} className="flex-none" aria-hidden />
                     Departure and destination can&apos;t be the same airport —
@@ -539,13 +541,13 @@ export function SearchBar({
                 {/* Options row */}
                 <div className="flex flex-col gap-3 border-t border-line px-5 py-3.5 lg:flex-row lg:items-center lg:gap-6">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                    <span className="text-[0.82rem] font-bold uppercase tracking-wide text-muted">
                       Fare type
                     </span>
                     {FARE_TYPES.map((f) => (
                       <label
                         key={f}
-                        className="flex cursor-pointer items-center gap-1.5 py-2 text-[0.85rem] text-ink lg:py-0"
+                        className="flex cursor-pointer items-center gap-1.5 py-2 text-[0.9rem] text-ink lg:py-0"
                       >
                         <input
                           type="radio"
@@ -567,7 +569,7 @@ export function SearchBar({
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:ml-auto">
-                    <label className="flex items-center gap-2 py-2 text-[0.85rem] font-medium text-ink lg:py-0">
+                    <label className="flex items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
                       <Plane size={15} className="text-red" aria-hidden />
                       <Select
                         bare
@@ -583,7 +585,7 @@ export function SearchBar({
                         ))}
                       </Select>
                     </label>
-                    <label className="flex cursor-pointer items-center gap-2 py-2 text-[0.85rem] font-medium text-ink lg:py-0">
+                    <label className="flex cursor-pointer items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
                       <input
                         type="checkbox"
                         checked={nonStop}
@@ -603,7 +605,7 @@ export function SearchBar({
 
         <p
           className={cn(
-            "mt-3 flex items-center justify-center gap-1.5 text-center text-[0.8rem]",
+            "mt-3 flex items-center justify-center gap-1.5 text-center text-[0.88rem]",
             noteColor,
           )}
         >
@@ -642,11 +644,11 @@ function AirportOption({
         <span className="block truncate text-[0.92rem] font-semibold text-ink">
           {airport.city}
         </span>
-        <span className="block truncate text-[0.78rem] text-muted">
+        <span className="block truncate text-[0.88rem] text-muted">
           {airport.name} · {airport.countryName}
         </span>
       </span>
-      <span className="flex-none rounded-md border border-line px-1.5 py-0.5 text-[0.72rem] font-bold tracking-wide text-muted">
+      <span className="flex-none rounded-md border border-line px-1.5 py-0.5 text-[0.82rem] font-bold tracking-wide text-muted">
         {airport.code}
       </span>
     </button>
@@ -757,7 +759,7 @@ function AirportField({
           >
             {typed.length < 2 ? (
               <>
-                <div className="mb-2 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-muted">
+                <div className="mb-2 text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
                   Popular in India
                 </div>
                 <div className="grid grid-cols-1 gap-1">
@@ -765,7 +767,7 @@ function AirportField({
                     <AirportOption key={a.code} airport={a} onPick={pick} />
                   ))}
                 </div>
-                <div className="mb-2 mt-4 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-muted">
+                <div className="mb-2 mt-4 text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
                   Popular international
                 </div>
                 <div className="grid grid-cols-1 gap-1">
@@ -773,7 +775,7 @@ function AirportField({
                     <AirportOption key={a.code} airport={a} onPick={pick} />
                   ))}
                 </div>
-                <p className="mt-3 border-t border-line pt-3 text-[0.78rem] text-muted">
+                <p className="mt-3 border-t border-line pt-3 text-[0.88rem] text-muted">
                   Or start typing a city, airport or code — we cover every
                   Indian airport and the major international hubs.
                 </p>
@@ -785,7 +787,7 @@ function AirportField({
                 ))}
               </div>
             ) : (
-              <p className="px-2 py-1 text-[0.85rem] text-muted">
+              <p className="px-2 py-1 text-[0.9rem] text-muted">
                 No airport matches &ldquo;{typed}&rdquo;. Check the spelling, or
                 enter the 3-letter code.
               </p>
@@ -816,7 +818,7 @@ function CityOption({
         <span className="block truncate text-[0.92rem] font-semibold text-ink">
           {city.label}
         </span>
-        <span className="block truncate text-[0.78rem] text-muted">
+        <span className="block truncate text-[0.88rem] text-muted">
           {regionName(city.countryCode)}
         </span>
       </span>
@@ -1004,7 +1006,7 @@ function HotelsPanel() {
                         />
                       ))}
                     </div>
-                    <p className="mt-3 border-t border-line pt-3 text-[0.78rem] text-muted">
+                    <p className="mt-3 border-t border-line pt-3 text-[0.88rem] text-muted">
                       Or start typing — we cover 43,000+ cities worldwide.
                     </p>
                   </>
@@ -1015,7 +1017,7 @@ function HotelsPanel() {
                     ))}
                   </div>
                 ) : (
-                  <p className="px-2 py-1 text-[0.85rem] text-muted">
+                  <p className="px-2 py-1 text-[0.9rem] text-muted">
                     No matching destination yet — keep typing, or press Search
                     and we&apos;ll match it for you.
                   </p>
@@ -1033,6 +1035,7 @@ function HotelsPanel() {
             />
             <DateField
               bare
+              showDay
               className="flex-1"
               value={checkIn}
               min={today || undefined}
@@ -1050,6 +1053,7 @@ function HotelsPanel() {
             />
             <DateField
               bare
+              showDay
               className="flex-1"
               value={checkOut}
               min={checkIn || today || undefined}
@@ -1069,7 +1073,7 @@ function HotelsPanel() {
             className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
             aria-expanded={paxOpen}
           >
-            <span className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted">
+            <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
               Guests &amp; rooms
             </span>
             <span className="flex items-center gap-2">
@@ -1117,7 +1121,7 @@ function HotelsPanel() {
               />
               {childCount > 0 && (
                 <div className="mt-3 border-t border-line pt-3">
-                  <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <div className="mb-2 text-[0.82rem] font-bold uppercase tracking-wide text-muted">
                     Children&apos;s ages
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1150,7 +1154,7 @@ function HotelsPanel() {
               {/* Guest nationality — priced differently by some hotels, and TBO
                   allows international stays for Indian nationality only. */}
               <div className="mt-3 border-t border-line pt-3">
-                <label className="mb-2 block text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                <label className="mb-2 block text-[0.82rem] font-bold uppercase tracking-wide text-muted">
                   Guest nationality
                 </label>
                 <Select
@@ -1166,7 +1170,7 @@ function HotelsPanel() {
                   ))}
                 </Select>
                 {nationality !== "IN" && (
-                  <p className="mt-2 text-[0.75rem] leading-snug text-muted">
+                  <p className="mt-2 text-[0.82rem] leading-snug text-muted">
                     Non-Indian nationalities can be booked for stays in India
                     only.
                   </p>

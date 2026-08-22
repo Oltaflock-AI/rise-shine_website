@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/format-date";
 import { addressSummary, type SavedAddress, type SavedTraveller } from "@/lib/saved-details";
 
 const chip =
-  "inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-ink transition hover:border-red hover:text-red";
+  "inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[0.88rem] font-semibold text-ink transition hover:border-red hover:text-red";
 
 export function SavedTravellerPicker({
   travellers,
@@ -27,7 +27,7 @@ export function SavedTravellerPicker({
   if (!travellers.length) return null;
   return (
     <div className="mb-4 rounded-brand bg-cream-2 p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+      <p className="mb-2 flex items-center gap-1.5 text-[0.82rem] font-semibold uppercase tracking-wide text-muted">
         <UserRound size={13} aria-hidden /> Use a saved traveller
       </p>
       <ul className="flex flex-wrap gap-2">
@@ -68,7 +68,7 @@ export function SavedAddressPicker({
   if (!addresses.length) return null;
   return (
     <div className="mb-4 rounded-brand bg-cream-2 p-3">
-      <p className="mb-2 text-[0.75rem] font-semibold uppercase tracking-wide text-muted">
+      <p className="mb-2 text-[0.82rem] font-semibold uppercase tracking-wide text-muted">
         Saved addresses
       </p>
       <ul className="grid gap-2">
@@ -80,7 +80,7 @@ export function SavedAddressPicker({
                 type="button"
                 onClick={() => onPick(a)}
                 aria-pressed={on}
-                className={`flex-1 rounded-brand border px-3 py-2 text-left text-[0.82rem] transition ${
+                className={`flex-1 rounded-brand border px-3 py-2 text-left text-[0.88rem] transition ${
                   on ? "border-red bg-white text-ink" : "border-line bg-white text-muted hover:border-red"
                 }`}
               >
@@ -89,7 +89,7 @@ export function SavedAddressPicker({
                   <span className="min-w-0">
                     <span className="block font-semibold text-ink">{addressSummary(a)}</span>
                     {(a.phone || a.email) && (
-                      <span className="block text-[0.75rem] text-muted">
+                      <span className="block text-[0.82rem] text-muted">
                         {[a.phone, a.email].filter(Boolean).join(" · ")}
                       </span>
                     )}

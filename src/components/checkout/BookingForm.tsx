@@ -672,7 +672,7 @@ export function BookingForm({
       {/* ── passengers ── */}
       <div className="space-y-6">
         {quote.priceChanged && (
-          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
+          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.9rem] text-ink">
             The airline re-priced this fare. The total below is the confirmed
             price.
           </p>
@@ -831,7 +831,7 @@ export function BookingForm({
                   </div>
                 ) : (
                   <div className="rounded-brand bg-cream-2 p-3">
-                    <p className="mb-2 text-[0.78rem] text-muted">
+                    <p className="mb-2 text-[0.88rem] text-muted">
                       Parent/guardian PAN is required for a{" "}
                       {TYPE_LABEL[p.PaxType].toLowerCase()}.
                     </p>
@@ -885,7 +885,7 @@ export function BookingForm({
           <h3 className="mb-1 text-[0.95rem] font-bold text-ink">
             Contact details
           </h3>
-          <p className="mb-4 text-[0.78rem] text-muted">
+          <p className="mb-4 text-[0.88rem] text-muted">
             Your ticket and invoice go to this email. The airline uses the
             mobile number for schedule changes.
           </p>
@@ -950,7 +950,7 @@ export function BookingForm({
           <h4 className="mb-1 mt-6 text-[0.95rem] font-bold text-ink">
             Billing address
           </h4>
-          <p className="mb-4 text-[0.78rem] text-muted">
+          <p className="mb-4 text-[0.88rem] text-muted">
             As on the card you will pay with. This address prints on your GST
             invoice.
           </p>
@@ -1021,7 +1021,7 @@ export function BookingForm({
                 }
               />
               {contact.pin.trim() !== "" && !pinValid && (
-                <p className="mt-1 text-[0.72rem] font-medium text-red">
+                <p className="mt-1 text-[0.82rem] font-medium text-red">
                   {contact.countryCode === "IN"
                     ? "An Indian PIN code is exactly 6 digits."
                     : "Enter a valid postal code."}
@@ -1091,7 +1091,7 @@ export function BookingForm({
         </div>
 
         {booked && !booked.ok && (
-          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
+          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.9rem] text-ink">
             <b>Booking not completed.</b> {booked.error}
           </p>
         )}
@@ -1103,13 +1103,13 @@ export function BookingForm({
           <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
             {b.airline}
           </h3>
-          <p className="text-[0.85rem] text-muted">
+          <p className="text-[0.9rem] text-muted">
             {b.from} → {b.to}
           </p>
           <p className="text-[0.9rem] font-bold text-ink">
             {formatDateWithDay(b.depart)}
           </p>
-          <p className="mb-3 text-[0.8rem] text-muted">{b.flightNo}</p>
+          <p className="mb-3 text-[0.88rem] text-muted">{b.flightNo}</p>
           {quote.details?.segments.length ? (
             <BaggageSummary
               className="mb-4"
@@ -1122,7 +1122,7 @@ export function BookingForm({
             />
           ) : null}
           {quote.details?.fare && (
-            <dl className="space-y-1 border-t border-line pt-3 text-[0.8rem]">
+            <dl className="space-y-1 border-t border-line pt-3 text-[0.88rem]">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">Base fare</dt>
                 <dd className="tabular-nums text-ink">
@@ -1138,12 +1138,12 @@ export function BookingForm({
             </dl>
           )}
           <div className="flex items-baseline justify-between border-t border-line pt-3">
-            <span className="text-[0.85rem] text-muted">Total</span>
+            <span className="text-[0.9rem] text-muted">Total</span>
             <span className="text-[1.35rem] font-extrabold text-navy">
               ₹{inr.format(totalFare)}
             </span>
           </div>
-          <p className="mb-4 text-[0.72rem] text-muted">
+          <p className="mb-4 text-[0.82rem] text-muted">
             {adults} adult{adults > 1 ? "s" : ""}
             {children ? `, ${children} child` : ""}
             {infants ? `, ${infants} infant` : ""} · taxes included
@@ -1164,7 +1164,7 @@ export function BookingForm({
               <>Pay ₹{inr.format(totalFare)} & issue ticket</>
             )}
           </button>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-[0.72rem] text-muted">
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-[0.82rem] text-muted">
             <ShieldCheck size={13} aria-hidden /> Secure payment via Cashfree ·
             ticket issued on success
           </p>
@@ -1175,7 +1175,7 @@ export function BookingForm({
           screens, so surface the total + CTA without scrolling past it. */}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+          <p className="text-[0.76rem] font-bold uppercase tracking-wide text-muted">
             Total
           </p>
           <p className="truncate text-[1.05rem] font-extrabold text-navy">

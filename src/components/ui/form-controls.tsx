@@ -8,7 +8,7 @@ import {
 } from "react";
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format-date";
+import { formatDate, weekdayOf } from "@/lib/format-date";
 
 /**
  * One control language for the whole site — enquiry forms, the search bar and
@@ -26,7 +26,7 @@ export const controlFocusWithin =
 /** Field caption. Sentence case on purpose — shouty all-caps micro-labels read
  *  as a system form, not as this brand. */
 export const controlLabelClass =
-  "mb-1.5 block text-[0.84rem] font-semibold text-ink";
+  "mb-1.5 block text-[0.88rem] font-semibold text-ink";
 
 /**
  * A native `<select>` wearing the brand box. The native element is kept (it
@@ -85,6 +85,10 @@ export function Select({
  * top (invisible) so the calendar, keyboard and form validation still work; the
  * visible text is always formatDate()'s DD-MM-YY.
  *
+ * `showDay` appends the weekday: DD-MM-YY alone is a row of digits, and the
+ * weekday is what tells a traveller at a glance that they picked the Saturday
+ * they meant rather than the Sunday beside it.
+ *
  * `bare` drops the box for hosts that draw their own (the search bar cells).
  * Works controlled (`value`) or uncontrolled (`defaultValue` + `name`, for the
  * server-action enquiry forms) — the visible text tracks either.
@@ -100,6 +104,7 @@ export function DateField({
   required,
   disabled,
   bare = false,
+  showDay = false,
   placeholder = "dd-mm-yy",
   className,
   "aria-label": ariaLabel,
@@ -114,6 +119,7 @@ export function DateField({
   required?: boolean;
   disabled?: boolean;
   bare?: boolean;
+  showDay?: boolean;
   placeholder?: string;
   className?: string;
   "aria-label"?: string;
@@ -132,11 +138,16 @@ export function DateField({
       <span
         aria-hidden
         className={cn(
-          "min-w-0 flex-1 truncate text-[0.95rem] font-semibold text-ink",
+          "flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-[0.95rem] font-semibold text-ink",
           !shown && "font-normal text-muted/70",
         )}
       >
-        {shown ? formatDate(shown) : placeholder}
+        <span className="flex-none">{shown ? formatDate(shown) : placeholder}</span>
+        {showDay && shown && (
+          <span className="truncate text-[0.85rem] font-medium text-muted">
+            {weekdayOf(shown).slice(0, 3)}
+          </span>
+        )}
       </span>
       {!bare && (
         <CalendarDays

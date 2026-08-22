@@ -76,7 +76,7 @@ export function LiveFare({
           </span>
           <Link
             href={`/flights?from=${from}&to=${to}&trip=round&adults=1`}
-            className="inline-flex min-h-11 items-center gap-1 text-[0.85rem] font-semibold text-red hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 text-[0.9rem] font-semibold text-red hover:underline"
           >
             See flights <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
           </Link>

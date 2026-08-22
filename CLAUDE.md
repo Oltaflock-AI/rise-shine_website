@@ -65,6 +65,25 @@ verification, and refund path mirrors the flight one and is live-ready but keyle
 Post-booking detail, voucher, and cancellation calls live in `tbo-hotel-post.ts`.
 Never retry Hotel Book after a timeout; recover by client reference.
 
+**The static-IP proxy truncates large responses.** `TBO_PROXY_URL` drops the
+socket part-way through anything much over ~1 MB. `HotelDetails` returns ~21 kB
+per hotel, so asking for a whole result page in one call was a 3–4 MB response
+that failed **5 times in 12** through the proxy and 0 in 12 without it — and
+because `hotelInfoBatch` swallowed the error, ~40% of hotel searches rendered
+with no photos at all and nothing in the logs. It now chunks at
+`INFO_CHUNK = 25` (~500 kB), retries each chunk once, and **logs** a chunk that
+still fails. Keep the chunk small and keep the log; a silent catch here hid this
+for weeks. Per-room content (`hotelInfoWithRooms`) is single-hotel only for the
+same reason — `RoomDetails` alone is 0.63 MB on a large hotel.
+
+**TBO returns no per-room photographs.** `RoomDetails[].imageURL` is in the
+schema and empty on every room of every hotel on our account (6,879 rooms across
+23 hotels, three cities, checked 2026-08-22). The room list shows `RoomSize` and
+`RoomDescription` instead, matched to each live rate by name — see
+`src/lib/hotel-room-match.ts`, which joins on **coverage of the catalogue name**,
+not symmetric similarity, because a rate name carries promotions the catalogue
+never mentions. Don't build anything that assumes a room photo exists.
+
 **Rules TBO's portal verification enforces — don't "tidy" these away:**
 
 - **Show `TotalFare`, never `NetAmount`.** NetAmount is TBO's charge to the agency
@@ -136,6 +155,35 @@ that has never heard of it, producing an endless `407 Proxy Authentication Requi
 loop and a conversation that fails with `max auth retry attempts reached for SIP
 invite` — zero duration, zero credits, no SIP Call SID. That exact misconfiguration
 cost a day on 2026-08-04. Full diagnosis in `platform_docs/elevenlabs.md`.
+
+### Flight ancillaries (seats · meals · extra baggage)
+
+TBO exposes a full paid catalogue — a live IndiGo domestic leg returns 233 seats
+(206 paid, ₹400–₹1,500), 9 paid meals and 10 paid bag options — and `bookFlight()`
+deliberately discards all of it: `pickFree*` takes only the ₹0 row, because free
+SSRs are a certification requirement and paid ones are not wired to the payment
+amount. Selling any of it means putting the ancillary total into the Cashfree
+`bind` hash, which today covers the itinerary only.
+
+Post-ticket add-ons exist too (TBO's "Air Amendment": `SSR` with a `BookingId`,
+then `TicketReIssue`), LCC-only. Researched and **parked** on 2026-08-22 —
+findings, live numbers and the re-run script are in
+`platform_docs/tbo-flight-ancillaries.md` (`scripts/ssr-probe.mts`).
+
+### Multi-city flights — supported by TBO, not built here
+
+TBO's `JourneyType 3` accepts N `Segments` and returns a **single through-fare
+covering every leg** (one `ResultIndex`, one `Fare`, `Segments` holding one group
+per leg). Verified live on our own credentials 2026-08-22 — 3-leg domestic,
+open-jaw and international all return results; the same legs sent as
+`JourneyType 1` fail with `Invalid segment length.`, so the field is doing the
+work. `JourneyType 4` (AdvanceSearch) is **not** enabled for us.
+
+Parked, not shipped, because `rawSearch` builds at most 2 segments and both
+`mapResult` and `quoteDetails` read `Segments[0]` only — enabling the search
+without widening those would show leg 1 while charging the whole itinerary.
+Findings, the shape and the build scope: `platform_docs/tbo-multicity.md`
+(`scripts/multicity-probe.mts`).
 
 ### Payments — Cashfree (`src/lib/cashfree.ts` + `/api/payment/*`)
 

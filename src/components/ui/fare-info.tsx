@@ -49,7 +49,7 @@ function AllowancePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.72rem] font-semibold",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.82rem] font-semibold",
         ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-line bg-cream-2 text-muted",
       )}
     >
@@ -122,7 +122,7 @@ export function FarePolicyTable({ rules }: { rules: MiniFareRule[] }) {
   });
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[26rem] border-collapse text-left text-[0.78rem]">
+      <table className="w-full min-w-[26rem] border-collapse text-left text-[0.88rem]">
         <thead>
           <tr className="text-muted">
             <th className="border-b border-line py-1.5 pr-3 font-semibold">Charge</th>
@@ -146,7 +146,7 @@ export function FarePolicyTable({ rules }: { rules: MiniFareRule[] }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 flex items-start gap-1.5 text-[0.72rem] text-muted">
+      <p className="mt-2 flex items-start gap-1.5 text-[0.82rem] text-muted">
         <Info className="mt-[1px] h-3.5 w-3.5 flex-none" aria-hidden />
         Airline fees only. Any fare difference on a date change, and our service fee, are
         charged on top. Amounts are the airline&apos;s and can change without notice.
@@ -163,7 +163,7 @@ export function FareInclusions({ items }: { items: string[] }) {
       {items.map((t) => (
         <li
           key={t}
-          className="rounded-full border border-line bg-cream-2 px-2.5 py-1 text-[0.72rem] font-medium text-ink"
+          className="rounded-full border border-line bg-cream-2 px-2.5 py-1 text-[0.82rem] font-medium text-ink"
         >
           {t}
         </li>

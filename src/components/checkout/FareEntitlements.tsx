@@ -29,7 +29,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
         <h3 className="mb-1 flex items-center gap-2 text-[0.95rem] font-bold text-ink">
           <Luggage className="h-4 w-4 text-red" aria-hidden /> Baggage &amp; what&apos;s included
         </h3>
-        <p className="mb-4 text-[0.78rem] text-muted">
+        <p className="mb-4 text-[0.88rem] text-muted">
           Allowance is per passenger, as confirmed by the airline for this fare.
         </p>
 
@@ -37,10 +37,10 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
           {details.segments.map((s, i) => (
             <li key={`${s.flightNumber}-${i}`} className="rounded-brand border border-line p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <span className="text-[0.85rem] font-semibold text-ink">
+                <span className="text-[0.9rem] font-semibold text-ink">
                   {s.from} → {s.to}
                 </span>
-                <span className="text-[0.75rem] text-muted">
+                <span className="text-[0.82rem] text-muted">
                   {s.flightNumber}
                   {s.cabinClass ? ` · ${s.cabinClass}` : ""}
                   {s.depTime ? ` · ${fmtTime(s.depTime)}–${fmtTime(s.arrTime)}` : ""}
@@ -58,13 +58,13 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
         )}
 
         {details.ticketAdvisory && (
-          <p className="mt-4 flex items-start gap-2 rounded-brand bg-cream-2 px-3 py-2 text-[0.78rem] text-ink">
+          <p className="mt-4 flex items-start gap-2 rounded-brand bg-cream-2 px-3 py-2 text-[0.88rem] text-ink">
             <Info className="mt-[2px] h-3.5 w-3.5 flex-none text-muted" aria-hidden />
             {details.ticketAdvisory}
           </p>
         )}
 
-        <p className="mt-4 text-[0.72rem] text-muted">
+        <p className="mt-4 text-[0.82rem] text-muted">
           Extra baggage can be added by the airline at the airport, at their published
           rates. Need more allowance booked in advance? Call us before you pay.
         </p>
@@ -75,7 +75,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
         <h3 className="mb-1 flex items-center gap-2 text-[0.95rem] font-bold text-ink">
           <ShieldAlert className="h-4 w-4 text-red" aria-hidden /> Cancellation &amp; date change
         </h3>
-        <p className="mb-4 text-[0.78rem] text-muted">
+        <p className="mb-4 text-[0.88rem] text-muted">
           {details.isRefundable
             ? "This is a refundable fare — the airline keeps a cancellation charge and refunds the rest."
             : "This is a non-refundable fare. Cancelling forfeits the fare; some government taxes may still come back."}
@@ -84,12 +84,12 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
         {details.miniRules.length > 0 ? (
           <FarePolicyTable rules={details.miniRules} />
         ) : hasRuleDocs ? (
-          <p className="text-[0.78rem] text-muted">
+          <p className="text-[0.88rem] text-muted">
             The airline published no penalty grid for this fare — the full rules below
             are the binding version.
           </p>
         ) : (
-          <p className="text-[0.78rem] text-muted">
+          <p className="text-[0.88rem] text-muted">
             The airline has not published its cancellation charges through our booking
             system for this fare. Call us before you pay and we will confirm them with
             the airline.
@@ -97,7 +97,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
         )}
 
         {details.lastTicketDate && (
-          <p className="mt-3 text-[0.75rem] text-muted">
+          <p className="mt-3 text-[0.82rem] text-muted">
             Hold expires {formatDate(details.lastTicketDate)} — after that the airline may
             re-price this fare.
           </p>
@@ -109,7 +109,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
               type="button"
               onClick={() => setRulesOpen((v) => !v)}
               aria-expanded={rulesOpen}
-              className="mt-4 inline-flex items-center gap-1.5 text-[0.82rem] font-semibold text-red hover:underline"
+              className="mt-4 inline-flex items-center gap-1.5 text-[0.88rem] font-semibold text-red hover:underline"
             >
               <FileText className="h-4 w-4" aria-hidden />
               {rulesOpen ? "Hide the airline's full fare rules" : "Read the airline's full fare rules"}
@@ -122,14 +122,14 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
               <div className="mt-3 space-y-4">
                 {details.fareRules.map((r, i) => (
                   <div key={i} className="rounded-brand border border-line bg-cream-2/60 p-3">
-                    <p className="mb-2 text-[0.75rem] font-semibold text-ink">
+                    <p className="mb-2 text-[0.88rem] font-semibold text-ink">
                       {r.origin} → {r.destination}
                       {r.airline ? ` · ${r.airline}` : ""}
                       {r.fareBasisCode ? ` · fare basis ${r.fareBasisCode}` : ""}
                     </p>
                     {/* Sanitised server-side by lib/fare-rules.ts — allowlisted tags only. */}
                     <div
-                      className="fare-rule-html max-h-80 overflow-y-auto text-[0.75rem] leading-relaxed text-ink"
+                      className="fare-rule-html max-h-80 overflow-y-auto text-[0.88rem] leading-relaxed text-ink"
                       dangerouslySetInnerHTML={{ __html: r.html }}
                     />
                   </div>
@@ -139,7 +139,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
           </>
         )}
 
-        <p className="mt-4 text-[0.72rem] text-muted">
+        <p className="mt-4 text-[0.82rem] text-muted">
           Airline charges above are in addition to our service fee. See our{" "}
           <Link href="/refund-policy" className="font-semibold text-red hover:underline">
             cancellation &amp; refund policy

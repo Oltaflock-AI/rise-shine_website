@@ -27,6 +27,7 @@ import { waHref as waDeepLink } from "@/lib/whatsapp";
 import { useAuth } from "@/lib/auth";
 import { AUTH_DISABLED } from "@/lib/flags";
 import { cn } from "@/lib/cn";
+import { formatDate } from "@/lib/format-date";
 import { Button } from "./Button";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -466,7 +467,7 @@ export function FlightResultsClient({
           <button
             type="button"
             onClick={resetAll}
-            className="flex items-center gap-1 text-[0.8rem] font-semibold text-red hover:underline"
+            className="flex items-center gap-1 text-[0.88rem] font-semibold text-red hover:underline"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset all
           </button>
@@ -481,7 +482,7 @@ export function FlightResultsClient({
           }
           aria-pressed={nonstopOnly}
           className={cn(
-            "mb-1 mt-2 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-[0.85rem] font-semibold transition-colors",
+            "mb-1 mt-2 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-[0.9rem] font-semibold transition-colors",
             nonstopOnly
               ? "border-red bg-red/10 text-red"
               : "border-line text-ink hover:border-red/50",
@@ -492,7 +493,7 @@ export function FlightResultsClient({
           </span>
           <span
             className={cn(
-              "text-[0.78rem] font-medium",
+              "text-[0.88rem] font-medium",
               nonstopOnly ? "text-red" : "text-muted",
             )}
           >
@@ -562,7 +563,7 @@ export function FlightResultsClient({
         <div className="space-y-4">
           <div>
             {trip === "round" && (
-              <div className="mb-1 text-[0.82rem] font-semibold text-muted">
+              <div className="mb-1 text-[0.88rem] font-semibold text-muted">
                 Outbound
               </div>
             )}
@@ -578,7 +579,7 @@ export function FlightResultsClient({
           </div>
           {trip === "round" && inbound && inbound.length > 0 && (
             <div>
-              <div className="mb-1 text-[0.82rem] font-semibold text-muted">
+              <div className="mb-1 text-[0.88rem] font-semibold text-muted">
                 Return
               </div>
               <DualRange
@@ -613,7 +614,7 @@ export function FlightResultsClient({
         <Section title="Layovers">
           {domain.layHi > 0 && (
             <div className="mb-4">
-              <div className="mb-1 text-[0.82rem] font-semibold text-muted">
+              <div className="mb-1 text-[0.88rem] font-semibold text-muted">
                 Layover duration
               </div>
               <DualRange
@@ -627,7 +628,7 @@ export function FlightResultsClient({
               />
             </div>
           )}
-          <div className="mb-1 text-[0.82rem] font-semibold text-muted">
+          <div className="mb-1 text-[0.88rem] font-semibold text-muted">
             Layover airports
           </div>
           <SelectClear
@@ -655,7 +656,7 @@ export function FlightResultsClient({
             <button
               type="button"
               onClick={() => setShowAirports((s) => !s)}
-              className="mt-2 text-[0.85rem] font-bold text-ink underline underline-offset-4 hover:text-red"
+              className="mt-2 text-[0.9rem] font-bold text-ink underline underline-offset-4 hover:text-red"
             >
               {showAirports
                 ? "Show fewer airports"
@@ -674,7 +675,7 @@ export function FlightResultsClient({
           type="button"
           onClick={() => setFiltersOpen((o) => !o)}
           className={cn(
-            "mb-4 flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[0.85rem] font-semibold lg:hidden",
+            "mb-4 flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[0.9rem] font-semibold lg:hidden",
             filtersActive
               ? "border-red bg-red/10 text-red"
               : "border-line text-ink",
@@ -709,7 +710,7 @@ export function FlightResultsClient({
                   >
                     <span
                       className={cn(
-                        "block text-[0.8rem] font-semibold",
+                        "block text-[0.88rem] font-semibold",
                         active ? "text-white/70" : "text-muted",
                       )}
                     >
@@ -720,7 +721,7 @@ export function FlightResultsClient({
                     </span>
                     <span
                       className={cn(
-                        "block text-[0.78rem]",
+                        "block text-[0.88rem]",
                         active ? "text-white/70" : "text-muted",
                       )}
                     >
@@ -935,7 +936,7 @@ export function FlightResultsClient({
                     Show all {shownIn.length} flights
                   </Button>
                 )}
-                <p className="mt-4 text-[0.82rem] text-muted">
+                <p className="mt-4 text-[0.88rem] text-muted">
                   Fares are shown per direction. Your round-trip total combines
                   the outbound and return you choose.
                 </p>
@@ -944,7 +945,7 @@ export function FlightResultsClient({
           </>
         )}
 
-        <p className="mt-8 text-center text-[0.82rem] text-muted">
+        <p className="mt-8 text-center text-[0.88rem] text-muted">
           Live fares via our booking system · prices are confirmed at the time
           of booking. Tap <b>Book</b> to confirm availability with our team.
         </p>
@@ -955,23 +956,25 @@ export function FlightResultsClient({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 shadow-[0_-4px_20px_rgba(8,50,73,0.12)] backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-1">
+              {/* Each leg names its own date. Two legs of a round trip are
+                  otherwise indistinguishable here bar the airline. */}
               <div className="min-w-0">
-                <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
                   Outbound
                 </div>
-                <div className="truncate text-[0.88rem] font-semibold text-ink">
+                <div className="truncate text-[0.95rem] font-semibold text-ink">
                   {selOut
-                    ? `${selOut.airlineName} · ${(selOut.segments[0]?.depTime || "").slice(11, 16)} · ₹${inr.format(selOut.fareINR)}`
+                    ? `${formatDate(selOut.segments[0]?.depTime)} · ${(selOut.segments[0]?.depTime || "").slice(11, 16)} · ${selOut.airlineName} · ₹${inr.format(selOut.fareINR)}`
                     : "Choose an outbound flight"}
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
                   Return
                 </div>
-                <div className="truncate text-[0.88rem] font-semibold text-ink">
+                <div className="truncate text-[0.95rem] font-semibold text-ink">
                   {selIn
-                    ? `${selIn.airlineName} · ${(selIn.segments[0]?.depTime || "").slice(11, 16)} · ₹${inr.format(selIn.fareINR)}`
+                    ? `${formatDate(selIn.segments[0]?.depTime)} · ${(selIn.segments[0]?.depTime || "").slice(11, 16)} · ${selIn.airlineName} · ₹${inr.format(selIn.fareINR)}`
                     : "Choose a return flight"}
                 </div>
               </div>
@@ -979,7 +982,7 @@ export function FlightResultsClient({
             <div className="flex items-center gap-4">
               {selOut && selIn && (
                 <div className="text-right">
-                  <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                  <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
                     Total / adult
                   </div>
                   <div className="text-[1.15rem] font-extrabold leading-tight text-navy">

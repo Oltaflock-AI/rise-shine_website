@@ -40,7 +40,7 @@ export function BookButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "grad-red inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.85rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px]",
+        "grad-red inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.9rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px]",
         className,
       )}
       title={!AUTH_DISABLED && ready && !user ? "Log in or sign up to book" : undefined}

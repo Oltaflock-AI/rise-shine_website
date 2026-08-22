@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { Search, TriangleAlert } from "lucide-react";
+import { CalendarDays, Search, TriangleAlert } from "lucide-react";
 import { FlightResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import { searchFlights, defaultDates } from "@/lib/tbo";
 import { resolveAirport } from "@/data/airports";
 import { site } from "@/data/site";
 import { whatsappEnabled } from "@/lib/whatsapp";
+import { formatDateWithDay } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -63,18 +64,48 @@ export default async function FlightsPage({
     .filter(Boolean)
     .join(", ");
 
+  // Resolved once, up here, because the header now states them out loud as well
+  // as the search using them. They were previously legible only as 11px grey
+  // print on each result card, so a traveller arriving from a stale link had no
+  // easy way to see which day they were being priced for.
+  const departISO = sp.depart || defaultDates().departISO;
+  const returnISO =
+    trip === "round"
+      ? sp.return ||
+        (() => {
+          const [y, m, d] = departISO.split("-").map(Number);
+          const t = new Date(Date.UTC(y, m - 1, d));
+          t.setUTCDate(t.getUTCDate() + 7);
+          return t.toISOString().slice(0, 10);
+        })()
+      : undefined;
+
   const header = (
     <section className="bg-navy pb-8 pt-28 text-white sm:pt-32">
       <Container>
-        <nav aria-label="Breadcrumb" className="mb-3 text-[0.85rem] font-medium text-white/70">
+        <nav aria-label="Breadcrumb" className="mb-3 text-[0.9rem] font-medium text-white/70">
           <Link href="/" className="hover:text-white">Home</Link> / <span className="text-white">Flights</span>
         </nav>
         <h1 className="h-md text-white">Search flights</h1>
         {toA && fromA && (
-          <p className="mt-2 text-white/80">
-            {fromA.city} ({fromA.code}) → {toA.city} ({toA.code}) · {paxSummary} · {cabin} · {trip === "round" ? "Round-trip" : "One-way"}
-            {directOnly ? " · Non-stop" : ""}
-          </p>
+          <>
+            <p className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-2 text-[1.05rem] font-bold text-white">
+              <CalendarDays size={19} className="flex-none text-white/70" aria-hidden />
+              <span>{formatDateWithDay(departISO)}</span>
+              {returnISO && (
+                <>
+                  <span aria-hidden className="text-white/40">
+                    &rarr;
+                  </span>
+                  <span>{formatDateWithDay(returnISO)}</span>
+                </>
+              )}
+            </p>
+            <p className="mt-1.5 text-[1rem] text-white/80">
+              {fromA.city} ({fromA.code}) → {toA.city} ({toA.code}) · {paxSummary} · {cabin} · {trip === "round" ? "Round-trip" : "One-way"}
+              {directOnly ? " · Non-stop" : ""}
+            </p>
+          </>
         )}
       </Container>
       <div className="mt-6">
@@ -129,17 +160,6 @@ export default async function FlightsPage({
 
   const from = fromA?.code || "AMD";
   const to = toA.code;
-  const departISO = sp.depart || defaultDates().departISO;
-  let returnISO: string | undefined;
-  if (trip === "round") {
-    returnISO =
-      sp.return ||
-      (() => {
-        const d = new Date(departISO);
-        d.setDate(d.getDate() + 7);
-        return d.toISOString().slice(0, 10);
-      })();
-  }
 
   // Re-suspend (show the searching fallback) whenever the search itself changes.
   // Sorting and result filters are client-side now — they never re-trigger this.

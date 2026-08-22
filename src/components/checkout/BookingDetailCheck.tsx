@@ -45,7 +45,7 @@ export function BookingDetailCheck({ bookingId }: { bookingId: number }) {
 
   if (waiting) {
     return (
-      <p className="mb-6 inline-flex items-center gap-2 text-[0.82rem] text-muted">
+      <p className="mb-6 inline-flex items-center gap-2 text-[0.88rem] text-muted">
         <Loader2 size={14} className="animate-spin text-red" aria-hidden />
         Re-confirming with the hotel system (about 2 minutes)…
       </p>
@@ -54,7 +54,7 @@ export function BookingDetailCheck({ bookingId }: { bookingId: number }) {
 
   if (detail?.ok && detail.status === 1) {
     return (
-      <p className="mb-6 inline-flex items-center gap-2 text-[0.82rem] font-semibold text-green-700">
+      <p className="mb-6 inline-flex items-center gap-2 text-[0.88rem] font-semibold text-green-700">
         <BadgeCheck size={14} aria-hidden />
         Re-confirmed with the hotel system{detail.isVoucherBooked ? " · voucher issued" : ""} ·{" "}
         <Link href={`/hotels/voucher/${bookingId}`} className="underline">
@@ -66,7 +66,7 @@ export function BookingDetailCheck({ bookingId }: { bookingId: number }) {
 
   // Anything else is a "call us" state, never a silent success.
   return (
-    <p className="mb-6 inline-flex items-center gap-2 text-[0.82rem] text-amber-700">
+    <p className="mb-6 inline-flex items-center gap-2 text-[0.88rem] text-amber-700">
       <TriangleAlert size={14} aria-hidden />
       {detail?.hotelBookingStatus
         ? `Hotel system status: ${detail.hotelBookingStatus}.`

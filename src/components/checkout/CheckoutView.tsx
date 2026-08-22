@@ -56,7 +56,7 @@ export function CheckoutView() {
     <>
       <section className="bg-navy pb-8 pt-28 text-white sm:pt-32">
         <Container>
-          <nav className="mb-3 text-[0.85rem] font-medium text-white/70">
+          <nav className="mb-3 text-[0.9rem] font-medium text-white/70">
             <Link href="/flights" className="hover:text-white">
               Flights
             </Link>{" "}
@@ -64,7 +64,7 @@ export function CheckoutView() {
           </nav>
           <h1 className="h-md text-white">Passenger details</h1>
           {(b.leg === "out" || b.leg === "ret") && (
-            <p className="mt-3 inline-flex items-center rounded-full bg-white/10 px-3.5 py-1.5 text-[0.82rem] font-semibold text-white">
+            <p className="mt-3 inline-flex items-center rounded-full bg-white/10 px-3.5 py-1.5 text-[0.88rem] font-semibold text-white">
               Round trip · {b.leg === "out" ? "Step 1 of 2 — outbound" : "Step 2 of 2 — return"}
             </p>
           )}
@@ -87,7 +87,7 @@ export function CheckoutView() {
                 {formatDateWithDay(b.dep)}
               </p>
               {arrivesLater && (
-                <span className="rounded-full bg-red/10 px-3 py-1 text-[0.75rem] font-semibold text-red">
+                <span className="rounded-full bg-red/10 px-3 py-1 text-[0.82rem] font-semibold text-red">
                   Arrives {formatDateWithDay(b.arr)}
                 </span>
               )}
@@ -95,10 +95,10 @@ export function CheckoutView() {
             <div className="flex items-center justify-between gap-4 p-6">
               <div>
                 <div className="text-[1.5rem] font-extrabold tabular-nums text-ink">{fmtTime(b.dep)}</div>
-                <div className="text-[0.85rem] font-medium text-muted">{b.from}</div>
+                <div className="text-[0.9rem] font-medium text-muted">{b.from}</div>
               </div>
               <div className="flex flex-1 flex-col items-center px-2">
-                <div className="text-[0.75rem] text-muted">{durLabel}</div>
+                <div className="text-[0.82rem] text-muted">{durLabel}</div>
                 <div className="my-1 flex w-full items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-line" />
                   <span className="h-px flex-1 bg-line" />
@@ -106,14 +106,14 @@ export function CheckoutView() {
                   <span className="h-px flex-1 bg-line" />
                   <span className="h-1.5 w-1.5 rounded-full bg-line" />
                 </div>
-                <div className="text-[0.72rem] font-medium text-muted">{stopsLabel}</div>
+                <div className="text-[0.82rem] font-medium text-muted">{stopsLabel}</div>
               </div>
               <div className="text-right">
                 <div className="text-[1.5rem] font-extrabold tabular-nums text-ink">{fmtTime(b.arr)}</div>
-                <div className="text-[0.85rem] font-medium text-muted">{b.to}</div>
+                <div className="text-[0.9rem] font-medium text-muted">{b.to}</div>
               </div>
             </div>
-            <div className="mx-6 mb-6 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-line pt-4 text-[0.85rem]">
+            <div className="mx-6 mb-6 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-line pt-4 text-[0.9rem]">
               <span className="font-semibold text-ink">{b.airline}</span>
               <span className="text-muted">{b.flightNo}</span>
             </div>

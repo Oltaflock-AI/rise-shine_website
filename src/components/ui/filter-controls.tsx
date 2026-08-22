@@ -54,7 +54,7 @@ export function SelectClear({
 }) {
   const link = (active: boolean) =>
     cn(
-      "text-[0.8rem] font-semibold underline-offset-4",
+      "text-[0.88rem] font-semibold underline-offset-4",
       active ? "text-ink underline hover:text-red" : "cursor-default text-muted/50",
     );
   return (
@@ -96,7 +96,7 @@ export function CheckRow({
           {label}
         </span>
         {fromINR != null && (
-          <span className="block text-[0.78rem] text-muted">from ₹{inr.format(fromINR)}</span>
+          <span className="block text-[0.88rem] text-muted">from ₹{inr.format(fromINR)}</span>
         )}
       </span>
     </label>
@@ -133,7 +133,7 @@ export function DualRange({
   const loOnTop = lo > min + span * 0.5;
   return (
     <div>
-      <div className="mb-1.5 text-[0.85rem] font-medium text-ink">
+      <div className="mb-1.5 text-[0.9rem] font-medium text-ink">
         {format(lo)} – {format(hi)}
       </div>
       <div className="relative h-6">

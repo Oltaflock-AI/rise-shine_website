@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, Clock, Plane } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronDown, Clock, Plane } from "lucide-react";
 import { airlineLogo } from "@/data/airlineLogos";
 import { BookButton } from "./BookButton";
 import type { FlightOffer } from "@/lib/tbo";
-import { formatDate } from "@/lib/format-date";
+import { formatDate, formatDateWithDay } from "@/lib/format-date";
 import {
   BaggageSummary,
   FareInclusions,
@@ -21,6 +21,7 @@ const fmtTime = (iso: string) => (iso || "").slice(11, 16);
 const fmtDur = (m: number) =>
   `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 const fmtDate = formatDate;
+const fmtDateWithDay = formatDateWithDay;
 
 /** What the checkout needs to actually book this fare with TBO. */
 export type BookingContext = {
@@ -96,7 +97,7 @@ function OfferDetails({ offer }: { offer: FlightOffer }) {
         {legs.map((s, i) => (
           <li key={`${s.flightNumber}-${i}`}>
             {i > 0 && layoverMin(legs[i - 1].arrTime, s.depTime) > 0 && (
-              <p className="mb-3 flex items-center gap-1.5 rounded-brand bg-cream-2 px-3 py-1.5 text-[0.75rem] font-medium text-muted">
+              <p className="mb-3 flex items-center gap-1.5 rounded-brand bg-cream-2 px-3 py-1.5 text-[0.82rem] font-medium text-muted">
                 <Clock className="h-3.5 w-3.5 flex-none" aria-hidden />
                 {fmtDur(layoverMin(legs[i - 1].arrTime, s.depTime))} layover in{" "}
                 {s.fromCity || s.from}
@@ -104,22 +105,22 @@ function OfferDetails({ offer }: { offer: FlightOffer }) {
             )}
             <div className="rounded-brand border border-line p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <span className="text-[0.85rem] font-semibold text-ink">
+                <span className="text-[0.9rem] font-semibold text-ink">
                   {s.fromCity || s.from} → {s.toCity || s.to}
                 </span>
-                <span className="text-[0.75rem] text-muted">
+                <span className="text-[0.82rem] text-muted">
                   {s.flightNumber}
                   {s.cabinClass ? ` · ${s.cabinClass}` : ""}
                   {s.fareClass ? ` · class ${s.fareClass}` : ""}
                 </span>
               </div>
-              <div className="mt-1 text-[0.78rem] text-muted">
+              <div className="mt-1 text-[0.88rem] text-muted">
                 {fmtTime(s.depTime)} {s.from}
                 {s.fromTerminal ? ` T${s.fromTerminal}` : ""} — {fmtTime(s.arrTime)} {s.to}
                 {s.toTerminal ? ` T${s.toTerminal}` : ""} · {fmtDur(s.durationMin)}
               </div>
               {s.operatedBy && (
-                <div className="mt-1 text-[0.72rem] text-muted">Operated by {s.operatedBy}</div>
+                <div className="mt-1 text-[0.82rem] text-muted">Operated by {s.operatedBy}</div>
               )}
               <BaggageSummary className="mt-2" checkedIn={s.baggage} cabin={s.cabinBaggage} />
             </div>
@@ -129,7 +130,7 @@ function OfferDetails({ offer }: { offer: FlightOffer }) {
 
       {offer.fareInclusions.length > 0 && (
         <div className="mt-4">
-          <h4 className="mb-2 text-[0.8rem] font-bold text-ink">Included in this fare</h4>
+          <h4 className="mb-2 text-[0.88rem] font-bold text-ink">Included in this fare</h4>
           <FareInclusions items={offer.fareInclusions} />
         </div>
       )}
@@ -138,8 +139,8 @@ function OfferDetails({ offer }: { offer: FlightOffer }) {
         {/* Two lines, and base is the remainder: taxes and surcharges are their own
             line, everything else is the fare. Our service fee is part of the fare the
             customer is quoted, never itemised as a separate charge. */}
-        <h4 className="mb-2 text-[0.8rem] font-bold text-ink">Fare breakdown (per adult)</h4>
-        <dl className="space-y-1 text-[0.78rem]">
+        <h4 className="mb-2 text-[0.88rem] font-bold text-ink">Fare breakdown (per adult)</h4>
+        <dl className="space-y-1 text-[0.88rem]">
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Base fare</dt>
             <dd className="tabular-nums text-ink">
@@ -158,19 +159,19 @@ function OfferDetails({ offer }: { offer: FlightOffer }) {
       </div>
 
       <div className="mt-4">
-        <h4 className="mb-2 text-[0.8rem] font-bold text-ink">
+        <h4 className="mb-2 text-[0.88rem] font-bold text-ink">
           Cancellation &amp; date change
         </h4>
         {offer.miniRules.length > 0 ? (
           <FarePolicyTable rules={offer.miniRules} />
         ) : (
-          <p className="text-[0.78rem] text-muted">
+          <p className="text-[0.88rem] text-muted">
             {offer.isRefundable
               ? "This fare is refundable, less the airline's cancellation charge. The exact charge is confirmed on the next step, before you pay."
               : "This fare is non-refundable. Government taxes may still be refundable. The exact position is confirmed on the next step, before you pay."}
           </p>
         )}
-        <p className="mt-2 text-[0.72rem] text-muted">
+        <p className="mt-2 text-[0.82rem] text-muted">
           Full airline rules are shown at checkout. See also our{" "}
           <Link href="/refund-policy" className="font-semibold text-red hover:underline">
             cancellation &amp; refund policy
@@ -199,6 +200,11 @@ export function FlightCard({
   const logo = airlineLogo(offer.airlineCode);
   const stopsLabel =
     offer.stops === 0 ? "Non-stop" : `${offer.stops} stop${offer.stops > 1 ? "s" : ""}`;
+  // TBO segment times are local airport time with no zone — compare the date
+  // parts as strings, never through Date, or an overnight hop shifts a day.
+  const landsNextDay =
+    Boolean(first?.depTime && last?.arrTime) &&
+    last.arrTime.slice(0, 10) !== first.depTime.slice(0, 10);
   const [open, setOpen] = useState(false);
   // Advertise the weakest leg — see weakestAllowance.
   const checkedIn = weakestAllowance(offer.segments.map((s) => s.baggage));
@@ -213,43 +219,59 @@ export function FlightCard({
           {logo ? (
             <Image src={logo} alt={offer.airlineName} width={28} height={28} className="object-contain" unoptimized />
           ) : (
-            <span className="text-[0.7rem] font-bold text-navy">{offer.airlineCode}</span>
+            <span className="text-[0.76rem] font-bold text-navy">{offer.airlineCode}</span>
           )}
         </span>
         <div className="min-w-0">
           <div className="truncate text-[0.95rem] font-semibold text-ink">
             {offer.airlineName}
           </div>
-          <div className="truncate text-[0.75rem] text-muted">
+          <div className="truncate text-[0.82rem] text-muted">
             {offer.segments.map((s) => s.flightNumber).join(" · ")}
           </div>
         </div>
       </div>
 
-      {/* Route */}
-      <div className="flex flex-1 items-center gap-3">
-        <div className="text-left">
-          <div className="text-[1.15rem] font-bold tabular-nums text-ink">
-            {fmtTime(first?.depTime)}
-          </div>
-          <div className="text-[0.8rem] font-medium text-muted">{first?.from}</div>
+      {/* Route. The travel date leads it: it is the detail a customer re-checks
+          before booking, and as small print under the fare it was the least
+          legible thing on the card. A red-eye landing on the next calendar day
+          says so here rather than only inside the expanded itinerary. */}
+      <div className="flex flex-1 flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="inline-flex items-center gap-1.5 text-[0.95rem] font-bold text-ink">
+            <CalendarDays size={15} className="flex-none text-red" aria-hidden />
+            {fmtDateWithDay(first?.depTime)}
+          </span>
+          {landsNextDay && (
+            <span className="rounded-full bg-red/10 px-2.5 py-0.5 text-[0.82rem] font-semibold text-red">
+              Arrives {fmtDate(last?.arrTime)}
+            </span>
+          )}
         </div>
-        <div className="flex flex-1 flex-col items-center px-1">
-          <div className="text-[0.72rem] text-muted">{fmtDur(offer.durationMin)}</div>
-          <div className="my-1 flex w-full items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-line" />
-            <span className="h-px flex-1 bg-line" />
-            <Plane size={13} className="text-red" aria-hidden />
-            <span className="h-px flex-1 bg-line" />
-            <span className="h-1.5 w-1.5 rounded-full bg-line" />
+        <div className="flex items-center gap-3">
+          <div className="text-left">
+            <div className="text-[1.15rem] font-bold tabular-nums text-ink">
+              {fmtTime(first?.depTime)}
+            </div>
+            <div className="text-[0.88rem] font-medium text-muted">{first?.from}</div>
           </div>
-          <div className="text-[0.72rem] font-medium text-muted">{stopsLabel}</div>
-        </div>
-        <div className="text-right">
-          <div className="text-[1.15rem] font-bold tabular-nums text-ink">
-            {fmtTime(last?.arrTime)}
+          <div className="flex flex-1 flex-col items-center px-1">
+            <div className="text-[0.82rem] text-muted">{fmtDur(offer.durationMin)}</div>
+            <div className="my-1 flex w-full items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-line" />
+              <span className="h-px flex-1 bg-line" />
+              <Plane size={13} className="text-red" aria-hidden />
+              <span className="h-px flex-1 bg-line" />
+              <span className="h-1.5 w-1.5 rounded-full bg-line" />
+            </div>
+            <div className="text-[0.82rem] font-medium text-muted">{stopsLabel}</div>
           </div>
-          <div className="text-[0.8rem] font-medium text-muted">{last?.to}</div>
+          <div className="text-right">
+            <div className="text-[1.15rem] font-bold tabular-nums text-ink">
+              {fmtTime(last?.arrTime)}
+            </div>
+            <div className="text-[0.88rem] font-medium text-muted">{last?.to}</div>
+          </div>
         </div>
       </div>
 
@@ -259,10 +281,9 @@ export function FlightCard({
           <div className="text-[1.35rem] font-extrabold text-navy">
             ₹{inr.format(offer.fareINR)}
           </div>
-          <div className="text-[0.72rem] text-muted">
+          <div className="text-[0.88rem] text-muted">
             per adult · {offer.isRefundable ? "Refundable" : "Non-refundable"}
           </div>
-          <div className="text-[0.68rem] text-muted">{fmtDate(first?.depTime)}</div>
         </div>
         <div className="flex flex-col items-end gap-2">
           {selection && (
@@ -271,7 +292,7 @@ export function FlightCard({
               onClick={selection.onSelect}
               aria-pressed={selection.selected}
               className={cn(
-                "inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border-[1.6px] px-5 py-2.5 text-[0.85rem] font-semibold transition-colors",
+                "inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border-[1.6px] px-5 py-2.5 text-[0.9rem] font-semibold transition-colors",
                 selection.selected
                   ? "border-red bg-red/10 text-red"
                   : "border-line text-ink hover:border-red/60 hover:text-red",
@@ -299,7 +320,7 @@ export function FlightCard({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="inline-flex items-center gap-1 text-[0.8rem] font-semibold text-red hover:underline"
+          className="inline-flex items-center gap-1 text-[0.88rem] font-semibold text-red hover:underline"
         >
           {open ? "Hide details" : "Flight details & baggage"}
           <ChevronDown
