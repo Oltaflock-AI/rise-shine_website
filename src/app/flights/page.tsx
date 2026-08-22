@@ -104,6 +104,29 @@ export default async function FlightsPage({
     );
   }
 
+  // Same airport both ends is not a journey anyone can sell — say so instead of
+  // sending TBO a search that can only come back empty.
+  if ((fromA?.code || "AMD") === toA.code) {
+    return (
+      <>
+        {header}
+        <section className="py-20">
+          <Container>
+            <div className="mx-auto max-w-md rounded-brand-lg border border-line bg-white p-10 text-center shadow-brand-sm">
+              <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
+              <h2 className="h-sm mb-2">Pick two different airports</h2>
+              <p className="text-muted">
+                You&apos;ve set {toA.city} ({toA.code}) as both the departure and
+                the destination. Change one of them to see live fares.
+              </p>
+              <RecentSearches kind="flight" className="mt-6" />
+            </div>
+          </Container>
+        </section>
+      </>
+    );
+  }
+
   const from = fromA?.code || "AMD";
   const to = toA.code;
   const departISO = sp.depart || defaultDates().departISO;

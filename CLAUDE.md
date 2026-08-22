@@ -18,8 +18,8 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
 - **`src/data/`** — **all copy/content lives here.** Change content by editing data,
   not components.
 - **`supabase/migrations/`** — account, passenger, payment-ledger, hotel-booking,
-  voice-call-log (`0005`), callback-queue (`0006`) and Cashfree column rename
-  (`0007`) schema. TBO remains canonical;
+  voice-call-log (`0005`), callback-queue (`0006`), Cashfree column rename
+  (`0007`) and saved traveller/address details (`0008`) schema. TBO remains canonical;
   Supabase is an account-facing mirror.
 - **`voice-agent/`** — separate Next.js 15 app: a dashboard over the ElevenLabs
   conversation API. Its own package manifest; run it from that directory. It is
@@ -207,6 +207,24 @@ AccountView are untouched. `src/proxy.ts` (Next 16's renamed middleware) refresh
 the session and gates `/account`. `app/auth/callback/route.ts` exchanges the
 email-confirm/OAuth code. Schema + RLS: `supabase/migrations/0001_init.sql`.
 
+### Saved details (repeat bookings)
+
+`travellers` + `saved_addresses` (`0008`) are PREFILL CONVENIENCES, nothing more.
+They are written server-side **only after a confirmed ticket**
+(`lib/travel-profile.ts`, called from `/api/book` beside `saveBookingHistory`) and read
+in the browser under RLS (`lib/saved-details.ts`) to drive the checkout pickers. A
+customer editing or deleting a saved row must never touch `bookings`/`passengers` —
+that is the record of who actually flew, and TBO stays canonical above it.
+
+The structured address travels as the payload's own `billing` block, NOT inside the
+TBO request: TBO's Passenger object has no state or PIN field, so the form folds those
+into `AddressLine2`. Parsing that string back out is guesswork, hence the side channel.
+`parseBookingRequest` ignores `billing` on purpose — nothing about ticketing depends
+on it.
+
+Names are always an explicit pick; only the most recent address auto-applies. A
+wrong auto-filled name is a wasted ticket, a wrong address is a corrected field.
+
 ## Rules that will bite you if ignored
 
 - **Never import `tbo*.ts` from a client component.** They read credentials from
@@ -224,6 +242,15 @@ email-confirm/OAuth code. Schema + RLS: `supabase/migrations/0001_init.sql`.
 - **Next 16 renamed `middleware` → `proxy`.** The file is `src/proxy.ts`, exports
   `proxy()`, runs on the **Node.js** runtime (edge unsupported). Don't recreate a
   `middleware.ts`. Confirm framework conventions in `node_modules/next/dist/docs/`.
+- **Baggage and fare rules are contract terms, not decoration.** The allowance shown
+  for an itinerary is the WEAKEST leg (`weakestAllowance`), a blank allowance reads
+  "check with airline" rather than 0, and `MiniFareRules` rows render verbatim. TBO
+  reports baggage on `Segments[].Baggage` for some suppliers and only in
+  `FareBreakdown[].SegmentDetails[]` for others — read both. Checkout re-reads all of
+  it from the confirmed FareQuote, never from the search card.
+- **`FareRuleDetail` is third-party HTML.** It reaches the browser only through
+  `sanitizeFareRuleHtml` (`lib/fare-rules.ts`, allowlist — tags in, all attributes out
+  bar table spans). Never render it raw, never swap in a blocklist.
 - **Enquiry forms** post server-side to the agency's Google Form (`lib/actions.ts`
   + `lib/googleForm.ts`) — that's the lead pipeline. Transactional booking/refund
   email is separate and uses Resend via `lib/email.ts`.
@@ -231,6 +258,27 @@ email-confirm/OAuth code. Schema + RLS: `supabase/migrations/0001_init.sql`.
 ## Conventions
 
 - **TypeScript strict.** Icons via `lucide-react` (no emoji). Classes via `cn()` (`lib/cn.ts`).
+- **Buttons and form controls are shared, not hand-rolled.** Every CTA is
+  `ui/Button.tsx` (`primary` · `navy` · `ghost` · `light` · `danger`, `sm`/`md`);
+  `buttonClass()` is there for the rare host that must own the element. Every
+  input, select and date field is `ui/form-controls.tsx` — `controlClass`,
+  `<Select>`, `<DateField>`, `controlLabelClass` — re-exported from
+  `forms/controls.tsx` so the enquiry forms and the checkouts cannot drift.
+  `<Select>` keeps the native element (correct picker on every phone, free
+  keyboard support) and only swaps the OS chevron for a lucide one; `<DateField>`
+  overlays an invisible `<input type="date">` on DD-MM-YY text, because a native
+  date renders in the browser's locale and would break the site-wide date rule.
+  Don't re-style a bare `<select>`/`<input>` inline — reach for these.
+- **Search dates default to TOMORROW**, and the return/check-out default hangs
+  off the departure the traveller picked, never off today — a return prefilled
+  from today lands *before* an outbound that came in on the URL. Server-side,
+  `defaultDates()` measures "tomorrow" in `Asia/Kolkata` (`todayInIndiaISO`),
+  because Vercel runs UTC 5h30m behind India and a naive `new Date()` + 1 day
+  resolves to today in IST for every request between 18:30 and 24:00 UTC.
+  `tests/default-dates.test.ts` pins that boundary.
+- **Titles are stored upper-case, shown cased.** TBO only accepts `MR`/`MRS`/
+  `MS`/`MSTR`, so the `<option>` value stays the code and `TITLE_LABEL` supplies
+  the "Mr" the traveller reads. Don't "fix" the display by changing the value.
 - **Business info is single-source in `src/data/site.ts`** (NAP, phones, socials, nav,
   reviews) — consumed by header, footer, contact, and layout JSON-LD.
 - **Tour packages** live in `src/data/catalog/` (per-category files → `catalog/index.ts`);

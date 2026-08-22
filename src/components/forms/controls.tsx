@@ -7,8 +7,9 @@ import { cn } from "@/lib/cn";
  *  only export async functions, so it can't host this constant. */
 export const initialFormState: FormState = { status: "idle", message: "" };
 
-export const controlClass =
-  "w-full rounded-[13px] border-[1.6px] border-line bg-cream px-4 py-3.5 text-base text-ink outline-none transition-all placeholder:text-muted/70 focus:border-red focus:bg-white focus:ring-4 focus:ring-red/15";
+/** Re-exported so the enquiry forms and the checkouts can never drift apart —
+ *  the one definition lives in ui/form-controls.tsx. */
+export { controlClass, Select, DateField } from "../ui/form-controls";
 
 export function Field({
   label,

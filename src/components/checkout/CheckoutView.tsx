@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Plane, ShieldCheck } from "lucide-react";
+import { CalendarDays, MessageCircle, Plane, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { AUTH_DISABLED } from "@/lib/flags";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
 import { BookingForm } from "./BookingForm";
-import { formatDate } from "@/lib/format-date";
+import { formatDateWithDay } from "@/lib/format-date";
 
 const fmtTime = (iso: string) => (iso || "").slice(11, 16);
-const fmtDate = formatDate;
 
 type Booking = Record<string, string>;
 
@@ -50,6 +49,8 @@ export function CheckoutView() {
   const dur = Number(b.dur || 0);
   const durLabel = dur ? `${Math.floor(dur / 60)}h ${String(dur % 60).padStart(2, "0")}m` : "";
   const wa = b.wa?.startsWith("http") ? b.wa : undefined;
+  // Red-eyes land on the next calendar day; say so instead of showing one date.
+  const arrivesLater = Boolean(b.arr) && b.arr.slice(0, 10) !== (b.dep || "").slice(0, 10);
 
   return (
     <>
@@ -76,8 +77,22 @@ export function CheckoutView() {
       <section className="py-12 sm:py-16">
         <Container>
           {/* flight strip */}
-          <div className="mb-8 rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
-            <div className="flex items-center justify-between gap-4">
+          <div className="mb-8 overflow-hidden rounded-brand-lg border border-line bg-white shadow-brand-sm">
+            {/* Travel date, said out loud. It is the one detail a customer re-checks
+                before paying, so it leads the card with its weekday rather than
+                sitting as small print beside the flight number. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-cream-2 px-6 py-3">
+              <p className="flex items-center gap-2 text-[1.05rem] font-extrabold text-ink">
+                <CalendarDays size={18} className="text-red" aria-hidden />
+                {formatDateWithDay(b.dep)}
+              </p>
+              {arrivesLater && (
+                <span className="rounded-full bg-red/10 px-3 py-1 text-[0.75rem] font-semibold text-red">
+                  Arrives {formatDateWithDay(b.arr)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-4 p-6">
               <div>
                 <div className="text-[1.5rem] font-extrabold tabular-nums text-ink">{fmtTime(b.dep)}</div>
                 <div className="text-[0.85rem] font-medium text-muted">{b.from}</div>
@@ -98,10 +113,9 @@ export function CheckoutView() {
                 <div className="text-[0.85rem] font-medium text-muted">{b.to}</div>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-line pt-4 text-[0.85rem]">
+            <div className="mx-6 mb-6 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-line pt-4 text-[0.85rem]">
               <span className="font-semibold text-ink">{b.airline}</span>
               <span className="text-muted">{b.flightNo}</span>
-              <span className="text-muted">{fmtDate(b.dep)}</span>
             </div>
           </div>
 

@@ -26,6 +26,16 @@ export async function GET(req: Request) {
       { status: 400 },
     );
   }
+  if (to === from) {
+    return Response.json(
+      {
+        ok: false,
+        source: "unavailable",
+        error: "origin and destination must be different airports",
+      },
+      { status: 400 },
+    );
+  }
 
   const adults = Math.min(9, Math.max(1, parseInt(q.get("adults") || "1", 10) || 1));
   const nights = Math.max(1, parseInt(q.get("nights") || "7", 10) || 7);

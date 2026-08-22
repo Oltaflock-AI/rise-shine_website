@@ -19,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/request-a-call",
     "/terms",
     "/refund-policy",
+    "/privacy",
   ];
 
   return paths.map((path) => ({

@@ -21,13 +21,11 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { loadEnvLocal } from "./load-env.mjs";
 
 // ── env: load .env.local the way Next would ──────────────────────────────────
 const ROOT = join(import.meta.dirname, "..");
-for (const line of readFileSync(join(ROOT, ".env.local"), "utf8").split("\n")) {
-  const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-  if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim();
-}
+loadEnvLocal(ROOT);
 
 // ── raw traffic recorder: wrap fetch BEFORE the libs make any call ───────────
 type Call = { step: string; url: string; request: unknown; response: unknown; at: string; ms: number };
@@ -331,6 +329,7 @@ function specialReturnPairs(wantLCC: boolean): FlightOffer[] {
       flightNumber: `${a?.AirlineCode ?? ""} ${a?.FlightNumber ?? ""}`.trim(),
       from: "", fromCity: "", fromTerminal: "", to: "", toCity: "", toTerminal: "",
       depTime: "", arrTime: "", durationMin: 0, baggage: "", cabinBaggage: "",
+      cabinClass: "", fareClass: "", operatedBy: "",
     };
   };
   const pairs: FlightOffer[] = [];
@@ -351,6 +350,8 @@ function specialReturnPairs(wantLCC: boolean): FlightOffer[] {
         baseINR: 0,
         taxINR: 0,
         segments: [seg(ob)],
+        fareInclusions: [],
+        miniRules: [],
       });
     }
   }

@@ -156,7 +156,9 @@ export default async function HotelsPage({
                   <>Your stay needs at least one night. Pick your dates above and we&apos;ll price {city.label} live.</>
                 )}
               </p>
-              <Button href={qs({ checkIn: inDays(14), checkOut: inDays(16) })} arrow>
+              {/* Tomorrow, matching the search bar's own default — the guest
+                  came here to stay soon, not in a fortnight. */}
+              <Button href={qs({ checkIn: inDays(1), checkOut: inDays(3) })} arrow>
                 Search the next available dates
               </Button>
             </div>

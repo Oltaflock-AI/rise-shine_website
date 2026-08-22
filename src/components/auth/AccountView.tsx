@@ -74,7 +74,10 @@ const travelDate = (bk: BookingRow) =>
  * Human status. Hotels persist 1 = confirmed and flip to 6 on a cancellation
  * request; flights mirror TBO's itinerary Status (5 = ticketed).
  */
-function statusOf(bk: BookingRow): { label: string; tone: "good" | "warn" | "bad" } {
+function statusOf(bk: BookingRow): {
+  label: string;
+  tone: "good" | "warn" | "bad";
+} {
   if (bk.status === 6) return { label: "Cancellation requested", tone: "bad" };
   if (bk.kind === "hotel") {
     return bk.status === 1
@@ -107,14 +110,21 @@ function StatusBadge({ bk }: { bk: BookingRow }) {
  * the customer's only route and it must never vanish: when WhatsApp is unavailable it
  * becomes an email carrying the same details.
  */
-function flightCancelHref(bk: BookingRow): { href: string; via: "whatsapp" | "email" } {
+function flightCancelHref(bk: BookingRow): {
+  href: string;
+  via: "whatsapp" | "email";
+} {
   const text = `Hi Rise & Shine! I'd like to request cancellation of my flight booking:
 ${bk.origin ?? ""} → ${bk.destination ?? ""} on ${fmtDate(bk.depart_date)}${bk.pnr ? `\nPNR: ${bk.pnr}` : ""}${bk.booking_id ? `\nBooking id: ${bk.booking_id}` : ""}
 Please let me know the cancellation charges and refund.`;
   return contactHref(text, "Flight cancellation request");
 }
 
-const PAX_TYPE: Record<number, string> = { 1: "Adult", 2: "Child", 3: "Infant" };
+const PAX_TYPE: Record<number, string> = {
+  1: "Adult",
+  2: "Child",
+  3: "Infant",
+};
 
 export function AccountView() {
   const { user, ready, logout } = useAuth();
@@ -122,7 +132,9 @@ export function AccountView() {
   const [bookings, setBookings] = useState<BookingRow[] | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [paxByBooking, setPaxByBooking] = useState<Record<string, PaxRow[] | "loading">>({});
+  const [paxByBooking, setPaxByBooking] = useState<
+    Record<string, PaxRow[] | "loading">
+  >({});
 
   /** Request a TBO cancellation; the server enforces ownership. */
   async function cancelHotel(bk: BookingRow) {
@@ -141,9 +153,16 @@ export function AccountView() {
       });
       const j = await r.json();
       if (j.ok) {
-        setBookings((rows) => rows?.map((x) => (x.id === bk.id ? { ...x, status: 6 } : x)) ?? rows);
+        setBookings(
+          (rows) =>
+            rows?.map((x) => (x.id === bk.id ? { ...x, status: 6 } : x)) ??
+            rows,
+        );
       } else {
-        window.alert(j.error || "Cancellation failed — please contact us and we'll handle it.");
+        window.alert(
+          j.error ||
+            "Cancellation failed — please contact us and we'll handle it.",
+        );
       }
     } catch {
       window.alert("Network error — please try again or contact us.");
@@ -159,11 +178,16 @@ export function AccountView() {
       setPaxByBooking((m) => ({ ...m, [bk.id]: "loading" }));
       createClient()
         .from("passengers")
-        .select("title, first_name, last_name, pax_type, ticket_number, is_lead")
+        .select(
+          "title, first_name, last_name, pax_type, ticket_number, is_lead",
+        )
         .eq("booking_id", bk.id)
         .order("is_lead", { ascending: false })
         .then(({ data, error }) => {
-          setPaxByBooking((m) => ({ ...m, [bk.id]: error ? [] : ((data ?? []) as PaxRow[]) }));
+          setPaxByBooking((m) => ({
+            ...m,
+            [bk.id]: error ? [] : ((data ?? []) as PaxRow[]),
+          }));
         });
     }
   }
@@ -186,7 +210,8 @@ export function AccountView() {
         .select(BOOKING_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (alive) setBookings(error ? [] : ((data ?? []) as unknown as BookingRow[]));
+      if (alive)
+        setBookings(error ? [] : ((data ?? []) as unknown as BookingRow[]));
     })();
     return () => {
       alive = false;
@@ -203,8 +228,12 @@ export function AccountView() {
 
   const todayISO = new Date().toISOString().slice(0, 10);
   // A booking with no travel date (defensive) stays visible under Upcoming.
-  const upcoming = (bookings ?? []).filter((b) => (travelDate(b) ?? "9999") >= todayISO);
-  const past = (bookings ?? []).filter((b) => (travelDate(b) ?? "9999") < todayISO);
+  const upcoming = (bookings ?? []).filter(
+    (b) => (travelDate(b) ?? "9999") >= todayISO,
+  );
+  const past = (bookings ?? []).filter(
+    (b) => (travelDate(b) ?? "9999") < todayISO,
+  );
 
   const renderBooking = (bk: BookingRow) => {
     const open = expanded === bk.id;
@@ -221,7 +250,11 @@ export function AccountView() {
             {bk.kind === "hotel" ? (
               <BedDouble size={18} className="flex-none text-red" aria-hidden />
             ) : (
-              <PlaneTakeoff size={18} className="flex-none text-red" aria-hidden />
+              <PlaneTakeoff
+                size={18}
+                className="flex-none text-red"
+                aria-hidden
+              />
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold text-ink">
@@ -237,7 +270,9 @@ export function AccountView() {
                   <>
                     {bk.city ? `${bk.city} · ` : ""}
                     {fmtDate(bk.check_in)} → {fmtDate(bk.check_out)}
-                    {bk.rooms ? ` · ${bk.rooms} room${bk.rooms > 1 ? "s" : ""}` : ""}
+                    {bk.rooms
+                      ? ` · ${bk.rooms} room${bk.rooms > 1 ? "s" : ""}`
+                      : ""}
                   </>
                 ) : (
                   <>{fmtDate(bk.depart_date)}</>
@@ -246,7 +281,10 @@ export function AccountView() {
             </div>
             <ChevronDown
               size={16}
-              className={cn("ml-1 flex-none text-muted transition-transform", open && "rotate-180")}
+              className={cn(
+                "ml-1 flex-none text-muted transition-transform",
+                open && "rotate-180",
+              )}
               aria-hidden
             />
           </button>
@@ -266,24 +304,32 @@ export function AccountView() {
           <div className="border-t border-line bg-cream/40 px-4 py-3 text-[0.85rem]">
             <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               <div>
-                <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Booked on</dt>
+                <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  Booked on
+                </dt>
                 <dd className="text-ink">{fmtDate(bk.created_at)}</dd>
               </div>
               {bk.kind === "flight" && bk.flight_number && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Flight</dt>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                    Flight
+                  </dt>
                   <dd className="text-ink">{bk.flight_number}</dd>
                 </div>
               )}
               {bk.booking_id != null && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Booking id</dt>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                    Booking id
+                  </dt>
                   <dd className="text-ink">{bk.booking_id}</dd>
                 </div>
               )}
               {bk.amount_paid_inr != null && (
                 <div>
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Payment</dt>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                    Payment
+                  </dt>
                   <dd className="text-ink">
                     ₹{inr.format(bk.amount_paid_inr)} paid online
                     {bk.cf_payment_id ? ` · ${bk.cf_payment_id}` : ""}
@@ -295,18 +341,26 @@ export function AccountView() {
             {/* Travellers / guests on this booking */}
             <div className="mt-3">
               <p className="flex items-center gap-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-muted">
-                <Users size={13} aria-hidden /> {bk.kind === "hotel" ? "Guests" : "Passengers"}
+                <Users size={13} aria-hidden />{" "}
+                {bk.kind === "hotel" ? "Guests" : "Passengers"}
               </p>
               {pax === "loading" || pax === undefined ? (
                 <p className="mt-1 text-muted">Loading…</p>
               ) : pax.length === 0 ? (
-                <p className="mt-1 text-muted">Traveller details are with our team.</p>
+                <p className="mt-1 text-muted">
+                  Traveller details are with our team.
+                </p>
               ) : (
                 <ul className="mt-1 space-y-1">
                   {pax.map((p, i) => (
-                    <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-ink">
+                    <li
+                      key={i}
+                      className="flex flex-wrap items-baseline gap-x-2 text-ink"
+                    >
                       <span className="font-semibold">
-                        {[p.title, p.first_name, p.last_name].filter(Boolean).join(" ")}
+                        {[p.title, p.first_name, p.last_name]
+                          .filter(Boolean)
+                          .join(" ")}
                       </span>
                       <span className="text-[0.78rem] text-muted">
                         {PAX_TYPE[p.pax_type ?? 0] ?? ""}
@@ -332,13 +386,14 @@ export function AccountView() {
               {bk.status !== 6 &&
                 (bk.kind === "hotel" ? (
                   bk.booking_id != null && (
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => cancelHotel(bk)}
                       disabled={cancelling === bk.id}
-                      className="rounded-full border-[1.6px] border-red/60 px-4 py-2 text-[0.8rem] font-semibold text-red transition-colors hover:bg-red/5 disabled:opacity-60"
                     >
                       {cancelling === bk.id ? "Cancelling…" : "Cancel booking"}
-                    </button>
+                    </Button>
                   )
                 ) : (
                   <a
@@ -354,7 +409,9 @@ export function AccountView() {
                 href={
                   contactHref(
                     `Hi! I have a question about my ${bk.kind} booking ${
-                      bk.kind === "hotel" ? bk.confirmation_no ?? "" : bk.pnr ?? ""
+                      bk.kind === "hotel"
+                        ? (bk.confirmation_no ?? "")
+                        : (bk.pnr ?? "")
                     }`.trim(),
                     "Question about my booking",
                   ).href
@@ -396,11 +453,15 @@ export function AccountView() {
               <h2 className="text-[1.05rem] font-bold text-ink">Profile</h2>
               <dl className="mt-4 space-y-3 text-[0.95rem]">
                 <div>
-                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">Name</dt>
+                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">
+                    Name
+                  </dt>
                   <dd className="text-ink">{user.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">Email</dt>
+                  <dt className="text-[0.78rem] font-semibold uppercase tracking-wide text-muted">
+                    Email
+                  </dt>
                   <dd className="text-ink">{user.email}</dd>
                 </div>
               </dl>
@@ -420,14 +481,16 @@ export function AccountView() {
               <h2 className="text-[1.05rem] font-bold text-ink">My bookings</h2>
 
               {bookings === null ? (
-                <p className="mt-4 text-[0.9rem] text-muted">Loading your bookings…</p>
+                <p className="mt-4 text-[0.9rem] text-muted">
+                  Loading your bookings…
+                </p>
               ) : bookings.length === 0 ? (
                 <div className="mt-4 flex flex-col items-center rounded-brand border border-dashed border-line bg-cream/50 px-6 py-10 text-center">
                   <Ticket className="mb-3 text-red" aria-hidden />
                   <p className="font-semibold text-ink">No bookings yet</p>
                   <p className="mt-1 max-w-sm text-[0.9rem] text-muted">
-                    Flights and hotels you book will appear here with your tickets and
-                    confirmation numbers.
+                    Flights and hotels you book will appear here with your
+                    tickets and confirmation numbers.
                   </p>
                   <Button href="/flights" arrow className="mt-5">
                     <PlaneTakeoff size={17} aria-hidden /> Search flights
@@ -440,7 +503,9 @@ export function AccountView() {
                       <h3 className="mt-4 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
                         Upcoming
                       </h3>
-                      <ul className="mt-2 space-y-3">{upcoming.map(renderBooking)}</ul>
+                      <ul className="mt-2 space-y-3">
+                        {upcoming.map(renderBooking)}
+                      </ul>
                     </>
                   )}
                   {past.length > 0 && (
@@ -448,12 +513,15 @@ export function AccountView() {
                       <h3 className="mt-6 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
                         Past
                       </h3>
-                      <ul className="mt-2 space-y-3">{past.map(renderBooking)}</ul>
+                      <ul className="mt-2 space-y-3">
+                        {past.map(renderBooking)}
+                      </ul>
                     </>
                   )}
                   <p className="mt-5 text-[0.78rem] text-muted">
-                    Tap a booking for its travellers, tickets and payment details. Need a
-                    change? Every booking has a help link — we handle changes personally.
+                    Tap a booking for its travellers, tickets and payment
+                    details. Need a change? Every booking has a help link — we
+                    handle changes personally.
                   </p>
                 </>
               )}

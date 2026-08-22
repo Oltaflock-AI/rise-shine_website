@@ -1,9 +1,19 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
-import { CheckCircle2, Plane } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, ChevronDown, Clock, Plane } from "lucide-react";
 import { airlineLogo } from "@/data/airlineLogos";
 import { BookButton } from "./BookButton";
 import type { FlightOffer } from "@/lib/tbo";
 import { formatDate } from "@/lib/format-date";
+import {
+  BaggageSummary,
+  FareInclusions,
+  FarePolicyTable,
+  weakestAllowance,
+} from "./fare-info";
 import { cn } from "@/lib/cn";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -64,6 +74,114 @@ export function buildCheckoutQuery(
   };
 }
 
+/** Minutes between one leg landing and the next taking off. */
+function layoverMin(prevArr: string, nextDep: string): number {
+  const gap = (new Date(nextDep).getTime() - new Date(prevArr).getTime()) / 60000;
+  return Number.isFinite(gap) && gap > 0 ? Math.round(gap) : 0;
+}
+
+/**
+ * The expandable half of the card: leg-by-leg itinerary with the baggage allowance
+ * that applies to EACH leg, the fare split, and the airline's cancellation grid.
+ *
+ * Search already carries all of this (Segments[].Baggage, FareInclusions,
+ * MiniFareRules) — it was simply never rendered, so customers reached checkout not
+ * knowing what they were buying.
+ */
+function OfferDetails({ offer }: { offer: FlightOffer }) {
+  const legs = offer.segments;
+  return (
+    <div className="border-t border-dashed border-line pt-4">
+      <ol className="space-y-3">
+        {legs.map((s, i) => (
+          <li key={`${s.flightNumber}-${i}`}>
+            {i > 0 && layoverMin(legs[i - 1].arrTime, s.depTime) > 0 && (
+              <p className="mb-3 flex items-center gap-1.5 rounded-brand bg-cream-2 px-3 py-1.5 text-[0.75rem] font-medium text-muted">
+                <Clock className="h-3.5 w-3.5 flex-none" aria-hidden />
+                {fmtDur(layoverMin(legs[i - 1].arrTime, s.depTime))} layover in{" "}
+                {s.fromCity || s.from}
+              </p>
+            )}
+            <div className="rounded-brand border border-line p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="text-[0.85rem] font-semibold text-ink">
+                  {s.fromCity || s.from} → {s.toCity || s.to}
+                </span>
+                <span className="text-[0.75rem] text-muted">
+                  {s.flightNumber}
+                  {s.cabinClass ? ` · ${s.cabinClass}` : ""}
+                  {s.fareClass ? ` · class ${s.fareClass}` : ""}
+                </span>
+              </div>
+              <div className="mt-1 text-[0.78rem] text-muted">
+                {fmtTime(s.depTime)} {s.from}
+                {s.fromTerminal ? ` T${s.fromTerminal}` : ""} — {fmtTime(s.arrTime)} {s.to}
+                {s.toTerminal ? ` T${s.toTerminal}` : ""} · {fmtDur(s.durationMin)}
+              </div>
+              {s.operatedBy && (
+                <div className="mt-1 text-[0.72rem] text-muted">Operated by {s.operatedBy}</div>
+              )}
+              <BaggageSummary className="mt-2" checkedIn={s.baggage} cabin={s.cabinBaggage} />
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {offer.fareInclusions.length > 0 && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-[0.8rem] font-bold text-ink">Included in this fare</h4>
+          <FareInclusions items={offer.fareInclusions} />
+        </div>
+      )}
+
+      <div className="mt-4">
+        {/* Two lines, and base is the remainder: taxes and surcharges are their own
+            line, everything else is the fare. Our service fee is part of the fare the
+            customer is quoted, never itemised as a separate charge. */}
+        <h4 className="mb-2 text-[0.8rem] font-bold text-ink">Fare breakdown (per adult)</h4>
+        <dl className="space-y-1 text-[0.78rem]">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Base fare</dt>
+            <dd className="tabular-nums text-ink">
+              ₹{inr.format(Math.max(0, offer.fareINR - offer.taxINR))}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Taxes &amp; surcharges</dt>
+            <dd className="tabular-nums text-ink">₹{inr.format(offer.taxINR)}</dd>
+          </div>
+          <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold">
+            <dt className="text-ink">Total per adult</dt>
+            <dd className="tabular-nums text-navy">₹{inr.format(offer.fareINR)}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="mt-4">
+        <h4 className="mb-2 text-[0.8rem] font-bold text-ink">
+          Cancellation &amp; date change
+        </h4>
+        {offer.miniRules.length > 0 ? (
+          <FarePolicyTable rules={offer.miniRules} />
+        ) : (
+          <p className="text-[0.78rem] text-muted">
+            {offer.isRefundable
+              ? "This fare is refundable, less the airline's cancellation charge. The exact charge is confirmed on the next step, before you pay."
+              : "This fare is non-refundable. Government taxes may still be refundable. The exact position is confirmed on the next step, before you pay."}
+          </p>
+        )}
+        <p className="mt-2 text-[0.72rem] text-muted">
+          Full airline rules are shown at checkout. See also our{" "}
+          <Link href="/refund-policy" className="font-semibold text-red hover:underline">
+            cancellation &amp; refund policy
+          </Link>
+          .
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function FlightCard({
   offer,
   enquireHref,
@@ -81,9 +199,14 @@ export function FlightCard({
   const logo = airlineLogo(offer.airlineCode);
   const stopsLabel =
     offer.stops === 0 ? "Non-stop" : `${offer.stops} stop${offer.stops > 1 ? "s" : ""}`;
+  const [open, setOpen] = useState(false);
+  // Advertise the weakest leg — see weakestAllowance.
+  const checkedIn = weakestAllowance(offer.segments.map((s) => s.baggage));
+  const cabinBag = weakestAllowance(offer.segments.map((s) => s.cabinBaggage));
 
   return (
-    <div className="flex flex-col gap-4 rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm transition-shadow hover:shadow-brand sm:flex-row sm:items-center sm:gap-6">
+    <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm transition-shadow hover:shadow-brand">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
       {/* Airline */}
       <div className="flex items-center gap-3 sm:w-44 sm:flex-none">
         <span className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-lg border border-line bg-white">
@@ -166,6 +289,30 @@ export function FlightCard({
           <BookButton query={buildCheckoutQuery(offer, enquireHref, booking)} />
         </div>
       </div>
+    </div>
+
+      {/* Baggage + rules strip. Skyscanner-style: the allowance is on the card, not
+          three clicks away, because it is what decides between two similar fares. */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-line pt-3">
+        <BaggageSummary checkedIn={checkedIn} cabin={cabinBag} />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="inline-flex items-center gap-1 text-[0.8rem] font-semibold text-red hover:underline"
+        >
+          {open ? "Hide details" : "Flight details & baggage"}
+          <ChevronDown
+            className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-3">
+          <OfferDetails offer={offer} />
+        </div>
+      )}
     </div>
   );
 }

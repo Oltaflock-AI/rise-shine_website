@@ -5,7 +5,14 @@ import { submitEnquiry } from "@/lib/actions";
 import { site } from "@/data/site";
 import { GOOGLE_FORM } from "@/lib/googleForm";
 import { Button } from "../ui/Button";
-import { Field, FormNote, controlClass, initialFormState } from "./controls";
+import {
+  Field,
+  FormNote,
+  controlClass,
+  DateField,
+  Select,
+  initialFormState,
+} from "./controls";
 import { cn } from "@/lib/cn";
 
 const JOURNEY_TYPES = [
@@ -78,16 +85,15 @@ export function PlanTripForm({
           />
         </Field>
         <Field label="Journey type" htmlFor="t-type">
-          <select
+          <Select
             id="t-type"
             name="journeyType"
             defaultValue={defaultJourneyType}
-            className={controlClass}
           >
             {JOURNEY_TYPES.map((t) => (
               <option key={t}>{t}</option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label="Destination" htmlFor="t-dest">
           <input
@@ -100,38 +106,27 @@ export function PlanTripForm({
           />
         </Field>
         <Field label="Approx. departure date" htmlFor="t-date">
-          <input
+          <DateField
             id="t-date"
             name="departure"
-            type="date"
-            className={controlClass}
+            aria-label="Approximate departure date"
           />
         </Field>
         <Field label="Number of travellers" htmlFor="t-pax">
-          <select
-            id="t-pax"
-            name="travellers"
-            defaultValue="2"
-            className={controlClass}
-          >
+          <Select id="t-pax" name="travellers" defaultValue="2">
             <option>1</option>
             <option>2</option>
             <option>3–4</option>
             <option>5+</option>
-          </select>
+          </Select>
         </Field>
         <Field label="Budget per person (₹)" htmlFor="t-budget">
-          <select
-            id="t-budget"
-            name="budget"
-            defaultValue="25,000 – 50,000"
-            className={controlClass}
-          >
+          <Select id="t-budget" name="budget" defaultValue="25,000 – 50,000">
             <option>Under 25,000</option>
             <option>25,000 – 50,000</option>
             <option>50,000 – 1,00,000</option>
             <option>1,00,000+</option>
-          </select>
+          </Select>
         </Field>
       </div>
 

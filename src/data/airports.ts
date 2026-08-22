@@ -25,3 +25,67 @@ export function resolveAirport(input: string): Airport | undefined {
     AIRPORTS.find((a) => a.name.toLowerCase().includes(lc) || a.city.toLowerCase().includes(lc))
   );
 }
+
+/**
+ * The airports the dropdown offers before anyone types.
+ *
+ * The picker used to dump all ~230 entries into a <datalist>, which is a list to
+ * scroll, not a list to choose from. These are the routes this agency actually
+ * sells — Ahmedabad first (home base), then the metros, then the hubs Gujarati
+ * travellers fly to. The full list is still reachable: type two letters and
+ * `searchAirports` searches everything.
+ */
+const POPULAR_DOMESTIC_CODES = [
+  "AMD", "BOM", "DEL", "BLR", "GOI", "HYD", "MAA", "CCU",
+  "PNQ", "JAI", "COK", "IXC", "LKO", "SXR", "STV", "BDQ",
+];
+const POPULAR_INTERNATIONAL_CODES = [
+  "DXB", "AUH", "SIN", "BKK", "KUL", "DOH",
+  "LHR", "JFK", "YYZ", "CMB", "KTM", "MLE",
+];
+
+const pick = (codes: string[]): Airport[] =>
+  codes.map((c) => BY_CODE[c]).filter((a): a is Airport => Boolean(a));
+
+export const POPULAR_DOMESTIC_AIRPORTS: Airport[] = pick(POPULAR_DOMESTIC_CODES);
+export const POPULAR_INTERNATIONAL_AIRPORTS: Airport[] = pick(POPULAR_INTERNATIONAL_CODES);
+export const POPULAR_AIRPORTS: Airport[] = [
+  ...POPULAR_DOMESTIC_AIRPORTS,
+  ...POPULAR_INTERNATIONAL_AIRPORTS,
+];
+
+/**
+ * Rank airports for a typed query. Order matters more than completeness here: an
+ * exact IATA code, then a city that starts with the query, then a popular airport,
+ * then anything else that contains it. "del" must surface Delhi, not Deoghar.
+ */
+export function searchAirports(query: string, limit = 8): Airport[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return POPULAR_AIRPORTS.slice(0, limit);
+  const popular = new Set(POPULAR_AIRPORTS.map((a) => a.code));
+  const score = (a: Airport): number => {
+    const code = a.code.toLowerCase();
+    const city = a.city.toLowerCase();
+    const name = a.name.toLowerCase();
+    let s: number;
+    if (code === q) s = 0;
+    else if (city === q) s = 1;
+    else if (city.startsWith(q)) s = 2;
+    else if (code.startsWith(q)) s = 3;
+    else if (name.startsWith(q)) s = 4;
+    else if (city.includes(q) || name.includes(q)) s = 5;
+    else return Infinity;
+    // Within a tier, an airport we actually sell outranks an airstrip.
+    return s * 2 + (popular.has(a.code) ? 0 : 1);
+  };
+  return AIRPORTS.map((a) => ({ a, s: score(a) }))
+    .filter((x) => x.s !== Infinity)
+    .sort((x, y) => x.s - y.s || x.a.city.localeCompare(y.a.city))
+    .slice(0, limit)
+    .map((x) => x.a);
+}
+
+/** The label the search inputs carry, e.g. "Goa (GOI)". `resolveAirport` reads it back. */
+export function airportLabel(a: Airport): string {
+  return `${a.city} (${a.code})`;
+}

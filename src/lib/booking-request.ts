@@ -9,6 +9,7 @@ import "server-only";
  */
 import { normalizeTitle, type PaxType } from "@/lib/tbo-validate";
 import type { BookingRequest } from "@/lib/tbo-book";
+import type { BillingDetails } from "@/lib/travel-profile";
 
 export type IncomingBooking = {
   traceId?: string;
@@ -23,6 +24,14 @@ export type IncomingBooking = {
   isInternational?: boolean;
   passengers?: Array<Record<string, unknown>>;
   gst?: BookingRequest["gst"];
+  /**
+   * The structured billing address, carried alongside the TBO request rather
+   * than inside it — TBO's Passenger has no state/PIN field, so the form folds
+   * those into AddressLine2. Ignored here on purpose: nothing about ticketing
+   * depends on it. /api/book hands it to lib/travel-profile so the customer's
+   * next checkout can prefill (see migrations/0008).
+   */
+  billing?: BillingDetails;
 };
 
 export type ParseResult =

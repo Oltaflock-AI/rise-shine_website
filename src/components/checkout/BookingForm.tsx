@@ -2,11 +2,39 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
-import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarDays,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { formatDate } from "@/lib/format-date";
+import { formatDateWithDay } from "@/lib/format-date";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
-import { openCashfreeCheckout, type CashfreeMode } from "@/lib/cashfree-checkout";
+import {
+  openCashfreeCheckout,
+  type CashfreeMode,
+} from "@/lib/cashfree-checkout";
+import { FareEntitlements } from "./FareEntitlements";
+import { BaggageSummary, weakestAllowance } from "@/components/ui/fare-info";
+import { NATIONALITIES } from "@/data/nationalities";
+import {
+  controlClass,
+  controlLabelClass,
+  DateField,
+  Select,
+} from "@/components/ui/form-controls";
+import { SavedAddressPicker, SavedTravellerPicker } from "./SavedDetails";
+import {
+  forgetSaved,
+  loadSavedAddresses,
+  loadSavedTravellers,
+  type SavedAddress,
+  type SavedTraveller,
+} from "@/lib/saved-details";
+import type { QuoteDetails } from "@/lib/tbo-book";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
@@ -16,8 +44,20 @@ const TITLES: Record<PaxType, string[]> = {
   2: ["MR", "MS"],
   3: ["MSTR", "MR", "MS"],
 };
+/** TBO only accepts the upper-case code, but shouting "MR" at the traveller is
+ *  not how the rest of the site talks — show the cased word, send the code. */
+const TITLE_LABEL: Record<string, string> = {
+  MR: "Mr",
+  MRS: "Mrs",
+  MS: "Ms",
+  MSTR: "Mstr",
+};
 type PaxType = 1 | 2 | 3;
-const TYPE_LABEL: Record<PaxType, string> = { 1: "Adult", 2: "Child", 3: "Infant" };
+const TYPE_LABEL: Record<PaxType, string> = {
+  1: "Adult",
+  2: "Child",
+  3: "Infant",
+};
 
 type Flags = {
   IsPanRequiredAtBook?: boolean;
@@ -35,6 +75,8 @@ type Quote = {
   publishedFare?: number;
   priceChanged?: boolean;
   flags?: Flags;
+  /** Baggage, inclusions and refund rules, read off the confirmed FareQuote. */
+  details?: QuoteDetails;
   error?: string;
 };
 type Booked = {
@@ -85,9 +127,25 @@ const blankPax = (t: PaxType): PaxForm => ({
   GuardianPAN: "",
 });
 
-const field =
-  "w-full rounded-brand border border-line bg-white px-3 py-2.5 text-base text-ink outline-none transition focus:border-red focus:ring-2 focus:ring-red/15";
-const label = "mb-1 block text-[0.75rem] font-semibold uppercase tracking-wide text-muted";
+/** A saved address as the contact form holds it. Blank fields stay blank, not "null". */
+function contactFromAddress(a: SavedAddress, fallbackEmail: string) {
+  return {
+    phone: a.phone ?? "",
+    email: a.email || fallbackEmail,
+    address1: a.address1 ?? "",
+    address2: a.address2 ?? "",
+    city: a.city ?? "",
+    state: a.state ?? "",
+    pin: a.pin ?? "",
+    countryCode: a.country_code || "IN",
+    nationality: a.nationality || a.country_code || "IN",
+  };
+}
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
+const field = controlClass;
+const label = controlLabelClass;
 
 export function BookingForm({
   b,
@@ -106,8 +164,32 @@ export function BookingForm({
     ...Array.from({ length: children }, () => blankPax(2)),
     ...Array.from({ length: infants }, () => blankPax(3)),
   ]);
-  const [contact, setContact] = useState({ phone: "", email: contactEmail, address: "", city: "Ahmedabad" });
+  /**
+   * Billing address, in the shape airlines and GST invoices actually need. A single
+   * free-text "address" line could not carry a PIN code, and TBO's Passenger object
+   * has no PinCode/State field of its own — so line 2 carries area, state and PIN,
+   * which is what an address line 2 is for. Nothing is silently dropped.
+   */
+  const [contact, setContact] = useState({
+    phone: "",
+    email: contactEmail,
+    address1: "",
+    address2: "",
+    city: "Ahmedabad",
+    state: "",
+    pin: "",
+    countryCode: "IN",
+    nationality: "IN",
+  });
   const [gst, setGst] = useState({ GSTCompanyName: "", GSTNumber: "" });
+  /**
+   * What we already know about this customer from their past bookings
+   * (lib/saved-details, RLS-scoped). Empty for a first-time or signed-out
+   * booker, and the form behaves exactly as before in that case.
+   */
+  const [savedPax, setSavedPax] = useState<SavedTraveller[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [addressId, setAddressId] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
   /** Captured once — reading the clock during render is impure. */
@@ -129,7 +211,11 @@ export function BookingForm({
         const j = (await r.json()) as Quote;
         if (alive) setQuote(j);
       } catch {
-        if (alive) setQuote({ ok: false, error: "Could not price this fare. Please search again." });
+        if (alive)
+          setQuote({
+            ok: false,
+            error: "Could not price this fare. Please search again.",
+          });
       }
     })();
     return () => {
@@ -137,26 +223,140 @@ export function BookingForm({
     };
   }, [b.traceId, b.searchedAt, b.resultIndex]);
 
+  // Pull the saved travellers + addresses once. The most recently used address is
+  // applied straight away — re-typing the same billing address is the friction
+  // this exists to remove — while names are always an explicit pick, because a
+  // wrong one is a wasted ticket. Both stay fully editable afterwards.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [people, addresses] = await Promise.all([
+        loadSavedTravellers(),
+        loadSavedAddresses(),
+      ]);
+      if (!alive) return;
+      setSavedPax(people);
+      setSavedAddresses(addresses);
+      const first = addresses[0];
+      if (first) {
+        setAddressId(first.id);
+        setContact((c) => ({ ...c, ...contactFromAddress(first, c.email) }));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const flags = quote?.flags ?? {};
   const isIntl = b.intl === "1";
-  const needPassport = Boolean(flags.IsPassportRequiredAtBook || flags.IsPassportRequiredAtTicket || isIntl);
+  const needPassport = Boolean(
+    flags.IsPassportRequiredAtBook ||
+    flags.IsPassportRequiredAtTicket ||
+    isIntl,
+  );
   const needFullPassport = Boolean(flags.IsPassportFullDetailRequiredAtBook);
-  const needPan = Boolean(flags.IsPanRequiredAtBook || flags.IsPanRequiredAtTicket);
+  const needPan = Boolean(
+    flags.IsPanRequiredAtBook || flags.IsPanRequiredAtTicket,
+  );
   const needGst = Boolean(flags.IsGSTMandatory);
 
   const set = (i: number, k: keyof PaxForm, v: string | number) =>
     setPax((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
-  const totalFare = quote?.publishedFare ?? Number(b.fare || 0) * (adults + children);
+  /** Fill one passenger card from a saved traveller. Its own pax type wins — a
+   *  saved adult picked into an infant slot must stay an infant. */
+  function applySavedTraveller(i: number, t: SavedTraveller) {
+    setPax((prev) =>
+      prev.map((x, j) => {
+        if (j !== i) return x;
+        const allowed = TITLES[x.PaxType];
+        const title =
+          t.title && allowed.includes(t.title) ? t.title : allowed[0];
+        return {
+          ...x,
+          Title: title,
+          FirstName: t.first_name ?? "",
+          LastName: t.last_name ?? "",
+          Gender: t.gender === 2 ? 2 : 1,
+          DateOfBirth: t.dob ?? "",
+          PAN: t.pan ?? "",
+          PassportNo: t.passport_no ?? "",
+          PassportExpiry: t.passport_expiry ?? "",
+          PassportIssueDate: t.passport_issue_date ?? "",
+        };
+      }),
+    );
+  }
+
+  /**
+   * Every manual edit to the contact block. It also clears the saved-address
+   * selection: once a field is changed by hand, this is no longer that saved
+   * address, and the picker must stop claiming it is.
+   */
+  const updateContact = (patch: Partial<typeof contact>) => {
+    setContact((c) => ({ ...c, ...patch }));
+    setAddressId(null);
+  };
+
+  function applySavedAddress(a: SavedAddress) {
+    setAddressId(a.id);
+    setContact((c) => ({ ...c, ...contactFromAddress(a, contactEmail) }));
+  }
+
+  /** Forget a saved row, and drop it from the picker without a re-fetch. */
+  async function forgetTraveller(t: SavedTraveller) {
+    if (await forgetSaved("travellers", t.id)) {
+      setSavedPax((list) => list.filter((x) => x.id !== t.id));
+    }
+  }
+
+  async function forgetAddress(a: SavedAddress) {
+    if (await forgetSaved("saved_addresses", a.id)) {
+      setSavedAddresses((list) => list.filter((x) => x.id !== a.id));
+      if (addressId === a.id) setAddressId(null);
+    }
+  }
+
+  const country = NATIONALITIES.find((n) => n.code === contact.countryCode);
+  /** TBO takes one address line 2, so area / state / PIN are joined into it. */
+  const addressLine2 = [
+    contact.address2.trim(),
+    contact.state.trim(),
+    contact.pin.trim(),
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const fullAddress = [
+    contact.address1.trim(),
+    addressLine2,
+    contact.city.trim(),
+    country?.label,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  // India posts 6-digit PINs; elsewhere the code is free-form, so only length is checked.
+  const pinValid =
+    contact.countryCode === "IN"
+      ? /^\d{6}$/.test(contact.pin.trim())
+      : contact.pin.trim().length >= 3;
+
+  const totalFare =
+    quote?.publishedFare ?? Number(b.fare || 0) * (adults + children);
 
   const canSubmit = useMemo(() => {
     if (!quote?.ok || booking) return false;
-    if (!contact.phone.trim() || !contact.email.trim() || !contact.address.trim()) return false;
-    if (needGst && (!gst.GSTNumber.trim() || !gst.GSTCompanyName.trim())) return false;
+    if (!/^\d{10}$/.test(contact.phone.trim())) return false;
+    if (!contact.email.trim()) return false;
+    if (!contact.address1.trim() || !contact.city.trim() || !pinValid)
+      return false;
+    if (needGst && (!gst.GSTNumber.trim() || !gst.GSTCompanyName.trim()))
+      return false;
     return pax.every((p) => {
       if (!p.FirstName.trim() || p.LastName.trim().length < 2) return false;
       if ((p.PaxType === 2 || p.PaxType === 3) && !p.DateOfBirth) return false;
-      if (needPassport && (!p.PassportNo.trim() || !p.PassportExpiry)) return false;
+      if (needPassport && (!p.PassportNo.trim() || !p.PassportExpiry))
+        return false;
       if (needFullPassport && !p.PassportIssueDate) return false;
       if (needPan) {
         // Adult pax type enters their own PAN (the form has no guardian fields
@@ -167,7 +367,18 @@ export function BookingForm({
       }
       return true;
     });
-  }, [quote, booking, contact, gst, pax, needPassport, needFullPassport, needPan, needGst]);
+  }, [
+    quote,
+    booking,
+    contact,
+    gst,
+    pax,
+    needPassport,
+    needFullPassport,
+    needPan,
+    needGst,
+    pinValid,
+  ]);
 
   /** Shape passengers into TBO's Pax objects from the current form state. */
   function buildPassengers() {
@@ -183,18 +394,20 @@ export function BookingForm({
         ContactNo: contact.phone.trim(),
         CellCountryCode: "+91", // TBO rejects a bare "91"
         Email: contact.email.trim(),
-        AddressLine1: contact.address.trim(),
+        AddressLine1: contact.address1.trim(),
+        AddressLine2: addressLine2,
         City: contact.city.trim(),
-        CountryCode: "IN",
-        CountryName: "India",
-        Nationality: "IN",
+        CountryCode: contact.countryCode,
+        CountryName: country?.label ?? "India",
+        Nationality: contact.nationality,
       };
       if (p.PAN.trim()) out.PAN = p.PAN.trim().toUpperCase();
       if (needPassport) {
         out.PassportNo = p.PassportNo.trim();
         out.PassportExpiry = `${p.PassportExpiry}T00:00:00`;
-        if (p.PassportIssueDate) out.PassportIssueDate = `${p.PassportIssueDate}T00:00:00`;
-        out.PassportIssueCountryCode = "IN";
+        if (p.PassportIssueDate)
+          out.PassportIssueDate = `${p.PassportIssueDate}T00:00:00`;
+        out.PassportIssueCountryCode = contact.nationality;
       }
       // Child/infant PAN travels as the guardian's, per TBO.
       if (needPan && p.PaxType !== 1 && p.GuardianPAN.trim()) {
@@ -223,11 +436,24 @@ export function BookingForm({
       departDate: b.depart,
       isInternational: isIntl,
       passengers,
+      // Structured for the saved-address book only — TBO gets the folded version
+      // on each passenger (see buildPassengers).
+      billing: {
+        phone: contact.phone.trim(),
+        email: contact.email.trim(),
+        address1: contact.address1.trim(),
+        address2: contact.address2.trim(),
+        city: contact.city.trim(),
+        state: contact.state.trim(),
+        pin: contact.pin.trim(),
+        countryCode: contact.countryCode,
+        nationality: contact.nationality,
+      },
       gst: needGst
         ? {
             GSTCompanyName: gst.GSTCompanyName,
             GSTNumber: gst.GSTNumber,
-            GSTCompanyAddress: contact.address,
+            GSTCompanyAddress: fullAddress,
             GSTCompanyEmail: contact.email,
             GSTCompanyContactNumber: contact.phone,
           }
@@ -242,7 +468,10 @@ export function BookingForm({
    * server re-reads the order from Cashfree and refuses to ticket unless it is PAID
    * and bound to this itinerary — nothing the client claims here is trusted.
    */
-  async function sendToBook(passengers: ReturnType<typeof buildPassengers>, orderId: string | null) {
+  async function sendToBook(
+    passengers: ReturnType<typeof buildPassengers>,
+    orderId: string | null,
+  ) {
     try {
       const r = await fetch("/api/book", {
         method: "POST",
@@ -258,7 +487,10 @@ export function BookingForm({
       // Say so plainly rather than surfacing it as a booking failure.
       setBooked(
         parsed.unpaid
-          ? { ok: false, error: "Payment was not completed — you have not been charged." }
+          ? {
+              ok: false,
+              error: "Payment was not completed — you have not been charged.",
+            }
           : parsed,
       );
     } catch {
@@ -309,14 +541,21 @@ export function BookingForm({
       }
       order = await r.json();
     } catch {
-      setBooked({ ok: false, error: "Could not start payment. Please try again." });
+      setBooked({
+        ok: false,
+        error: "Could not start payment. Please try again.",
+      });
       setBooking(false);
       return;
     }
 
     if (!order.ok || !order.orderId || !order.paymentSessionId) {
       // Includes a 422 pre-charge validation failure (order.rule) — nothing was charged.
-      setBooked({ ok: false, error: order.error ?? "Could not start payment.", rule: order.rule });
+      setBooked({
+        ok: false,
+        error: order.error ?? "Could not start payment.",
+        rule: order.rule,
+      });
       setBooking(false);
       return;
     }
@@ -327,7 +566,11 @@ export function BookingForm({
       paymentSessionId: order.paymentSessionId,
     });
     if (!result) {
-      setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });
+      setBooked({
+        ok: false,
+        error:
+          "Could not load the payment window. Check your connection and retry.",
+      });
       setBooking(false);
       return;
     }
@@ -371,10 +614,16 @@ export function BookingForm({
     return (
       <div className="mx-auto max-w-xl rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-red" aria-hidden />
-        <h2 className="h-sm mb-1">{nextLeg ? "Outbound ticket confirmed" : "Ticket confirmed"}</h2>
-        <p className="mb-6 text-muted">
+        <h2 className="h-sm mb-1">
+          {nextLeg ? "Outbound ticket confirmed" : "Ticket confirmed"}
+        </h2>
+        <p className="mb-2 text-muted">
           {b.from} → {b.to} · {b.airline}
           {nextLeg ? " · now book your return to complete the round trip" : ""}
+        </p>
+        <p className="mb-6 inline-flex items-center gap-2 rounded-full bg-cream-2 px-4 py-2 text-[0.95rem] font-extrabold text-ink">
+          <CalendarDays size={16} className="text-red" aria-hidden />
+          {formatDateWithDay(b.depart)}
         </p>
         <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-[0.9rem]">
           <div className="flex justify-between gap-4 border-b border-line pb-2">
@@ -383,7 +632,9 @@ export function BookingForm({
           </div>
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Ticket number</dt>
-            <dd className="min-w-0 break-words text-right font-semibold text-ink">{booked.ticketNumbers?.join(", ") || booked.pnr}</dd>
+            <dd className="min-w-0 break-words text-right font-semibold text-ink">
+              {booked.ticketNumbers?.join(", ") || booked.pnr}
+            </dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Invoice</dt>
@@ -422,26 +673,50 @@ export function BookingForm({
       <div className="space-y-6">
         {quote.priceChanged && (
           <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
-            The airline re-priced this fare. The total below is the confirmed price.
+            The airline re-priced this fare. The total below is the confirmed
+            price.
           </p>
         )}
 
+        {quote.details && <FareEntitlements details={quote.details} />}
+
         {pax.map((p, i) => (
-          <div key={i} className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+          <div
+            key={i}
+            className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm"
+          >
             <h3 className="mb-4 text-[0.95rem] font-bold text-ink">
-              {TYPE_LABEL[p.PaxType]} {pax.filter((x) => x.PaxType === p.PaxType).indexOf(p) + 1}
-              {p.PaxType === 2 && <span className="ml-1 font-normal text-muted">(2–12 yrs)</span>}
-              {p.PaxType === 3 && <span className="ml-1 font-normal text-muted">(under 2 yrs)</span>}
+              {TYPE_LABEL[p.PaxType]}{" "}
+              {pax.filter((x) => x.PaxType === p.PaxType).indexOf(p) + 1}
+              {p.PaxType === 2 && (
+                <span className="ml-1 font-normal text-muted">(2–12 yrs)</span>
+              )}
+              {p.PaxType === 3 && (
+                <span className="ml-1 font-normal text-muted">
+                  (under 2 yrs)
+                </span>
+              )}
             </h3>
+
+            <SavedTravellerPicker
+              travellers={savedPax.filter((t) => t.pax_type === p.PaxType)}
+              onPick={(t) => applySavedTraveller(i, t)}
+              onForget={forgetTraveller}
+            />
 
             <div className="grid gap-3 sm:grid-cols-[6rem_1fr_1fr]">
               <div>
                 <label className={label}>Title</label>
-                <select className={field} value={p.Title} onChange={(e) => set(i, "Title", e.target.value)}>
+                <Select
+                  value={p.Title}
+                  onChange={(e) => set(i, "Title", e.target.value)}
+                >
                   {TITLES[p.PaxType].map((t) => (
-                    <option key={t}>{t}</option>
+                    <option key={t} value={t}>
+                      {TITLE_LABEL[t] ?? t}
+                    </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className={label}>First name</label>
@@ -449,7 +724,13 @@ export function BookingForm({
                   className={field}
                   value={p.FirstName}
                   maxLength={32}
-                  onChange={(e) => set(i, "FirstName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+                  onChange={(e) =>
+                    set(
+                      i,
+                      "FirstName",
+                      e.target.value.replace(/[^A-Za-z ]/g, ""),
+                    )
+                  }
                   placeholder="As on ID"
                 />
               </div>
@@ -460,7 +741,13 @@ export function BookingForm({
                   value={p.LastName}
                   maxLength={32}
                   minLength={2}
-                  onChange={(e) => set(i, "LastName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+                  onChange={(e) =>
+                    set(
+                      i,
+                      "LastName",
+                      e.target.value.replace(/[^A-Za-z ]/g, ""),
+                    )
+                  }
                   placeholder="As on ID (min 2 letters, no title)"
                 />
               </div>
@@ -469,24 +756,26 @@ export function BookingForm({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label className={label}>Gender</label>
-                <select
-                  className={field}
+                <Select
                   value={p.Gender}
-                  onChange={(e) => set(i, "Gender", Number(e.target.value) as 1 | 2)}
+                  onChange={(e) =>
+                    set(i, "Gender", Number(e.target.value) as 1 | 2)
+                  }
                 >
                   <option value={1}>Male</option>
                   <option value={2}>Female</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className={label}>
-                  Date of birth {p.PaxType !== 1 && <span className="text-red">*</span>}
+                  Date of birth{" "}
+                  {p.PaxType !== 1 && <span className="text-red">*</span>}
                 </label>
-                <input
-                  type="date"
-                  className={field}
+                <DateField
                   value={p.DateOfBirth}
-                  onChange={(e) => set(i, "DateOfBirth", e.target.value)}
+                  max={TODAY}
+                  onChange={(v) => set(i, "DateOfBirth", v)}
+                  aria-label={`${TYPE_LABEL[p.PaxType]} date of birth`}
                 />
               </div>
             </div>
@@ -495,25 +784,29 @@ export function BookingForm({
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <div>
                   <label className={label}>Passport no.</label>
-                  <input className={field} value={p.PassportNo} onChange={(e) => set(i, "PassportNo", e.target.value)} />
+                  <input
+                    className={field}
+                    value={p.PassportNo}
+                    onChange={(e) => set(i, "PassportNo", e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className={label}>Expiry</label>
-                  <input
-                    type="date"
-                    className={field}
+                  <DateField
                     value={p.PassportExpiry}
-                    onChange={(e) => set(i, "PassportExpiry", e.target.value)}
+                    min={TODAY}
+                    onChange={(v) => set(i, "PassportExpiry", v)}
+                    aria-label="Passport expiry date"
                   />
                 </div>
                 {needFullPassport && (
                   <div>
                     <label className={label}>Issue date</label>
-                    <input
-                      type="date"
-                      className={field}
+                    <DateField
                       value={p.PassportIssueDate}
-                      onChange={(e) => set(i, "PassportIssueDate", e.target.value)}
+                      max={TODAY}
+                      onChange={(v) => set(i, "PassportIssueDate", v)}
+                      aria-label="Passport issue date"
                     />
                   </div>
                 )}
@@ -529,36 +822,53 @@ export function BookingForm({
                       className={field}
                       autoCapitalize="characters"
                       value={p.PAN}
-                      onChange={(e) => set(i, "PAN", e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        set(i, "PAN", e.target.value.toUpperCase())
+                      }
                       placeholder="ABCDE1234F"
                       maxLength={10}
                     />
                   </div>
                 ) : (
-                  <div className="rounded-brand bg-mist p-3">
+                  <div className="rounded-brand bg-cream-2 p-3">
                     <p className="mb-2 text-[0.78rem] text-muted">
-                      Parent/guardian PAN is required for a {TYPE_LABEL[p.PaxType].toLowerCase()}.
+                      Parent/guardian PAN is required for a{" "}
+                      {TYPE_LABEL[p.PaxType].toLowerCase()}.
                     </p>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <input
                         className={field}
                         value={p.GuardianFirstName}
                         maxLength={32}
-                        onChange={(e) => set(i, "GuardianFirstName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+                        onChange={(e) =>
+                          set(
+                            i,
+                            "GuardianFirstName",
+                            e.target.value.replace(/[^A-Za-z ]/g, ""),
+                          )
+                        }
                         placeholder="Guardian first name"
                       />
                       <input
                         className={field}
                         value={p.GuardianLastName}
                         maxLength={32}
-                        onChange={(e) => set(i, "GuardianLastName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+                        onChange={(e) =>
+                          set(
+                            i,
+                            "GuardianLastName",
+                            e.target.value.replace(/[^A-Za-z ]/g, ""),
+                          )
+                        }
                         placeholder="Guardian last name"
                       />
                       <input
                         className={field}
                         autoCapitalize="characters"
                         value={p.GuardianPAN}
-                        onChange={(e) => set(i, "GuardianPAN", e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          set(i, "GuardianPAN", e.target.value.toUpperCase())
+                        }
                         placeholder="Guardian PAN"
                         maxLength={10}
                       />
@@ -570,44 +880,188 @@ export function BookingForm({
           </div>
         ))}
 
-        {/* ── contact ── */}
+        {/* ── contact + billing address ── */}
         <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-          <h3 className="mb-4 text-[0.95rem] font-bold text-ink">Contact details</h3>
+          <h3 className="mb-1 text-[0.95rem] font-bold text-ink">
+            Contact details
+          </h3>
+          <p className="mb-4 text-[0.78rem] text-muted">
+            Your ticket and invoice go to this email. The airline uses the
+            mobile number for schedule changes.
+          </p>
+
+          <SavedAddressPicker
+            addresses={savedAddresses}
+            selectedId={addressId}
+            onPick={applySavedAddress}
+            onNew={() => {
+              setAddressId(null);
+              setContact((c) => ({
+                ...c,
+                phone: "",
+                email: contactEmail,
+                address1: "",
+                address2: "",
+                city: "",
+                state: "",
+                pin: "",
+              }));
+            }}
+            onForget={forgetAddress}
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className={label}>Mobile</label>
+              <label className={label}>
+                Mobile <span className="text-red">*</span>
+              </label>
               <div className="flex gap-2">
-                <span className="grid place-items-center rounded-brand border border-line bg-mist px-3 text-[0.9rem] text-muted">
+                <span className="grid place-items-center rounded-brand border border-line bg-cream-2 px-3 text-[0.9rem] text-muted">
                   +91
                 </span>
                 <input
                   className={field}
                   type="tel"
-                  inputMode="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={contact.phone}
-                  onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+                  onChange={(e) =>
+                    updateContact({
+                      phone: e.target.value.replace(/\D/g, "").slice(0, 10),
+                    })
+                  }
                   placeholder="9876543210"
                 />
               </div>
             </div>
             <div>
-              <label className={label}>Email</label>
+              <label className={label}>
+                Email <span className="text-red">*</span>
+              </label>
               <input
                 className={field}
                 type="email"
                 value={contact.email}
-                onChange={(e) => setContact({ ...contact, email: e.target.value })}
+                onChange={(e) => updateContact({ email: e.target.value })}
+                placeholder="you@example.com"
+              />
+            </div>
+          </div>
+
+          <h4 className="mb-1 mt-6 text-[0.95rem] font-bold text-ink">
+            Billing address
+          </h4>
+          <p className="mb-4 text-[0.78rem] text-muted">
+            As on the card you will pay with. This address prints on your GST
+            invoice.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className={label}>
+                Address line 1 <span className="text-red">*</span>
+              </label>
+              <input
+                className={field}
+                value={contact.address1}
+                maxLength={64}
+                onChange={(e) => updateContact({ address1: e.target.value })}
+                placeholder="Flat / house no., building, street"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className={label}>Address</label>
+              <label className={label}>Address line 2</label>
               <input
                 className={field}
-                value={contact.address}
-                onChange={(e) => setContact({ ...contact, address: e.target.value })}
-                placeholder="Street, area"
+                value={contact.address2}
+                maxLength={64}
+                onChange={(e) => updateContact({ address2: e.target.value })}
+                placeholder="Area, locality, landmark (optional)"
               />
             </div>
+            <div>
+              <label className={label}>
+                City <span className="text-red">*</span>
+              </label>
+              <input
+                className={field}
+                value={contact.city}
+                maxLength={32}
+                onChange={(e) => updateContact({ city: e.target.value })}
+                placeholder="Ahmedabad"
+              />
+            </div>
+            <div>
+              <label className={label}>State</label>
+              <input
+                className={field}
+                value={contact.state}
+                maxLength={32}
+                onChange={(e) => updateContact({ state: e.target.value })}
+                placeholder="Gujarat"
+              />
+            </div>
+            <div>
+              <label className={label}>
+                PIN / postal code <span className="text-red">*</span>
+              </label>
+              <input
+                className={field}
+                inputMode={contact.countryCode === "IN" ? "numeric" : "text"}
+                maxLength={10}
+                value={contact.pin}
+                onChange={(e) =>
+                  updateContact({
+                    pin:
+                      contact.countryCode === "IN"
+                        ? e.target.value.replace(/\D/g, "").slice(0, 6)
+                        : e.target.value,
+                  })
+                }
+                placeholder={
+                  contact.countryCode === "IN" ? "380015" : "Postal code"
+                }
+              />
+              {contact.pin.trim() !== "" && !pinValid && (
+                <p className="mt-1 text-[0.72rem] font-medium text-red">
+                  {contact.countryCode === "IN"
+                    ? "An Indian PIN code is exactly 6 digits."
+                    : "Enter a valid postal code."}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className={label}>
+                Country <span className="text-red">*</span>
+              </label>
+              <Select
+                value={contact.countryCode}
+                onChange={(e) =>
+                  updateContact({ countryCode: e.target.value, pin: "" })
+                }
+              >
+                {NATIONALITIES.map((n) => (
+                  <option key={n.code} value={n.code}>
+                    {n.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {needPassport && (
+              <div className="sm:col-span-2">
+                <label className={label}>Nationality (as on passport)</label>
+                <Select
+                  value={contact.nationality}
+                  onChange={(e) =>
+                    updateContact({ nationality: e.target.value })
+                  }
+                >
+                  {NATIONALITIES.map((n) => (
+                    <option key={n.code} value={n.code}>
+                      {n.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
           </div>
 
           {needGst && (
@@ -617,7 +1071,9 @@ export function BookingForm({
                 <input
                   className={field}
                   value={gst.GSTCompanyName}
-                  onChange={(e) => setGst({ ...gst, GSTCompanyName: e.target.value })}
+                  onChange={(e) =>
+                    setGst({ ...gst, GSTCompanyName: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -625,7 +1081,9 @@ export function BookingForm({
                 <input
                   className={field}
                   value={gst.GSTNumber}
-                  onChange={(e) => setGst({ ...gst, GSTNumber: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    setGst({ ...gst, GSTNumber: e.target.value.toUpperCase() })
+                  }
                 />
               </div>
             </div>
@@ -642,16 +1100,48 @@ export function BookingForm({
       {/* ── summary ── */}
       <aside className="lg:sticky lg:top-28 lg:self-start">
         <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-          <h3 className="mb-3 text-[0.95rem] font-bold text-ink">{b.airline}</h3>
+          <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
+            {b.airline}
+          </h3>
           <p className="text-[0.85rem] text-muted">
             {b.from} → {b.to}
           </p>
-          <p className="mb-4 text-[0.85rem] text-muted">
-            {formatDate(b.depart)} · {b.flightNo}
+          <p className="text-[0.9rem] font-bold text-ink">
+            {formatDateWithDay(b.depart)}
           </p>
+          <p className="mb-3 text-[0.8rem] text-muted">{b.flightNo}</p>
+          {quote.details?.segments.length ? (
+            <BaggageSummary
+              className="mb-4"
+              checkedIn={weakestAllowance(
+                quote.details.segments.map((s) => s.checkedIn),
+              )}
+              cabin={weakestAllowance(
+                quote.details.segments.map((s) => s.cabin),
+              )}
+            />
+          ) : null}
+          {quote.details?.fare && (
+            <dl className="space-y-1 border-t border-line pt-3 text-[0.8rem]">
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted">Base fare</dt>
+                <dd className="tabular-nums text-ink">
+                  ₹{inr.format(quote.details.fare.base)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted">Taxes &amp; surcharges</dt>
+                <dd className="tabular-nums text-ink">
+                  ₹{inr.format(quote.details.fare.tax)}
+                </dd>
+              </div>
+            </dl>
+          )}
           <div className="flex items-baseline justify-between border-t border-line pt-3">
             <span className="text-[0.85rem] text-muted">Total</span>
-            <span className="text-[1.35rem] font-extrabold text-navy">₹{inr.format(totalFare)}</span>
+            <span className="text-[1.35rem] font-extrabold text-navy">
+              ₹{inr.format(totalFare)}
+            </span>
           </div>
           <p className="mb-4 text-[0.72rem] text-muted">
             {adults} adult{adults > 1 ? "s" : ""}
@@ -667,14 +1157,16 @@ export function BookingForm({
           >
             {booking ? (
               <>
-                <Loader2 size={15} className="animate-spin" aria-hidden /> Processing…
+                <Loader2 size={15} className="animate-spin" aria-hidden />{" "}
+                Processing…
               </>
             ) : (
               <>Pay ₹{inr.format(totalFare)} & issue ticket</>
             )}
           </button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-[0.72rem] text-muted">
-            <ShieldCheck size={13} aria-hidden /> Secure payment via Cashfree · ticket issued on success
+            <ShieldCheck size={13} aria-hidden /> Secure payment via Cashfree ·
+            ticket issued on success
           </p>
         </div>
       </aside>
@@ -683,8 +1175,12 @@ export function BookingForm({
           screens, so surface the total + CTA without scrolling past it. */}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">Total</p>
-          <p className="truncate text-[1.05rem] font-extrabold text-navy">₹{inr.format(totalFare)}</p>
+          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+            Total
+          </p>
+          <p className="truncate text-[1.05rem] font-extrabold text-navy">
+            ₹{inr.format(totalFare)}
+          </p>
         </div>
         <button
           type="button"
@@ -694,7 +1190,8 @@ export function BookingForm({
         >
           {booking ? (
             <>
-              <Loader2 size={15} className="animate-spin" aria-hidden /> Processing…
+              <Loader2 size={15} className="animate-spin" aria-hidden />{" "}
+              Processing…
             </>
           ) : (
             <>Pay &amp; issue ticket</>

@@ -2,6 +2,7 @@ import { bookFlight } from "@/lib/tbo-book";
 import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request";
 import { getUser } from "@/lib/supabase/server";
 import { saveBookingHistory } from "@/lib/booking-history";
+import { saveTravelProfile } from "@/lib/travel-profile";
 import {
   emailConfigured,
   sendEmail,
@@ -161,7 +162,13 @@ export async function POST(req: Request) {
   if (result.ok) {
     try {
       const user = await getUser();
-      if (user) await saveBookingHistory(user.id, bookingReq, result, payment ?? undefined);
+      if (user) {
+        await saveBookingHistory(user.id, bookingReq, result, payment ?? undefined);
+        // Remember the travellers + billing address for a one-tap next checkout.
+        // Separate from the history mirror above so a failure in either is
+        // contained; both are best-effort and neither can fail a paid ticket.
+        await saveTravelProfile(user.id, bookingReq, body.billing);
+      }
     } catch (e) {
       console.error("[api/book] booking-history write failed (ticket unaffected):", e);
     }

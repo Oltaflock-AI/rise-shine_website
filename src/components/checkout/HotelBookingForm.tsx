@@ -2,11 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
-import { BadgeCheck, CheckCircle2, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  BadgeCheck,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BookingDetailCheck } from "./BookingDetailCheck";
 import { formatDate } from "@/lib/format-date";
-import { openCashfreeCheckout, type CashfreeMode } from "@/lib/cashfree-checkout";
+import { cn } from "@/lib/cn";
+import { controlClass, DateField, Select } from "@/components/ui/form-controls";
+import {
+  openCashfreeCheckout,
+  type CashfreeMode,
+} from "@/lib/cashfree-checkout";
 
 // ── quote/booked shapes (subset of the API responses) ──
 type Validation = {
@@ -24,12 +35,21 @@ type Quote = {
   currency?: string;
   isPriceChanged?: boolean;
   isCancellationPolicyChanged?: boolean;
-  cancelPolicies?: { fromDate: string; chargeType?: string | number; charge: number }[];
+  cancelPolicies?: {
+    fromDate: string;
+    chargeType?: string | number;
+    charge: number;
+  }[];
   mealType?: string;
   inclusion?: string;
   rateConditions?: string[];
   roomPromotions?: string[];
-  supplements?: { type?: string; description?: string; price?: number; currency?: string }[];
+  supplements?: {
+    type?: string;
+    description?: string;
+    price?: number;
+    currency?: string;
+  }[];
   amenities?: string[];
   lastCancellationDeadline?: string;
   validation?: Validation;
@@ -50,11 +70,15 @@ type Booked = {
 
 // TBO's hotel API accepts only these three guest titles (no Miss/Mstr).
 const TITLES = ["Mr", "Mrs", "Ms"];
+const TODAY = new Date().toISOString().slice(0, 10);
 
 // TBO Book rejects special characters in names and caps length (default 25,
 // or the rate's ValidationInfo range) — enforce while typing, server re-checks.
 function cleanName(raw: string, v?: Validation): string {
-  return raw.replace(/[^A-Za-z ]/g, "").replace(/ {2,}/g, " ").slice(0, v?.paxNameMaxLength ?? 25);
+  return raw
+    .replace(/[^A-Za-z ]/g, "")
+    .replace(/ {2,}/g, " ")
+    .slice(0, v?.paxNameMaxLength ?? 25);
 }
 
 type Guest = {
@@ -73,7 +97,13 @@ type Guest = {
   passportExp: string;
 };
 
-export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string>; contactEmail: string }) {
+export function HotelBookingForm({
+  b,
+  contactEmail,
+}: {
+  b: Record<string, string>;
+  contactEmail: string;
+}) {
   const rooms = Math.max(1, Number(b.rooms || 1));
   const adults = Math.max(1, Number(b.adults || 2));
   // Children per room, carried from the search (ages comma-joined).
@@ -85,7 +115,11 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [guests, setGuests] = useState<Guest[]>(() => {
-    const blank = (roomIndex: number, lead: boolean, childAge?: number): Guest => ({
+    const blank = (
+      roomIndex: number,
+      lead: boolean,
+      childAge?: number,
+    ): Guest => ({
       roomIndex,
       lead,
       childAge,
@@ -115,11 +149,21 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     fetch("/api/hotels/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookingCode: b.bookingCode, ...(b.cc ? { destinationCountry: b.cc } : {}) }),
+      body: JSON.stringify({
+        bookingCode: b.bookingCode,
+        ...(b.cc ? { destinationCountry: b.cc } : {}),
+      }),
     })
       .then((r) => r.json())
       .then((j) => alive && setQuote(j as Quote))
-      .catch(() => alive && setQuote({ ok: false, error: "Could not confirm this rate. Please try again." }));
+      .catch(
+        () =>
+          alive &&
+          setQuote({
+            ok: false,
+            error: "Could not confirm this rate. Please try again.",
+          }),
+      );
     return () => {
       alive = false;
     };
@@ -146,7 +190,10 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     setGuests((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
 
   function buildRooms() {
-    const byRoom: Array<{ passengers: Record<string, unknown>[] }> = Array.from({ length: rooms }, () => ({ passengers: [] }));
+    const byRoom: Array<{ passengers: Record<string, unknown>[] }> = Array.from(
+      { length: rooms },
+      () => ({ passengers: [] }),
+    );
     for (const g of guests) {
       // TBO Book treats ≤12 as a Child (PaxType 2, Age required); older
       // "children" from the search ride as adults.
@@ -161,7 +208,11 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         ...(g.lead ? { email: g.email.trim(), phone: g.phone.trim() } : {}),
         ...(g.pan.trim() ? { pan: g.pan.trim().toUpperCase() } : {}),
         ...(g.passportNo.trim()
-          ? { passportNo: g.passportNo.trim(), passportIssueDate: g.passportIssue, passportExpDate: g.passportExp }
+          ? {
+              passportNo: g.passportNo.trim(),
+              passportIssueDate: g.passportIssue,
+              passportExpDate: g.passportExp,
+            }
           : {}),
       });
     }
@@ -178,7 +229,12 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       rooms: buildRooms(),
       validation: v,
       // Display context mirrored into the customer's account view.
-      stay: { hotelName: b.hotel, city: b.city, checkIn: b.checkIn, checkOut: b.checkOut },
+      stay: {
+        hotelName: b.hotel,
+        city: b.city,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+      },
     };
   }
 
@@ -206,7 +262,10 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       if (parsed.ok) trackEvent("booking_confirmed", { kind: "hotel" });
       setBooked(
         parsed.unpaid
-          ? { ok: false, error: "Payment was not completed — you have not been charged." }
+          ? {
+              ok: false,
+              error: "Payment was not completed — you have not been charged.",
+            }
           : parsed,
       );
     } catch {
@@ -221,9 +280,18 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     // Light client check; the order route re-validates authoritatively before charging.
     const firstNames = new Set<string>();
     for (const g of guests) {
-      if (!g.first.trim() || !g.last.trim()) return setBooked({ ok: false, rule: true, error: "Every guest needs a first and last name." });
+      if (!g.first.trim() || !g.last.trim())
+        return setBooked({
+          ok: false,
+          rule: true,
+          error: "Every guest needs a first and last name.",
+        });
       if (g.lead && (!g.email.trim() || !g.phone.trim()))
-        return setBooked({ ok: false, rule: true, error: "Each room's lead guest needs an email and phone." });
+        return setBooked({
+          ok: false,
+          rule: true,
+          error: "Each room's lead guest needs an email and phone.",
+        });
       // TBO accepts only one guest per first name on a booking, whatever the surname.
       const first = g.first.trim().toUpperCase();
       if (firstNames.has(first))
@@ -259,7 +327,9 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         // on TBO's certification hosts an unpaid booking is the intended flow, while
         // against live credentials it would hold a real room on agency credit with no
         // money collected — so there the booking stops here.
-        const j = (await r.json().catch(() => ({}))) as { unpaidBookingAllowed?: boolean };
+        const j = (await r.json().catch(() => ({}))) as {
+          unpaidBookingAllowed?: boolean;
+        };
         if (j.unpaidBookingAllowed) {
           await sendToBook(null);
           return;
@@ -274,14 +344,21 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       }
       order = await r.json();
     } catch {
-      setBooked({ ok: false, error: "Could not start payment. Please try again." });
+      setBooked({
+        ok: false,
+        error: "Could not start payment. Please try again.",
+      });
       setBooking(false);
       return;
     }
 
     if (!order.ok || !order.orderId || !order.paymentSessionId) {
       // Includes a 422 pre-charge validation failure — nothing was charged.
-      setBooked({ ok: false, error: order.error ?? "Could not start payment.", rule: Boolean(order.rule) });
+      setBooked({
+        ok: false,
+        error: order.error ?? "Could not start payment.",
+        rule: Boolean(order.rule),
+      });
       setBooking(false);
       return;
     }
@@ -292,7 +369,11 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       paymentSessionId: order.paymentSessionId,
     });
     if (!result) {
-      setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });
+      setBooked({
+        ok: false,
+        error:
+          "Could not load the payment window. Check your connection and retry.",
+      });
       setBooking(false);
       return;
     }
@@ -312,7 +393,8 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     return (
       <div className="grid min-h-[40vh] place-items-center">
         <span className="inline-flex items-center gap-2 text-muted">
-          <Loader2 className="animate-spin text-red" size={18} aria-hidden /> Confirming this rate with the hotel…
+          <Loader2 className="animate-spin text-red" size={18} aria-hidden />{" "}
+          Confirming this rate with the hotel…
         </span>
       </div>
     );
@@ -342,22 +424,29 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-[0.9rem]">
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Confirmation no.</dt>
-            <dd className="font-bold tracking-wide text-navy">{booked.confirmationNo || "—"}</dd>
+            <dd className="font-bold tracking-wide text-navy">
+              {booked.confirmationNo || "—"}
+            </dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Booking ref</dt>
-            <dd className="font-semibold text-ink">{booked.bookingRefNo || booked.bookingId || "—"}</dd>
+            <dd className="font-semibold text-ink">
+              {booked.bookingRefNo || booked.bookingId || "—"}
+            </dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Status</dt>
             <dd className="inline-flex items-center gap-1 font-semibold text-ink">
-              <BadgeCheck size={14} className="text-red" aria-hidden /> Confirmed
+              <BadgeCheck size={14} className="text-red" aria-hidden />{" "}
+              Confirmed
             </dd>
           </div>
         </dl>
         {/* TBO checkpoint 38: re-read the booking from GetBookingDetail 120s
             after Book and show the guest that settled status. */}
-        {booked.bookingId ? <BookingDetailCheck bookingId={booked.bookingId} /> : null}
+        {booked.bookingId ? (
+          <BookingDetailCheck bookingId={booked.bookingId} />
+        ) : null}
         <div className="flex flex-wrap justify-center gap-3">
           {booked.bookingId ? (
             <Button href={`/hotels/voucher/${booked.bookingId}`} arrow>
@@ -378,12 +467,14 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
       <div className="space-y-6">
         {quote.isPriceChanged && (
           <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
-            The hotel re-priced this rate. The total shown is the confirmed price.
+            The hotel re-priced this rate. The total shown is the confirmed
+            price.
           </p>
         )}
         {quote.isCancellationPolicyChanged && (
           <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.85rem] text-ink">
-            The cancellation policy for this rate was updated — please review it below before paying.
+            The cancellation policy for this rate was updated — please review it
+            below before paying.
           </p>
         )}
 
@@ -393,40 +484,56 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         <RateTerms quote={quote} />
 
         {Array.from({ length: rooms }).map((_, r) => (
-          <div key={r} className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-            <h3 className="mb-4 text-[0.95rem] font-bold text-ink">Room {r + 1}</h3>
+          <div
+            key={r}
+            className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm"
+          >
+            <h3 className="mb-4 text-[0.95rem] font-bold text-ink">
+              Room {r + 1}
+            </h3>
             <div className="space-y-4">
               {guests.map((g, i) =>
                 g.roomIndex !== r ? null : (
-                  <div key={i} className="border-t border-dashed border-line pt-4 first:border-0 first:pt-0">
+                  <div
+                    key={i}
+                    className="border-t border-dashed border-line pt-4 first:border-0 first:pt-0"
+                  >
                     <p className="mb-2 text-[0.8rem] font-semibold text-muted">
-                      Guest {guests.filter((x) => x.roomIndex === r).indexOf(g) + 1}
-                      {g.childAge != null && <span className="ml-1">· Child ({g.childAge} yrs)</span>}
-                      {g.lead && <span className="ml-1 text-red">· Lead (contact)</span>}
+                      Guest{" "}
+                      {guests.filter((x) => x.roomIndex === r).indexOf(g) + 1}
+                      {g.childAge != null && (
+                        <span className="ml-1">· Child ({g.childAge} yrs)</span>
+                      )}
+                      {g.lead && (
+                        <span className="ml-1 text-red">· Lead (contact)</span>
+                      )}
                     </p>
                     <div className="grid gap-3 sm:grid-cols-[6rem_1fr_1fr]">
-                      <select
+                      <Select
                         value={g.title}
                         onChange={(e) => setGuest(i, { title: e.target.value })}
-                        className="rounded-brand border border-line bg-white px-3 py-2.5 text-base text-ink"
                         aria-label="Title"
                       >
                         {TITLES.map((t) => (
                           <option key={t}>{t}</option>
                         ))}
-                      </select>
+                      </Select>
                       <input
                         value={g.first}
-                        onChange={(e) => setGuest(i, { first: cleanName(e.target.value, v) })}
+                        onChange={(e) =>
+                          setGuest(i, { first: cleanName(e.target.value, v) })
+                        }
                         placeholder="First name"
-                        className="rounded-brand border border-line px-3 py-2.5 text-base"
+                        className={controlClass}
                         aria-label="First name"
                       />
                       <input
                         value={g.last}
-                        onChange={(e) => setGuest(i, { last: cleanName(e.target.value, v) })}
+                        onChange={(e) =>
+                          setGuest(i, { last: cleanName(e.target.value, v) })
+                        }
                         placeholder="Last name"
-                        className="rounded-brand border border-line px-3 py-2.5 text-base"
+                        className={controlClass}
                         aria-label="Last name"
                       />
                     </div>
@@ -436,17 +543,21 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                         <input
                           type="email"
                           value={g.email}
-                          onChange={(e) => setGuest(i, { email: e.target.value })}
+                          onChange={(e) =>
+                            setGuest(i, { email: e.target.value })
+                          }
                           placeholder="Email"
-                          className="rounded-brand border border-line px-3 py-2.5 text-base"
+                          className={controlClass}
                           aria-label="Email"
                         />
                         <input
                           type="tel"
                           value={g.phone}
-                          onChange={(e) => setGuest(i, { phone: e.target.value })}
+                          onChange={(e) =>
+                            setGuest(i, { phone: e.target.value })
+                          }
                           placeholder="Phone"
-                          className="rounded-brand border border-line px-3 py-2.5 text-base"
+                          className={controlClass}
                           aria-label="Phone"
                         />
                       </div>
@@ -455,10 +566,12 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                     {v?.panMandatory && (
                       <input
                         value={g.pan}
-                        onChange={(e) => setGuest(i, { pan: e.target.value.toUpperCase() })}
+                        onChange={(e) =>
+                          setGuest(i, { pan: e.target.value.toUpperCase() })
+                        }
                         placeholder="PAN (AAAAA9999A)"
                         maxLength={10}
-                        className="mt-3 w-full rounded-brand border border-line px-3 py-2.5 text-base uppercase"
+                        className={cn(controlClass, "mt-3 uppercase")}
                         aria-label="PAN"
                       />
                     )}
@@ -467,23 +580,27 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                       <div className="mt-3 grid gap-3 sm:grid-cols-3">
                         <input
                           value={g.passportNo}
-                          onChange={(e) => setGuest(i, { passportNo: e.target.value })}
+                          onChange={(e) =>
+                            setGuest(i, { passportNo: e.target.value })
+                          }
                           placeholder="Passport no."
-                          className="rounded-brand border border-line px-3 py-2.5 text-base"
+                          className={controlClass}
                           aria-label="Passport number"
                         />
-                        <input
-                          type="date"
+                        <DateField
                           value={g.passportIssue}
-                          onChange={(e) => setGuest(i, { passportIssue: e.target.value })}
-                          className="rounded-brand border border-line px-3 py-2.5 text-base"
+                          max={TODAY}
+                          onChange={(val) =>
+                            setGuest(i, { passportIssue: val })
+                          }
+                          placeholder="Issued (dd-mm-yy)"
                           aria-label="Passport issue date"
                         />
-                        <input
-                          type="date"
+                        <DateField
                           value={g.passportExp}
-                          onChange={(e) => setGuest(i, { passportExp: e.target.value })}
-                          className="rounded-brand border border-line px-3 py-2.5 text-base"
+                          min={TODAY}
+                          onChange={(val) => setGuest(i, { passportExp: val })}
+                          placeholder="Expires (dd-mm-yy)"
                           aria-label="Passport expiry date"
                         />
                       </div>
@@ -497,20 +614,29 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
 
         {v?.panMandatory && (
           <p className="text-[0.8rem] text-muted">
-            This rate requires PAN{v.panCountRequired && v.panCountRequired > 1 ? ` (${v.panCountRequired} guests)` : ""} per TBO rules.
+            This rate requires PAN
+            {v.panCountRequired && v.panCountRequired > 1
+              ? ` (${v.panCountRequired} guests)`
+              : ""}{" "}
+            per TBO rules.
           </p>
         )}
       </div>
 
       {/* ── summary / pay ── */}
       <aside className="h-fit rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm lg:sticky lg:top-24">
-        <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Price summary</h3>
+        <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
+          Price summary
+        </h3>
         <div className="flex items-baseline justify-between border-b border-line pb-3">
           <span className="text-muted">Total</span>
-          <span className="text-[1.4rem] font-extrabold text-navy">{money.format(amountInr)}</span>
+          <span className="text-[1.4rem] font-extrabold text-navy">
+            {money.format(amountInr)}
+          </span>
         </div>
         <p className="mt-2 text-[0.75rem] text-muted">
-          {b.nights} night{Number(b.nights) > 1 ? "s" : ""} · {rooms} room{rooms > 1 ? "s" : ""} · taxes included
+          {b.nights} night{Number(b.nights) > 1 ? "s" : ""} · {rooms} room
+          {rooms > 1 ? "s" : ""} · taxes included
         </p>
 
         {booked && !booked.ok && (
@@ -527,14 +653,16 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         >
           {booking ? (
             <>
-              <Loader2 className="animate-spin" size={16} aria-hidden /> Processing…
+              <Loader2 className="animate-spin" size={16} aria-hidden />{" "}
+              Processing…
             </>
           ) : (
             <>Pay &amp; Book</>
           )}
         </button>
         <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[0.72rem] text-muted">
-          <ShieldCheck size={12} aria-hidden /> Secure payment · confirmed instantly
+          <ShieldCheck size={12} aria-hidden /> Secure payment · confirmed
+          instantly
         </p>
       </aside>
 
@@ -542,8 +670,12 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
           screens, so surface the total + CTA without scrolling past it. */}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">Total</p>
-          <p className="truncate text-[1.05rem] font-extrabold text-navy">{money.format(amountInr)}</p>
+          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+            Total
+          </p>
+          <p className="truncate text-[1.05rem] font-extrabold text-navy">
+            {money.format(amountInr)}
+          </p>
         </div>
         <button
           type="button"
@@ -553,7 +685,8 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
         >
           {booking ? (
             <>
-              <Loader2 className="animate-spin" size={16} aria-hidden /> Processing…
+              <Loader2 className="animate-spin" size={16} aria-hidden />{" "}
+              Processing…
             </>
           ) : (
             <>Pay &amp; Book</>
@@ -570,11 +703,15 @@ function tboDateToISO(s: string): string {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 }
 
-function cancelCharge(p: NonNullable<Quote["cancelPolicies"]>[number], currency: string): string {
+function cancelCharge(
+  p: NonNullable<Quote["cancelPolicies"]>[number],
+  currency: string,
+): string {
   const t = String(p.chargeType ?? "").toLowerCase();
   if (p.charge <= 0) return "Free cancellation";
   if (t === "2" || t === "percentage") return `${p.charge}% of the fare`;
-  if (t === "3" || t === "nights") return `${p.charge} night${p.charge > 1 ? "s" : ""}' charge`;
+  if (t === "3" || t === "nights")
+    return `${p.charge} night${p.charge > 1 ? "s" : ""}' charge`;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
@@ -602,11 +739,14 @@ function RateTerms({ quote }: { quote: Quote }) {
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-      <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Room &amp; rate terms</h3>
+      <h3 className="mb-3 text-[0.95rem] font-bold text-ink">
+        Room &amp; rate terms
+      </h3>
       <div className="space-y-3 text-[0.83rem] text-ink">
         {quote.mealType && (
           <p>
-            <span className="font-semibold">Meal plan:</span> {quote.mealType.replace(/_/g, " ")}
+            <span className="font-semibold">Meal plan:</span>{" "}
+            {quote.mealType.replace(/_/g, " ")}
           </p>
         )}
         {quote.inclusion && (
@@ -616,12 +756,15 @@ function RateTerms({ quote }: { quote: Quote }) {
         )}
         {promos.length > 0 && (
           <p>
-            <span className="font-semibold">Promotion:</span> {promos.join(" · ")}
+            <span className="font-semibold">Promotion:</span>{" "}
+            {promos.join(" · ")}
           </p>
         )}
         {supplements.length > 0 && (
           <div className="rounded-brand border border-red/30 bg-red/5 px-3 py-2">
-            <p className="font-semibold">Payable at the hotel (not included in this total):</p>
+            <p className="font-semibold">
+              Payable at the hotel (not included in this total):
+            </p>
             <ul className="mt-1 list-disc pl-5">
               {supplements.map((s, i) => (
                 <li key={i}>
@@ -634,7 +777,9 @@ function RateTerms({ quote }: { quote: Quote }) {
                         currency: s.currency || currency,
                         maximumFractionDigits: 2,
                       }).format(s.price)}
-                      {s.currency && s.currency !== "INR" && " (hotel's local currency)"}
+                      {s.currency &&
+                        s.currency !== "INR" &&
+                        " (hotel's local currency)"}
                     </>
                   )}
                 </li>
@@ -650,7 +795,8 @@ function RateTerms({ quote }: { quote: Quote }) {
                 const iso = tboDateToISO(p.fromDate);
                 return (
                   <li key={i}>
-                    From {iso ? formatDate(iso) : p.fromDate}: {cancelCharge(p, currency)}
+                    From {iso ? formatDate(iso) : p.fromDate}:{" "}
+                    {cancelCharge(p, currency)}
                   </li>
                 );
               })}
@@ -665,14 +811,18 @@ function RateTerms({ quote }: { quote: Quote }) {
         )}
         {quote.lastCancellationDeadline && (
           <p className="text-muted">
-            <span className="font-semibold text-ink">Last cancellation deadline:</span>{" "}
+            <span className="font-semibold text-ink">
+              Last cancellation deadline:
+            </span>{" "}
             {quote.lastCancellationDeadline} (UTC)
           </p>
         )}
         <div>
           <p className="font-semibold">Rate conditions:</p>
           {conditions.length === 0 ? (
-            <p className="mt-1 text-muted">The hotel returns no additional rate conditions for this rate.</p>
+            <p className="mt-1 text-muted">
+              The hotel returns no additional rate conditions for this rate.
+            </p>
           ) : (
             <ul className="mt-1 list-disc pl-5 text-muted">
               {shown.map((c, i) => (
@@ -681,8 +831,14 @@ function RateTerms({ quote }: { quote: Quote }) {
             </ul>
           )}
           {conditions.length > 3 && (
-            <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 font-semibold text-red">
-              {showAll ? "Show fewer conditions" : `Show all ${conditions.length} conditions`}
+            <button
+              type="button"
+              onClick={() => setShowAll((s) => !s)}
+              className="mt-1 font-semibold text-red"
+            >
+              {showAll
+                ? "Show fewer conditions"
+                : `Show all ${conditions.length} conditions`}
             </button>
           )}
         </div>

@@ -11,6 +11,7 @@
  */
 import { TboValidationError, validateSearch } from "./tbo-validate";
 import { tboFetch } from "./tbo-fetch";
+import { todayInIndiaISO } from "./stay-dates";
 
 // Live and staging are wholly different hosts, not just different credentials, so
 // both bases are env-driven. Unset = staging. Live (issued 2026-08-11):
@@ -60,6 +61,33 @@ export type FlightSegment = {
   baggage: string;
   /** Cabin allowance, e.g. "7 KG" (empty when unknown). */
   cabinBaggage: string;
+  /** Cabin of travel, e.g. "Economy" (empty when TBO omits the code). */
+  cabinClass: string;
+  /** Booking/fare class letter, e.g. "T" (empty when unknown). */
+  fareClass: string;
+  /** Operating carrier code when the flight is code-shared (empty otherwise). */
+  operatedBy: string;
+};
+
+/**
+ * One penalty row from TBO's MiniFareRules: what the airline charges to cancel or
+ * change this fare, and in which window before departure. This is the closest thing
+ * TBO gives to a plain-language refund policy, so it is surfaced verbatim — never
+ * summarised into a single "refundable / non-refundable" word.
+ */
+export type MiniFareRule = {
+  /** "Cancellation" | "Reissue" | "No Show" — TBO's own wording. */
+  type: string;
+  /** Sector the rule applies to, e.g. "DEL-BOM". */
+  journey: string;
+  /** Window start, in `unit` before departure ("" when the row has no window). */
+  from: string;
+  /** Window end, in `unit` before departure. */
+  to: string;
+  /** "HOURS" | "DAYS" | "" */
+  unit: string;
+  /** The charge itself, e.g. "INR 3000" or "100%". */
+  details: string;
 };
 
 export type FlightOffer = {
@@ -74,6 +102,10 @@ export type FlightOffer = {
   baseINR: number;
   taxINR: number;
   segments: FlightSegment[];
+  /** Airline's own inclusion list, e.g. ["Cabin Baggage Included", "Reissue fees apply"]. */
+  fareInclusions: string[];
+  /** Cancellation / date-change penalties as TBO reports them (may be empty). */
+  miniRules: MiniFareRule[];
 };
 
 export type FlightSearch = {
@@ -135,18 +167,40 @@ export async function getAuthToken(force = false): Promise<string | null> {
 }
 
 type RawSeg = {
-  Airline?: { AirlineCode?: string; AirlineName?: string; FlightNumber?: string };
+  Airline?: { AirlineCode?: string; AirlineName?: string; FlightNumber?: string; FareClass?: string; OperatingCarrier?: string };
+  CabinClass?: number;
   Origin?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; DepTime?: string };
   Destination?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; ArrTime?: string };
   Duration?: number;
+  GroundTime?: number;
   Baggage?: string;
   CabinBaggage?: string;
+};
+
+/** One row of TBO's MiniFareRules — the airline's cancellation / date-change penalty grid. */
+type RawMiniRule = {
+  Type?: string;
+  JourneyPoints?: string;
+  From?: string | number | null;
+  To?: string | number | null;
+  Unit?: string | null;
+  Details?: string | null;
+  OnlineRefundAllowed?: boolean;
+  OnlineReissueAllowed?: boolean;
 };
 type RawFareBreakdown = {
   PassengerType?: number; // 1 = Adult, 2 = Child, 3 = Infant
   PassengerCount?: number;
   BaseFare?: number;
   Tax?: number;
+  /**
+   * Per-segment allowance, positionally aligned with Segments[0]. Some suppliers fill
+   * this and leave Segments[].Baggage empty, so it is the fallback for the card.
+   */
+  SegmentDetails?: {
+    CabinBaggage?: { FreeText?: string } | null;
+    CheckedInBaggage?: { FreeText?: string } | null;
+  }[];
 };
 type RawResult = {
   ResultIndex: string;
@@ -164,6 +218,9 @@ type RawResult = {
   };
   FareBreakdown?: RawFareBreakdown[];
   Segments?: RawSeg[][];
+  FareInclusions?: string[] | null;
+  // TBO nests this one level deep (per journey) on Search, flat on some sources.
+  MiniFareRules?: RawMiniRule[][] | RawMiniRule[] | null;
 };
 
 function mapSegment(s: RawSeg): FlightSegment {
@@ -183,7 +240,47 @@ function mapSegment(s: RawSeg): FlightSegment {
     durationMin: s.Duration ?? 0,
     baggage: s.Baggage ?? "",
     cabinBaggage: s.CabinBaggage ?? "",
+    cabinClass: CABIN_NAME[s.CabinClass ?? 0] ?? "",
+    fareClass: a.FareClass ?? "",
+    operatedBy:
+      a.OperatingCarrier && a.OperatingCarrier !== a.AirlineCode ? a.OperatingCarrier : "",
   };
+}
+
+/** TBO FlightCabinClass code → display name (1 = All is not a cabin, so it is blank). */
+const CABIN_NAME: Record<number, string> = {
+  2: "Economy",
+  3: "Premium Economy",
+  4: "Business",
+  5: "Premium First",
+  6: "First",
+};
+
+/** Flatten TBO's per-journey MiniFareRules into one displayable list. */
+function mapMiniRules(raw: RawResult["MiniFareRules"]): MiniFareRule[] {
+  if (!raw) return [];
+  const flat = (Array.isArray(raw) ? raw : []).flatMap((r) =>
+    Array.isArray(r) ? r : [r as RawMiniRule],
+  );
+  const seen = new Set<string>();
+  const out: MiniFareRule[] = [];
+  for (const r of flat) {
+    const details = String(r?.Details ?? "").trim();
+    if (!details) continue; // a row with no charge tells the customer nothing
+    const rule: MiniFareRule = {
+      type: String(r.Type ?? "").trim(),
+      journey: String(r.JourneyPoints ?? "").trim(),
+      from: r.From == null ? "" : String(r.From).trim(),
+      to: r.To == null ? "" : String(r.To).trim(),
+      unit: String(r.Unit ?? "").trim(),
+      details,
+    };
+    const key = `${rule.type}|${rule.journey}|${rule.from}|${rule.to}|${rule.unit}|${rule.details}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(rule);
+  }
+  return out;
 }
 
 /** Total journey time incl. layovers: first departure → last arrival. */
@@ -248,9 +345,21 @@ export function perAdultFare(
   };
 }
 
-function mapResult(r: RawResult, adults: number): FlightOffer {
+/** Exported for tests — the mapping that decides what a search card can show. */
+export function mapResult(r: RawResult, adults: number): FlightOffer {
   const legs = r.Segments?.[0] ?? [];
   const fare = perAdultFare(r, adults);
+  // Baggage lives on the segment for most suppliers and only in the adult fare
+  // breakdown for others. Read both so a card never shows a blank allowance when
+  // TBO did in fact tell us one.
+  const paxSegs =
+    r.FareBreakdown?.find((b) => (b.PassengerType ?? 0) === 1)?.SegmentDetails ?? [];
+  const segments = legs.map((s, i) => {
+    const seg = mapSegment(s);
+    if (!seg.baggage) seg.baggage = paxSegs[i]?.CheckedInBaggage?.FreeText?.trim() ?? "";
+    if (!seg.cabinBaggage) seg.cabinBaggage = paxSegs[i]?.CabinBaggage?.FreeText?.trim() ?? "";
+    return seg;
+  });
   return {
     id: r.ResultIndex,
     airlineCode: r.AirlineCode ?? legs[0]?.Airline?.AirlineCode ?? "",
@@ -262,7 +371,9 @@ function mapResult(r: RawResult, adults: number): FlightOffer {
     fareINR: fare.fareINR,
     baseINR: fare.baseINR,
     taxINR: fare.taxINR,
-    segments: legs.map(mapSegment),
+    segments,
+    fareInclusions: (r.FareInclusions ?? []).map((t) => String(t).trim()).filter(Boolean),
+    miniRules: mapMiniRules(r.MiniFareRules),
   };
 }
 
@@ -428,6 +539,11 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     error,
   });
 
+  // A journey that starts and ends at the same airport is not a route TBO can
+  // price. Fail here rather than burning a Search call (and its 15-minute
+  // TraceId) on a request that can only come back empty.
+  if (from === to) return fail("same-airport");
+
   let token = await authenticate();
   if (!token) return fail("auth");
 
@@ -495,11 +611,21 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
   return data;
 }
 
-/** Default outbound/return dates ~4–5 weeks out (for indicative package fares). */
+/**
+ * Default outbound/return dates when a search arrives without any: **tomorrow**
+ * and `nights` later. Someone who reaches a results page with no date wants to
+ * see what is flying, not fares a month out that they then have to correct.
+ *
+ * "Tomorrow" is measured in Asia/Kolkata, never in the server's clock. Vercel
+ * runs UTC, which is 5h30m BEHIND India — a naive `new Date()` + 1 day resolves
+ * to *today* in IST for every request placed between 18:30 and midnight UTC,
+ * and TBO rejects a same-day search once the day's flights have gone.
+ */
 export function defaultDates(nights = 7): { departISO: string; returnISO: string } {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
+  const [y, m, day] = todayInIndiaISO().split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day));
+  d.setUTCDate(d.getUTCDate() + 1);
   const dep = d.toISOString().slice(0, 10);
-  d.setDate(d.getDate() + Math.max(2, nights));
+  d.setUTCDate(d.getUTCDate() + Math.max(2, nights));
   return { departISO: dep, returnISO: d.toISOString().slice(0, 10) };
 }

@@ -6,6 +6,7 @@ import { HotelCard, type HotelStub } from "./HotelCard";
 import { CheckRow, DualRange, Section } from "./filter-controls";
 import type { HotelOffer } from "@/lib/tbo-hotel";
 import { cn } from "@/lib/cn";
+import { Button } from "./Button";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
@@ -24,8 +25,16 @@ export type HotelItem = {
 const DISPLAY_CAP = 25;
 
 const SORT_TABS: { key: SortKey; label: string; hint?: string }[] = [
-  { key: "reco", label: "Recommended", hint: "Our best balance of price and star class" },
-  { key: "reviews", label: "Top reviews", hint: "Highest Google review scores first" },
+  {
+    key: "reco",
+    label: "Recommended",
+    hint: "Our best balance of price and star class",
+  },
+  {
+    key: "reviews",
+    label: "Top reviews",
+    hint: "Highest Google review scores first",
+  },
   { key: "price", label: "Lowest price" },
   { key: "price-desc", label: "Highest price" },
   { key: "stars", label: "Most stars" },
@@ -46,12 +55,17 @@ const STAR_OPTIONS: { bucket: 5 | 4 | 3 | 0; label: string }[] = [
 function bySort(list: HotelItem[], key: SortKey): HotelItem[] {
   if (list.length < 2) return list;
   if (key === "price")
-    return [...list].sort((a, b) => a.offer.cheapestFare - b.offer.cheapestFare);
+    return [...list].sort(
+      (a, b) => a.offer.cheapestFare - b.offer.cheapestFare,
+    );
   if (key === "price-desc")
-    return [...list].sort((a, b) => b.offer.cheapestFare - a.offer.cheapestFare);
+    return [...list].sort(
+      (a, b) => b.offer.cheapestFare - a.offer.cheapestFare,
+    );
   if (key === "stars")
     return [...list].sort(
-      (a, b) => b.stars - a.stars || a.offer.cheapestFare - b.offer.cheapestFare,
+      (a, b) =>
+        b.stars - a.stars || a.offer.cheapestFare - b.offer.cheapestFare,
     );
   if (key === "reviews")
     // Rating first, review volume as the tiebreak; unrated hotels sink to the end.
@@ -65,9 +79,11 @@ function bySort(list: HotelItem[], key: SortKey): HotelItem[] {
   const fLo = Math.min(...fares);
   const fHi = Math.max(...fares);
   const norm = (v: number) => (fHi > fLo ? (v - fLo) / (fHi - fLo) : 0);
-  const score = (i: HotelItem) => norm(i.offer.cheapestFare) * 0.55 + (1 - i.stars / 5) * 0.45;
+  const score = (i: HotelItem) =>
+    norm(i.offer.cheapestFare) * 0.55 + (1 - i.stars / 5) * 0.45;
   return [...list].sort(
-    (a, b) => score(a) - score(b) || a.offer.cheapestFare - b.offer.cheapestFare,
+    (a, b) =>
+      score(a) - score(b) || a.offer.cheapestFare - b.offer.cheapestFare,
   );
 }
 
@@ -102,7 +118,9 @@ export function HotelResultsClient({
   initialMinStars?: number;
 }) {
   const [sort, setSort] = useState<SortKey>(
-    initialSort === "price-desc" || initialSort === "stars" || initialSort === "price"
+    initialSort === "price-desc" ||
+      initialSort === "stars" ||
+      initialSort === "price"
       ? initialSort
       : "reco",
   );
@@ -129,7 +147,11 @@ export function HotelResultsClient({
   }, [items]);
 
   const allStars = () =>
-    new Set<number>(STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map((s) => s.bucket));
+    new Set<number>(
+      STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map(
+        (s) => s.bucket,
+      ),
+    );
   const [nameQ, setNameQ] = useState("");
   const [starsSel, setStarsSel] = useState<Set<number>>(() => {
     if (initialMinStars && [3, 4, 5].includes(initialMinStars)) {
@@ -137,7 +159,10 @@ export function HotelResultsClient({
     }
     return allStars();
   });
-  const [price, setPrice] = useState<[number, number]>([domain.fareLo, domain.fareHi]);
+  const [price, setPrice] = useState<[number, number]>([
+    domain.fareLo,
+    domain.fareHi,
+  ]);
   const [ratingMin, setRatingMin] = useState<0 | 4 | 4.5>(0);
 
   const starCount = allStars().size;
@@ -160,14 +185,17 @@ export function HotelResultsClient({
     const pass = (i: HotelItem) => {
       if (q && !(i.stub.name ?? "").toLowerCase().includes(q)) return false;
       if (!starsSel.has(starBucket(i.stars))) return false;
-      if (i.offer.cheapestFare < price[0] || i.offer.cheapestFare > price[1]) return false;
+      if (i.offer.cheapestFare < price[0] || i.offer.cheapestFare > price[1])
+        return false;
       if (ratingMin > 0 && (i.review?.rating ?? 0) < ratingMin) return false;
       return true;
     };
     return bySort(items.filter(pass), sort);
   }, [items, sort, nameQ, starsSel, price, ratingMin]);
 
-  const tabs = domain.anyReviews ? SORT_TABS : SORT_TABS.filter((t) => t.key !== "reviews");
+  const tabs = domain.anyReviews
+    ? SORT_TABS
+    : SORT_TABS.filter((t) => t.key !== "reviews");
 
   const filtersPanel = (
     <div
@@ -204,7 +232,9 @@ export function HotelResultsClient({
       </Section>
 
       {domain.fareHi > domain.fareLo && (
-        <Section title={`Price (${nights} night${nights > 1 ? "s" : ""}, per room)`}>
+        <Section
+          title={`Price (${nights} night${nights > 1 ? "s" : ""}, per room)`}
+        >
           <DualRange
             min={domain.fareLo}
             max={domain.fareHi}
@@ -218,32 +248,39 @@ export function HotelResultsClient({
       )}
 
       <Section title="Star class">
-        {STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map((s) => (
-          <CheckRow
-            key={s.bucket}
-            checked={starsSel.has(s.bucket)}
-            onChange={(on) =>
-              setStarsSel((prev) => {
-                const next = new Set(prev);
-                if (on) next.add(s.bucket);
-                else next.delete(s.bucket);
-                return next;
-              })
-            }
-            label={s.label}
-            fromINR={domain.starMin[s.bucket]}
-          />
-        ))}
+        {STAR_OPTIONS.filter((s) => domain.starMin[s.bucket] != null).map(
+          (s) => (
+            <CheckRow
+              key={s.bucket}
+              checked={starsSel.has(s.bucket)}
+              onChange={(on) =>
+                setStarsSel((prev) => {
+                  const next = new Set(prev);
+                  if (on) next.add(s.bucket);
+                  else next.delete(s.bucket);
+                  return next;
+                })
+              }
+              label={s.label}
+              fromINR={domain.starMin[s.bucket]}
+            />
+          ),
+        )}
       </Section>
 
       {domain.anyReviews && (
         <Section title="Guest rating">
-          {([
-            [0, "Any"],
-            [4, "4.0+ Very good"],
-            [4.5, "4.5+ Excellent"],
-          ] as const).map(([v, label]) => (
-            <label key={v} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+          {(
+            [
+              [0, "Any"],
+              [4, "4.0+ Very good"],
+              [4.5, "4.5+ Excellent"],
+            ] as const
+          ).map(([v, label]) => (
+            <label
+              key={v}
+              className="flex cursor-pointer items-center gap-2.5 py-1.5"
+            >
               <input
                 type="radio"
                 name="hotel-rating-min"
@@ -251,7 +288,9 @@ export function HotelResultsClient({
                 onChange={() => setRatingMin(v)}
                 className="h-4 w-4 cursor-pointer accent-red"
               />
-              <span className="text-[0.9rem] font-medium text-ink">{label}</span>
+              <span className="text-[0.9rem] font-medium text-ink">
+                {label}
+              </span>
             </label>
           ))}
         </Section>
@@ -267,7 +306,9 @@ export function HotelResultsClient({
           onClick={() => setFiltersOpen((o) => !o)}
           className={cn(
             "mb-4 flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[0.85rem] font-semibold lg:hidden",
-            filtersActive ? "border-red bg-red/10 text-red" : "border-line text-ink",
+            filtersActive
+              ? "border-red bg-red/10 text-red"
+              : "border-line text-ink",
           )}
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden />
@@ -279,7 +320,11 @@ export function HotelResultsClient({
 
       <div className="min-w-0 flex-1">
         <div className="mb-4 overflow-x-auto rounded-brand-lg border border-line bg-white shadow-brand-sm">
-          <div className="flex min-w-max" role="tablist" aria-label="Sort hotels">
+          <div
+            className="flex min-w-max"
+            role="tablist"
+            aria-label="Sort hotels"
+          >
             {tabs.map((t) => {
               const active = sort === t.key;
               return (
@@ -298,7 +343,11 @@ export function HotelResultsClient({
                   <span className="flex items-center gap-1.5">
                     {t.label}
                     {t.hint && (
-                      <Info size={14} className={active ? "text-red" : "text-muted"} aria-hidden />
+                      <Info
+                        size={14}
+                        className={active ? "text-red" : "text-muted"}
+                        aria-hidden
+                      />
                     )}
                   </span>
                   {active && (
@@ -315,7 +364,8 @@ export function HotelResultsClient({
 
         {filtersActive && (
           <p className="mb-4 text-[0.88rem] text-muted">
-            Showing <b className="text-ink">{sorted.length}</b> of {items.length} hotels
+            Showing <b className="text-ink">{sorted.length}</b> of{" "}
+            {items.length} hotels
           </p>
         )}
 
@@ -325,13 +375,9 @@ export function HotelResultsClient({
             <p className="mb-5 text-muted">
               Loosen a filter or reset them all to see every result again.
             </p>
-            <button
-              type="button"
-              onClick={resetAll}
-              className="inline-flex items-center gap-2 rounded-full bg-red px-5 py-2.5 text-[0.9rem] font-semibold text-white transition-colors hover:bg-red-mid"
-            >
+            <Button size="sm" onClick={resetAll}>
               <RotateCcw className="h-4 w-4" aria-hidden /> Reset filters
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -357,13 +403,14 @@ export function HotelResultsClient({
               ))}
             </div>
             {sorted.length > DISPLAY_CAP && !showAll && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                fullWidth
+                className="mt-6"
                 onClick={() => setShowAll(true)}
-                className="mt-6 w-full rounded-full border border-line py-3 text-[0.9rem] font-semibold text-ink transition-colors hover:border-red/50"
               >
                 Show all {sorted.length} hotels
-              </button>
+              </Button>
             )}
           </>
         )}

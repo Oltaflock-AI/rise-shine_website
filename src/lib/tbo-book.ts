@@ -13,6 +13,8 @@
  * Reference: https://apidoc.tektravels.com/flight/apivalidation.aspx
  */
 import { tboFetch } from "./tbo-fetch";
+import { isEmptyFareRule, sanitizeFareRuleHtml } from "./fare-rules";
+import type { MiniFareRule } from "./tbo";
 import {
   type FareBreakdown,
   type FareQuoteFlags,
@@ -302,6 +304,57 @@ async function recoverFromTimeout(traceId: string, bookingId?: number, pnr?: str
   return null;
 }
 
+/** One airline fare-rule document, as sanitised HTML ready to render. */
+export type FareRuleDoc = {
+  origin: string;
+  destination: string;
+  airline: string;
+  fareBasisCode: string;
+  /** Sanitised by ./fare-rules — safe for dangerouslySetInnerHTML. */
+  html: string;
+};
+
+/**
+ * What the customer is entitled to on the fare they are about to pay for: baggage,
+ * inclusions, and the cancellation/date-change penalties — read from the CONFIRMED
+ * FareQuote plus FareRule, not from the search card. FareQuote can re-price and even
+ * re-issue the result, so this is the only trustworthy version of these facts.
+ */
+export type QuoteDetails = {
+  isRefundable: boolean;
+  fareInclusions: string[];
+  miniRules: MiniFareRule[];
+  /** Per-leg allowance for the quoted itinerary, in flight order. */
+  segments: {
+    from: string;
+    to: string;
+    flightNumber: string;
+    airlineName: string;
+    depTime: string;
+    arrTime: string;
+    /** Checked-in allowance as TBO words it, e.g. "15 KG" ("" when unknown). */
+    checkedIn: string;
+    /** Cabin allowance, e.g. "7 KG". */
+    cabin: string;
+    cabinClass: string;
+  }[];
+  /**
+   * All-passenger fare split from FareQuote — the numbers behind the total charged.
+   *
+   * Two lines only, and `base` is deliberately `total - tax`: everything that is not a
+   * government tax or surcharge (TBO's OtherCharges, and our service fee, which TBO
+   * folds into PublishedFare) belongs in the fare, not in a third line of its own.
+   * Itemising the agency fee separately is not something a customer is shown.
+   */
+  fare?: { base: number; tax: number; total: number };
+  /** Full airline rule text, one per fare component. May be empty. */
+  fareRules: FareRuleDoc[];
+  /** Airline's own advisory line, e.g. carry-on restrictions. */
+  ticketAdvisory: string;
+  /** ISO datetime after which the held fare can no longer be ticketed. */
+  lastTicketDate: string;
+};
+
 export type QuoteResult = {
   ok: boolean;
   isLCC?: boolean;
@@ -311,8 +364,113 @@ export type QuoteResult = {
   priceChanged?: boolean;
   /** What TBO says this fare requires — drives which fields the checkout form shows. */
   flags?: FareQuoteFlags;
+  /** Baggage, inclusions and refund rules to show before the customer pays. */
+  details?: QuoteDetails;
   error?: string;
 };
+
+const CABIN_NAME: Record<number, string> = {
+  2: "Economy",
+  3: "Premium Economy",
+  4: "Business",
+  5: "Premium First",
+  6: "First",
+};
+
+/** Flatten FareQuote's per-journey MiniFareRules grid into displayable rows. */
+function quoteMiniRules(raw: unknown): MiniFareRule[] {
+  const flat = (Array.isArray(raw) ? raw : []).flatMap((r) => (Array.isArray(r) ? r : [r]));
+  const seen = new Set<string>();
+  const out: MiniFareRule[] = [];
+  for (const r of flat as Json[]) {
+    const details = String(r?.Details ?? "").trim();
+    if (!details) continue;
+    const rule: MiniFareRule = {
+      type: String(r?.Type ?? "").trim(),
+      journey: String(r?.JourneyPoints ?? "").trim(),
+      from: r?.From == null ? "" : String(r.From).trim(),
+      to: r?.To == null ? "" : String(r.To).trim(),
+      unit: String(r?.Unit ?? "").trim(),
+      details,
+    };
+    const key = Object.values(rule).join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(rule);
+  }
+  return out;
+}
+
+/**
+ * Read the entitlement facts off a FareQuote result (+ the FareRule response).
+ *
+ * Exported for tests.
+ *
+ * Baggage is taken from the segment first and the adult fare breakdown second —
+ * suppliers fill one or the other, and a blank allowance on the checkout page is the
+ * exact thing this exists to prevent.
+ */
+/** TBO's null-date sentinel is 0001-01-01; treat anything pre-1900 as "not set". */
+function realDate(v: unknown): string {
+  const t = String(v ?? "").trim();
+  if (!t) return "";
+  const year = Number(t.slice(0, 4));
+  return Number.isFinite(year) && year >= 1900 ? t : "";
+}
+
+export function quoteDetails(quoted: Json, fareRuleRes: Json | null): QuoteDetails {
+  const legs: Json[] = (quoted.Segments?.[0] as Json[]) ?? [];
+  const paxSegs: Json[] =
+    ((quoted.FareBreakdown as Json[] | undefined)?.find((b) => (b?.PassengerType ?? 0) === 1)
+      ?.SegmentDetails as Json[] | undefined) ?? [];
+
+  const segments = legs.map((s, i) => {
+    const a = (s.Airline ?? {}) as Json;
+    return {
+      from: String(s.Origin?.Airport?.AirportCode ?? ""),
+      to: String(s.Destination?.Airport?.AirportCode ?? ""),
+      flightNumber: `${a.AirlineCode ?? ""} ${a.FlightNumber ?? ""}`.trim(),
+      airlineName: String(a.AirlineName ?? a.AirlineCode ?? ""),
+      depTime: String(s.Origin?.DepTime ?? ""),
+      arrTime: String(s.Destination?.ArrTime ?? ""),
+      checkedIn: String(s.Baggage ?? paxSegs[i]?.CheckedInBaggage?.FreeText ?? "").trim(),
+      cabin: String(s.CabinBaggage ?? paxSegs[i]?.CabinBaggage?.FreeText ?? "").trim(),
+      cabinClass: CABIN_NAME[Number(s.CabinClass) || 0] ?? "",
+    };
+  });
+
+  const f = (quoted.Fare ?? {}) as Json;
+  const total = Number(f.PublishedFare ?? 0);
+  const tax = Number(f.Tax ?? 0);
+  // base is the remainder, so the two lines always add up to the amount charged.
+  const fare = total ? { base: Math.max(0, Number((total - tax).toFixed(2))), tax, total } : undefined;
+
+  const rawRules: Json[] = (fareRuleRes?.Response?.FareRules as Json[] | undefined) ?? [];
+  const fareRules: FareRuleDoc[] = rawRules
+    .map((r) => ({
+      origin: String(r?.Origin ?? ""),
+      destination: String(r?.Destination ?? ""),
+      airline: String(r?.Airline ?? ""),
+      fareBasisCode: String(r?.FareBasisCode ?? ""),
+      html: sanitizeFareRuleHtml(String(r?.FareRuleDetail ?? "")),
+    }))
+    .filter((r) => !isEmptyFareRule(r.html));
+
+  return {
+    isRefundable: Boolean(quoted.IsRefundable),
+    fareInclusions: ((quoted.FareInclusions as string[] | null) ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean),
+    miniRules: quoteMiniRules(quoted.MiniFareRules),
+    segments,
+    fare,
+    fareRules,
+    ticketAdvisory: String(quoted.TicketAdvisory ?? "").trim(),
+    // TBO returns "0001-01-01T00:00:00" for "no hold" — rendering that as a date
+    // tells a customer their fare expired in the year 1.
+    lastTicketDate: realDate(quoted.LastTicketDate),
+  };
+}
 
 /**
  * FareRule + FareQuote only. The checkout page calls this before collecting passenger
@@ -326,7 +484,20 @@ export async function quoteFare(args: {
 }): Promise<QuoteResult> {
   try {
     assertTraceAlive(args.searchedAt);
-    await call(`${SEARCH_SVC}/FareRule`, { TraceId: args.traceId, ResultIndex: args.resultIndex }, TIMEOUT_OTHER, 2);
+    // FareRule is mandated by the checklist AND is the only source of the full refund /
+    // date-change conditions, so its response is kept rather than discarded. A rule
+    // lookup that fails must not block pricing — the customer still sees MiniFareRules.
+    let fareRuleRes: Json | null = null;
+    try {
+      fareRuleRes = await call(
+        `${SEARCH_SVC}/FareRule`,
+        { TraceId: args.traceId, ResultIndex: args.resultIndex },
+        TIMEOUT_OTHER,
+        2,
+      );
+    } catch {
+      fareRuleRes = null;
+    }
     const res = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: args.traceId, ResultIndex: args.resultIndex }, TIMEOUT_OTHER, 2);
     const FQ = assertOk(res, "FareQuote");
     const q = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
@@ -349,6 +520,7 @@ export async function quoteFare(args: {
         isseatmandatory: q.IsSeatMandatory ?? q.isseatmandatory,
         ismealmandatory: q.IsMealMandatory ?? q.ismealmandatory,
       },
+      details: quoteDetails(q, fareRuleRes),
     };
   } catch (e) {
     if (e instanceof TboError || e instanceof TboTimeoutError) return { ok: false, error: e.message };
