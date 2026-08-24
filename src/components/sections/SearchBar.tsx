@@ -354,7 +354,7 @@ export function SearchBar({
                 type="button"
                 onClick={() => setProduct(id)}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-5 py-2 text-[0.9rem] font-semibold transition-colors",
+                  "flex min-h-11 items-center gap-2 rounded-full px-5 py-2 text-[0.9rem] font-semibold transition-colors",
                   product === id
                     ? "grad-red text-white shadow-brand-red"
                     : "text-ink hover:text-red",
@@ -380,7 +380,7 @@ export function SearchBar({
                       type="button"
                       onClick={() => setTrip(t)}
                       className={cn(
-                        "rounded-t-lg px-4 py-2 text-[0.9rem] font-semibold transition-colors",
+                        "min-h-11 rounded-t-lg px-4 py-2 text-[0.9rem] font-semibold transition-colors",
                         trip === t
                           ? "bg-red/10 text-red"
                           : "text-muted hover:text-ink",
