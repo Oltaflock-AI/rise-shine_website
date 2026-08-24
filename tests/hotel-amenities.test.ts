@@ -32,7 +32,10 @@ describe("curateAmenities", () => {
 
   it("gives the amenities their own icons", () => {
     const out = curateAmenities(["Breakfast available (surcharge)", "Laundry", "Flat-screen TV"]);
-    expect(out.map((a) => a.icon)).toEqual(["Coffee", "WashingMachine", "Tv"]);
+    // Output order is decision weight, not feed order — this is about the icons.
+    expect(new Set(out.map((a) => a.icon))).toEqual(
+      new Set(["Coffee", "WashingMachine", "Tv"]),
+    );
   });
 
   it("drops pandemic-era operational boilerplate", () => {
@@ -48,9 +51,23 @@ describe("curateAmenities", () => {
   });
 
   it("keeps a specific rule ahead of the general one it would also match", () => {
-    // "Children's pool" must not be swallowed by the generic pool rule.
+    // "Children's pool" must not be swallowed by the generic pool rule: the
+    // two strings have to resolve to two different amenities.
     const out = curateAmenities(["Children's pool", "Outdoor pool"]);
-    expect(out.map((a) => a.key)).toEqual(["kids-pool", "pool"]);
+    expect(new Set(out.map((a) => a.key))).toEqual(
+      new Set(["kids-pool", "pool"]),
+    );
+  });
+
+  it("ranks by decision weight, not by the order the feed happened to use", () => {
+    // The card shows three. Feed order made those three arbitrary, so two
+    // hotels could not be compared without opening both.
+    const dull = curateAmenities(["Lift", "Safe", "Laundry", "Breakfast", "Free WiFi"], 3);
+    expect(dull.map((a) => a.key)).toEqual(["breakfast", "wifi", "laundry"]);
+
+    // Same amenities, opposite feed order — same three chips, same order.
+    const reversed = curateAmenities(["Free WiFi", "Breakfast", "Laundry", "Safe", "Lift"], 3);
+    expect(reversed.map((a) => a.key)).toEqual(["breakfast", "wifi", "laundry"]);
   });
 
   it("keeps unrecognised short labels, after the recognised ones", () => {

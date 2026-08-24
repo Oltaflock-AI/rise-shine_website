@@ -37,6 +37,10 @@ export type HotelItem = {
   image?: string;
   /** A few curated facilities for the card (absent when content failed). */
   amenities?: Amenity[];
+  /** Nearest landmark (TBO Attractions) — replaces the postal address. */
+  landmark?: string;
+  /** Hotel charges a mandatory fee on arrival (TBO HotelFees.Mandatory). */
+  payAtHotel?: boolean;
   detailHref: string;
 };
 
@@ -456,6 +460,8 @@ export function HotelResultsClient({
                   review={i.review}
                   image={i.image}
                   amenities={i.amenities}
+                  landmark={i.landmark}
+                  payAtHotel={i.payAtHotel}
                   detailHref={i.detailHref}
                 />
               ))}

@@ -17,7 +17,7 @@ import {
   cancellationWindows,
   tboDateToISO,
 } from "@/lib/hotel-cancellation";
-import { formatDeadline, perNightFare } from "@/lib/hotel-display";
+import { formatDeadline, mealLabel, perNightFare } from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
 import { controlClass, DateField, Select } from "@/components/ui/form-controls";
 import {
@@ -828,7 +828,7 @@ function RateTerms({ quote }: { quote: Quote }) {
         {quote.mealType && (
           <p>
             <span className="font-semibold">Meal plan:</span>{" "}
-            {quote.mealType.replace(/_/g, " ")}
+            {mealLabel(quote.mealType, true)}
           </p>
         )}
         {quote.inclusion && (

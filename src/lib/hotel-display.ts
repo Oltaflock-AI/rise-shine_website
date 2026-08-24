@@ -101,3 +101,25 @@ export function pageWindow(current: number, total: number): (number | null)[] {
   out.push(total);
   return out;
 }
+
+/**
+ * A meal plan a guest can read, or nothing at all.
+ *
+ * TBO writes these in its own screaming-snake shape — `Room_Only`,
+ * `Bed_And_Breakfast`, `HALF_BOARD` — and three separate components each did
+ * their own `.replace(/_/g, " ")`, so the results card compared the raw string
+ * against the literal "room only", never matched, and printed "Room_Only" on
+ * every card in Mumbai.
+ *
+ * Room-only returns "": it is the ABSENCE of a meal, and a chip saying so is a
+ * line of card space spent telling the guest nothing. Where a rate genuinely
+ * needs the distinction spelt out — the room page, checkout, the voucher — the
+ * caller passes `keepRoomOnly`.
+ */
+export function mealLabel(raw: string | undefined, keepRoomOnly = false): string {
+  const text = (raw ?? "").replace(/_/g, " ").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (!keepRoomOnly && (lower === "room only" || lower === "roomonly")) return "";
+  return lower.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+}

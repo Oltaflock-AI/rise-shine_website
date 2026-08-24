@@ -12,7 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatDeadline } from "@/lib/hotel-display";
+import { formatDeadline, mealLabel } from "@/lib/hotel-display";
 import {
   cancellationHeadline,
   cancellationWindows,
@@ -207,7 +207,7 @@ export function RoomRateDetails({
                   <Row icon={<Check size={15} aria-hidden />} title="Included">
                     {quote.inclusion}
                     {quote.mealType
-                      ? ` · ${quote.mealType.replace(/_/g, " ")}`
+                      ? ` · ${mealLabel(quote.mealType, true)}`
                       : ""}
                   </Row>
                 )}

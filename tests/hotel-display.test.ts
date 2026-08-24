@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  mealLabel,
   pageCount,
   pageSlice,
   pageWindow,
@@ -102,5 +103,25 @@ describe("pageWindow", () => {
     const w = pageWindow(1, 40);
     expect(w[0]).toBe(1);
     expect(w[w.length - 1]).toBe(40);
+  });
+});
+
+describe("mealLabel — TBO's snake case is not a meal plan", () => {
+  it("unpicks the underscores and cases it like a human wrote it", () => {
+    expect(mealLabel("Bed_And_Breakfast")).toBe("Bed And Breakfast");
+    expect(mealLabel("HALF_BOARD")).toBe("Half Board");
+  });
+
+  it("says nothing at all for room-only", () => {
+    // The card compared the raw string to "room only", never matched, and
+    // printed "Room_Only" on every card. Room-only is the absence of a meal.
+    expect(mealLabel("Room_Only")).toBe("");
+    expect(mealLabel("RoomOnly")).toBe("");
+    expect(mealLabel("room only")).toBe("");
+    expect(mealLabel(undefined)).toBe("");
+  });
+
+  it("keeps room-only where the rate has to be spelt out", () => {
+    expect(mealLabel("Room_Only", true)).toBe("Room Only");
   });
 });

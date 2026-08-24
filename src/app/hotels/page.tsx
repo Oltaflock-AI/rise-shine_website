@@ -515,6 +515,16 @@ async function HotelResults({
             // Three facts, not thirty: enough for the guest to rule a hotel in
             // or out from the list instead of opening every one of them.
             amenities: curateAmenities(infoMap.get(o.hotelCode)?.facilities, 3),
+            // Nearest landmark, not the postal address: "Near Juhu Beach" is
+            // what places a hotel on a results list; "Nehru Road, Vile Parle
+            // East, Mumbai 400099" is two lines answering a question nobody
+            // asks until they are already booked.
+            landmark: infoMap.get(o.hotelCode)?.attractions?.[0],
+            // A mandatory arrival fee is money the headline price does not
+            // cover, so the card says so rather than letting it surface at the
+            // hotel desk.
+            payAtHotel:
+              (infoMap.get(o.hotelCode)?.fees?.mandatory?.length ?? 0) > 0,
             detailHref: `/hotels/${o.hotelCode}?${occupancyQS}`,
           }))}
           nights={nights}

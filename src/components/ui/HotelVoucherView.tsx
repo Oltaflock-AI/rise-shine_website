@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { mealLabel } from "@/lib/hotel-display";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -246,7 +247,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
               {room.roomTypeName ? ` · ${room.roomTypeName}` : ""}
             </h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-body text-muted">
-              {room.mealType && <span>{room.mealType.replace(/_/g, " ")}</span>}
+              {room.mealType && <span>{mealLabel(room.mealType, true)}</span>}
               {room.totalFare != null && (
                 <span className="font-semibold text-ink">
                   {money(room.totalFare, room.currency || currency)}

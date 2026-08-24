@@ -2,13 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Star,
-  BedDouble,
   Utensils,
   ShieldCheck,
   MapPin,
   ImageOff,
   ArrowRight,
-  Check,
+  Wallet,
 } from "lucide-react";
 import { BookButton } from "@/components/ui/BookButton";
 import { AmenityIcon } from "@/components/ui/AmenityIcon";
@@ -19,7 +18,7 @@ import {
   cancellationHeadline,
   cancellationWindows,
 } from "@/lib/hotel-cancellation";
-import { formatDeadline, perNightFare } from "@/lib/hotel-display";
+import { formatDeadline, mealLabel, perNightFare } from "@/lib/hotel-display";
 
 /** TBO ratings arrive as words ("FourStar") or ints — normalize to 0–5. */
 function starCount(rating?: string): number {
@@ -59,6 +58,8 @@ export function HotelCard({
   review,
   image,
   amenities,
+  landmark,
+  payAtHotel,
   detailHref,
 }: {
   offer: HotelOffer;
@@ -84,6 +85,18 @@ export function HotelCard({
    * these from HotelDetails, which is cosmetic content that can fail.
    */
   amenities?: Amenity[];
+  /**
+   * Nearest landmark from TBO's `Attractions`. This is what the OTAs put on a
+   * card and what a guest can actually act on; the postal address it replaces
+   * cost two lines and answered a question nobody asks from a results list.
+   */
+  landmark?: string;
+  /**
+   * True when the hotel charges a mandatory fee on arrival (`HotelFees`
+   * Mandatory). The headline price does not include it, so a card that stays
+   * silent is quietly under-quoting the stay.
+   */
+  payAtHotel?: boolean;
   /** /hotels/[code]?dates… — the room-options page for this hotel. */
   detailHref: string;
 }) {
@@ -139,126 +152,138 @@ export function HotelCard({
 
   return (
     <div className="flex flex-col gap-4 rounded-brand-lg border border-line bg-white p-4 shadow-brand-sm sm:flex-row sm:items-stretch">
-      {/* Photo → room options. Hidden from assistive tech and from the tab
+      {/* Photo beside the facts, not above them. A full-width 160px photo cost
+          a fifth of a phone screen per card and pushed the results per screen
+          below 1.5; alongside, the same card reads in a single glance.
+          `sm:contents` dissolves this wrapper on wider screens so the photo and
+          the body rejoin the card's own row. */}
+      <div className="flex min-w-0 gap-3 sm:contents">
+        {/* Photo → room options. Hidden from assistive tech and from the tab
           order: the heading link below goes to the same place, and three
           identical links per card is three times the noise for no gain. */}
-      <Link
-        href={detailHref}
-        tabIndex={-1}
-        aria-hidden
-        className="relative block h-40 w-full flex-none overflow-hidden rounded-brand bg-cream sm:h-auto sm:min-h-36 sm:w-44"
-      >
-        {image ? (
-          <Image
-            src={image}
-            alt=""
-            fill
-            sizes="(min-width: 640px) 11rem, 100vw"
-            className="object-cover transition-transform duration-300 hover:scale-105"
-          />
-        ) : (
-          <span className="grid h-full w-full place-items-center text-muted">
-            <ImageOff size={26} aria-hidden />
-          </span>
-        )}
-      </Link>
+        <Link
+          href={detailHref}
+          tabIndex={-1}
+          aria-hidden
+          className="relative block h-28 w-28 flex-none overflow-hidden rounded-brand bg-cream sm:h-auto sm:min-h-36 sm:w-44"
+        >
+          {image ? (
+            <Image
+              src={image}
+              alt=""
+              fill
+              sizes="(min-width: 640px) 11rem, 7rem"
+              className="object-cover transition-transform duration-300 hover:scale-105"
+            />
+          ) : (
+            <span className="grid h-full w-full place-items-center text-muted">
+              <ImageOff size={26} aria-hidden />
+            </span>
+          )}
+        </Link>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {/* Two lines, then ellipsis. A single truncated line cut names like
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/* Two lines, then ellipsis. A single truncated line cut names like
               "Pearl Marina Hotel Apartments" mid-word on every phone. */}
-          <h3 className="text-lead font-bold text-ink">
-            <Link href={detailHref} className="line-clamp-2 hover:text-red">
-              {name}
-            </Link>
-          </h3>
-          {stars > 0 && (
-            <span
-              className="flex flex-none items-center gap-0.5 text-red"
-              aria-label={`${stars} star`}
-            >
-              {Array.from({ length: stars }).map((_, i) => (
+            <h3 className="text-lead font-bold text-ink">
+              <Link href={detailHref} className="line-clamp-2 hover:text-red">
+                {name}
+              </Link>
+            </h3>
+            {stars > 0 && (
+              <span
+                className="flex flex-none items-center gap-0.5 text-red"
+                aria-label={`${stars} star`}
+              >
+                {Array.from({ length: stars }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={13}
+                    fill="currentColor"
+                    strokeWidth={0}
+                    aria-hidden
+                  />
+                ))}
+              </span>
+            )}
+          </div>
+
+          {review && (
+            <p className="mt-1 flex items-center gap-1.5 text-meta">
+              <span className="inline-flex flex-none items-center gap-1 rounded-md bg-navy px-1.5 py-0.5 font-bold text-white">
+                {review.rating.toFixed(1)}
                 <Star
-                  key={i}
-                  size={13}
+                  size={11}
                   fill="currentColor"
                   strokeWidth={0}
                   aria-hidden
                 />
-              ))}
-            </span>
+              </span>
+              <span className="text-muted">
+                {review.count > 0
+                  ? `${new Intl.NumberFormat("en-IN").format(review.count)} Google review${review.count > 1 ? "s" : ""}`
+                  : "Google rating"}
+              </span>
+            </p>
           )}
-        </div>
 
-        {review && (
-          <p className="mt-1 flex items-center gap-1.5 text-meta">
-            <span className="inline-flex flex-none items-center gap-1 rounded-md bg-navy px-1.5 py-0.5 font-bold text-white">
-              {review.rating.toFixed(1)}
-              <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
-            </span>
-            <span className="text-muted">
-              {review.count > 0
-                ? `${new Intl.NumberFormat("en-IN").format(review.count)} Google review${review.count > 1 ? "s" : ""}`
-                : "Google rating"}
-            </span>
-          </p>
-        )}
+          {landmark && (
+            <p className="mt-1 flex items-start gap-1.5 text-meta text-muted">
+              <MapPin
+                size={13}
+                className="mt-0.5 flex-none text-red"
+                aria-hidden
+              />
+              <span className="line-clamp-1">Near {landmark}</span>
+            </p>
+          )}
 
-        {stub?.address && (
-          <p className="mt-1 flex items-start gap-1.5 text-meta text-muted">
-            <MapPin size={13} className="mt-0.5 flex-none text-red" aria-hidden />
-            <span className="line-clamp-2">{stub.address}</span>
-          </p>
-        )}
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted">
-          <span className="inline-flex min-w-0 max-w-full items-center gap-1">
-            <BedDouble size={14} className="flex-none text-red" aria-hidden />
-            <span className="line-clamp-1">{cheapest?.name || "Room"}</span>
-          </span>
-          {cheapest?.mealType &&
-            cheapest.mealType.toLowerCase() !== "room only" && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted">
+            {mealLabel(cheapest?.mealType) && (
               <span className="inline-flex items-center gap-1">
                 <Utensils size={14} className="text-red" aria-hidden />
-                {cheapest.mealType}
+                {mealLabel(cheapest?.mealType)}
               </span>
             )}
-          <span
-            className={cn(
-              "inline-flex items-center gap-1",
-              cancelFree ? "font-medium text-green-700" : "text-muted",
-            )}
-          >
-            <ShieldCheck size={14} aria-hidden />
-            {cancelLine}
-          </span>
-        </div>
-
-        {/* What the hotel offers, at a glance. Without this the guest had to
-            open every property just to find out which ones have a pool. */}
-        {amenities && amenities.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {amenities.map((a) => (
-              <li
-                key={a.key}
-                className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-meta font-medium text-ink"
-              >
-                <AmenityIcon name={a.icon} size={12} className="text-red" />
-                {a.label}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Inclusions from the Search RS — TBO portal checkpoint 14. */}
-        {cheapest?.inclusion && (
-          <p className="mt-1.5 flex items-start gap-1.5 text-meta text-muted">
-            <Check size={13} className="mt-0.5 flex-none text-red" aria-hidden />
-            <span className="line-clamp-2">
-              {cheapest.inclusion.replace(/,/g, " · ")}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1",
+                cancelFree ? "font-medium text-green-700" : "text-muted",
+              )}
+            >
+              <ShieldCheck size={14} aria-hidden />
+              {cancelLine}
             </span>
-          </p>
-        )}
+          </div>
+
+          {/* What the hotel offers, at a glance. Without this the guest had to
+            open every property just to find out which ones have a pool. */}
+          {amenities && amenities.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {amenities.map((a) => (
+                <li
+                  key={a.key}
+                  className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-meta font-medium text-ink"
+                >
+                  <AmenityIcon name={a.icon} size={12} className="text-red" />
+                  {a.label}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {payAtHotel && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-meta text-muted">
+              <Wallet
+                size={13}
+                className="mt-0.5 flex-none text-red"
+                aria-hidden
+              />
+              <span>Extra charges payable at the hotel</span>
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-none items-end justify-between gap-4 sm:flex-col sm:items-end sm:justify-end">
@@ -279,8 +304,7 @@ export function HotelCard({
             href={detailHref}
             className="inline-flex min-h-11 items-center gap-1 text-meta font-semibold text-red hover:underline"
           >
-            View rooms{" "}
-            <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
+            View rooms <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
           </Link>
           <BookButton query={query} path="/hotels/checkout" label="Book" />
         </div>
