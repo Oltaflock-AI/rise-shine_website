@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/format-date";
 import {
   cancellationHeadline,
   cancellationWindows,
+  tboDateToISO,
 } from "@/lib/hotel-cancellation";
 import { formatDeadline, perNightFare } from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
@@ -806,6 +807,13 @@ function RateTerms({ quote }: { quote: Quote }) {
   const supplements = quote.supplements ?? [];
   const windows = cancellationWindows(quote.cancelPolicies);
   const amenities = quote.amenities ?? [];
+  // TBO hands this over as its own "DD-MM-YYYY hh:mm:ss" string. Printed
+  // verbatim it broke the site-wide date format and, like the raw policy rows,
+  // could name a deadline that had already passed.
+  const lastDeadlineISO = (() => {
+    const iso = tboDateToISO(quote.lastCancellationDeadline ?? "");
+    return iso && iso > new Date().toISOString() ? iso : "";
+  })();
   const [showAll, setShowAll] = useState(false);
   // Never returns null: TBO's verifier must be able to find the rate's terms on the
   // book page for EVERY rate, including one whose supplier sends no conditions.
@@ -887,12 +895,12 @@ function RateTerms({ quote }: { quote: Quote }) {
             <p className="mt-1 text-muted">{amenities.join(" · ")}</p>
           </div>
         )}
-        {quote.lastCancellationDeadline && (
+        {lastDeadlineISO && (
           <p className="text-muted">
             <span className="font-semibold text-ink">
               Last cancellation deadline:
             </span>{" "}
-            {quote.lastCancellationDeadline} (UTC)
+            {formatDeadline(lastDeadlineISO)}
           </p>
         )}
         <div>

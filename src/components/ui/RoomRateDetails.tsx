@@ -12,7 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format-date";
+import { formatDeadline } from "@/lib/hotel-display";
 import {
   cancellationHeadline,
   cancellationWindows,
@@ -63,14 +63,6 @@ type Quote = {
 function humanise(text: string): string {
   const t = text.replace(/_/g, " ").trim();
   return t ? t[0].toUpperCase() + t.slice(1) : t;
-}
-
-function formatDeadline(iso: string): string {
-  const day = formatDate(iso);
-  const time = iso.slice(11, 16);
-  return time && time !== "00:00"
-    ? `${day}, ${time} UTC`
-    : `${day} (00:00 UTC)`;
 }
 
 function chargeLabel(
