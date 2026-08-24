@@ -509,6 +509,10 @@ async function HotelResults({
           childAges={childAges}
           cityLabel={city.label}
           countryCode={city.countryCode}
+          // TBO cp.27: Book must carry the same guest nationality Search used.
+          // Omitting this let the card's Book link fall back to `nat=IN` for a
+          // guest who had searched as any other nationality.
+          nationality={nationality}
           initialSort={sp.sort}
           initialMinStars={initialMinStars}
           rateFilters={rateFilters}

@@ -67,6 +67,7 @@ export function PlanTripForm({
             id="t-phone"
             name="phone"
             type="tel"
+            inputMode="tel"
             required
             autoComplete="tel"
             placeholder="+91"
@@ -78,6 +79,10 @@ export function PlanTripForm({
             id="t-email"
             name="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             autoComplete="email"
             placeholder="you@email.com"

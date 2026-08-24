@@ -139,6 +139,10 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                   <input
                     className={inputCls}
                     type="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@email.com"
@@ -164,7 +168,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                   <button
                     type="button"
                     onClick={() => setShowPw((s) => !s)}
-                    className="-m-2 flex-none p-2 text-muted hover:text-ink"
+                    className="-m-3.5 flex-none p-3.5 text-muted hover:text-ink"
                     aria-label={showPw ? "Hide password" : "Show password"}
                   >
                     {showPw ? <EyeOff size={18} /> : <Eye size={18} />}

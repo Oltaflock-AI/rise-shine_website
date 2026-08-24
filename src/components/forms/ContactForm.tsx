@@ -40,6 +40,7 @@ export function ContactForm() {
             id="c-phone"
             name="phone"
             type="tel"
+            inputMode="tel"
             required
             autoComplete="tel"
             placeholder="+91"
@@ -54,6 +55,10 @@ export function ContactForm() {
             id="c-email"
             name="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             autoComplete="email"
             placeholder="you@email.com"
             className={controlClass}

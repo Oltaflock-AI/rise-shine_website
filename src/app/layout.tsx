@@ -9,18 +9,22 @@ import { AuthProvider } from "@/lib/auth";
 import { site } from "@/data/site";
 import { cn } from "@/lib/cn";
 
+// Both families ship a variable face, so weight is deliberately omitted: one
+// file covers the whole 100-900 range instead of five static cuts. This also
+// makes globals.css's `font-weight: 800` render as authored rather than being
+// nearest-matched to 900. Dancing Script is a decorative accent that never
+// appears in the LCP, so it is not preloaded.
 const roboto = Roboto({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "700", "900"],
   variable: "--font-roboto",
   display: "swap",
 });
 
 const dancing = Dancing_Script({
   subsets: ["latin"],
-  weight: ["600", "700"],
   variable: "--font-dancing",
   display: "swap",
+  preload: false,
 });
 
 const description =

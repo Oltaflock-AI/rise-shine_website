@@ -19,6 +19,14 @@ export type HeroReviews = { rating: number; count: number; url: string };
 
 export function Hero({ reviews }: { reviews?: HeroReviews }) {
   const [active, setActive] = useState(0);
+  // Slides 2 and 3 are in-viewport, so `loading="lazy"` would fetch them
+  // immediately anyway — three 1920w photos on the critical path of a phone.
+  // The carousel does not move for 6s; mount the rest once the fold is paid for.
+  const [restLoaded, setRestLoaded] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setRestLoaded(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(
@@ -31,7 +39,8 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
   return (
     <section className="relative flex min-h-dvh items-center overflow-hidden bg-navy text-white">
       <div className="absolute inset-0">
-        {heroPhotos.map((p, i) => (
+        {heroPhotos.map((p, i) =>
+          i > 0 && !restLoaded ? null : (
           <Image
             key={p}
             src={photo(p, 1920)}
@@ -44,7 +53,8 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
               i === active ? "opacity-100" : "opacity-0",
             )}
           />
-        ))}
+          ),
+        )}
       </div>
 
       {/* brand wash */}

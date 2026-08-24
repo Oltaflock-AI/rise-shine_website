@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import {
   BadgeCheck,
@@ -147,6 +147,21 @@ export function HotelBookingForm({
   });
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
+
+  /**
+   * On a phone the summary aside — and with it this failure message — sits below
+   * the whole guest form, while the CTA that triggers it is a fixed bar at the
+   * bottom of the screen. Without this the guest taps "Pay & Book" and sees
+   * nothing change. Bring the message into view and announce it.
+   */
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!booked || booked.ok) return;
+    const el = errorRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+  }, [booked]);
 
   // PreBook on mount: confirm the rate + learn what fields TBO requires.
   useEffect(() => {
@@ -522,6 +537,7 @@ export function HotelBookingForm({
                     <div className="grid gap-3 sm:grid-cols-[6rem_1fr_1fr]">
                       <Select
                         value={g.title}
+                        autoComplete={`section-guest${i} honorific-prefix`}
                         onChange={(e) => setGuest(i, { title: e.target.value })}
                         aria-label="Title"
                       >
@@ -531,6 +547,8 @@ export function HotelBookingForm({
                       </Select>
                       <input
                         value={g.first}
+                        autoComplete={`section-guest${i} given-name`}
+                        autoCapitalize="words"
                         onChange={(e) =>
                           setGuest(i, { first: cleanName(e.target.value, v) })
                         }
@@ -540,6 +558,8 @@ export function HotelBookingForm({
                       />
                       <input
                         value={g.last}
+                        autoComplete={`section-guest${i} family-name`}
+                        autoCapitalize="words"
                         onChange={(e) =>
                           setGuest(i, { last: cleanName(e.target.value, v) })
                         }
@@ -553,6 +573,10 @@ export function HotelBookingForm({
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <input
                           type="email"
+                          inputMode="email"
+                          autoComplete="email"
+                          autoCapitalize="none"
+                          autoCorrect="off"
                           value={g.email}
                           onChange={(e) =>
                             setGuest(i, { email: e.target.value })
@@ -563,6 +587,8 @@ export function HotelBookingForm({
                         />
                         <input
                           type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
                           value={g.phone}
                           onChange={(e) =>
                             setGuest(i, { phone: e.target.value })
@@ -576,6 +602,7 @@ export function HotelBookingForm({
 
                     {v?.panMandatory && (
                       <input
+                        autoCapitalize="characters"
                         value={g.pan}
                         onChange={(e) =>
                           setGuest(i, { pan: e.target.value.toUpperCase() })
@@ -590,6 +617,7 @@ export function HotelBookingForm({
                     {v?.passportMandatory && (
                       <div className="mt-3 grid gap-3 sm:grid-cols-3">
                         <input
+                          autoCapitalize="characters"
                           value={g.passportNo}
                           onChange={(e) =>
                             setGuest(i, { passportNo: e.target.value })
@@ -689,11 +717,13 @@ export function HotelBookingForm({
           </p>
         )}
 
-        {booked && !booked.ok && (
-          <p className="mt-4 rounded-brand border border-red/30 bg-red/5 px-3 py-2 text-meta text-red">
-            {booked.error}
-          </p>
-        )}
+        <div ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive">
+          {booked && !booked.ok && (
+            <p className="mt-4 rounded-brand border border-red/30 bg-red/5 px-3 py-2 text-meta text-red">
+              {booked.error}
+            </p>
+          )}
+        </div>
 
         <button
           type="button"

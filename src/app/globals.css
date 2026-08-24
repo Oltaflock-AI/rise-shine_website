@@ -280,6 +280,16 @@
   transform: none;
 }
 
+/* With no JS the IntersectionObserver never fires and every .reveal section
+   stays at opacity 0 — most of /about, /services and /packages would render
+   blank rather than merely unanimated. */
+@media (scripting: none) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

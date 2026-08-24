@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import {
   BadgeCheck,
@@ -192,6 +192,21 @@ export function BookingForm({
   const [addressId, setAddressId] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
+
+  /**
+   * The failure message renders at the foot of the form column, which on a phone
+   * is thousands of pixels from the sticky pay bar that triggered it — a tap on
+   * "Pay" looked like nothing had happened. Bring the message to the guest and
+   * announce it, rather than waiting for them to go looking.
+   */
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!booked || booked.ok) return;
+    const el = errorRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+  }, [booked]);
   /** Captured once — reading the clock during render is impure. */
 
   // Ask TBO what this fare needs BEFORE collecting details (FareQuote flags).
@@ -709,6 +724,7 @@ export function BookingForm({
                 <label className={label}>Title</label>
                 <Select
                   value={p.Title}
+                  autoComplete={`section-pax${i} honorific-prefix`}
                   onChange={(e) => set(i, "Title", e.target.value)}
                 >
                   {TITLES[p.PaxType].map((t) => (
@@ -723,6 +739,8 @@ export function BookingForm({
                 <input
                   className={field}
                   value={p.FirstName}
+                  autoComplete={`section-pax${i} given-name`}
+                  autoCapitalize="words"
                   maxLength={32}
                   onChange={(e) =>
                     set(
@@ -739,6 +757,8 @@ export function BookingForm({
                 <input
                   className={field}
                   value={p.LastName}
+                  autoComplete={`section-pax${i} family-name`}
+                  autoCapitalize="words"
                   maxLength={32}
                   minLength={2}
                   onChange={(e) =>
@@ -758,6 +778,7 @@ export function BookingForm({
                 <label className={label}>Gender</label>
                 <Select
                   value={p.Gender}
+                  autoComplete={`section-pax${i} sex`}
                   onChange={(e) =>
                     set(i, "Gender", Number(e.target.value) as 1 | 2)
                   }
@@ -786,6 +807,7 @@ export function BookingForm({
                   <label className={label}>Passport no.</label>
                   <input
                     className={field}
+                    autoCapitalize="characters"
                     value={p.PassportNo}
                     onChange={(e) => set(i, "PassportNo", e.target.value)}
                   />
@@ -839,6 +861,7 @@ export function BookingForm({
                       <input
                         className={field}
                         value={p.GuardianFirstName}
+                        autoCapitalize="words"
                         maxLength={32}
                         onChange={(e) =>
                           set(
@@ -852,6 +875,7 @@ export function BookingForm({
                       <input
                         className={field}
                         value={p.GuardianLastName}
+                        autoCapitalize="words"
                         maxLength={32}
                         onChange={(e) =>
                           set(
@@ -921,7 +945,8 @@ export function BookingForm({
                 <input
                   className={field}
                   type="tel"
-                  inputMode="numeric"
+                  inputMode="tel"
+                  autoComplete="tel-national"
                   maxLength={10}
                   value={contact.phone}
                   onChange={(e) =>
@@ -940,6 +965,10 @@ export function BookingForm({
               <input
                 className={field}
                 type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={contact.email}
                 onChange={(e) => updateContact({ email: e.target.value })}
                 placeholder="you@example.com"
@@ -962,6 +991,8 @@ export function BookingForm({
               <input
                 className={field}
                 value={contact.address1}
+                autoComplete="address-line1"
+                autoCapitalize="words"
                 maxLength={64}
                 onChange={(e) => updateContact({ address1: e.target.value })}
                 placeholder="Flat / house no., building, street"
@@ -972,6 +1003,8 @@ export function BookingForm({
               <input
                 className={field}
                 value={contact.address2}
+                autoComplete="address-line2"
+                autoCapitalize="words"
                 maxLength={64}
                 onChange={(e) => updateContact({ address2: e.target.value })}
                 placeholder="Area, locality, landmark (optional)"
@@ -984,6 +1017,8 @@ export function BookingForm({
               <input
                 className={field}
                 value={contact.city}
+                autoComplete="address-level2"
+                autoCapitalize="words"
                 maxLength={32}
                 onChange={(e) => updateContact({ city: e.target.value })}
                 placeholder="Ahmedabad"
@@ -994,6 +1029,8 @@ export function BookingForm({
               <input
                 className={field}
                 value={contact.state}
+                autoComplete="address-level1"
+                autoCapitalize="words"
                 maxLength={32}
                 onChange={(e) => updateContact({ state: e.target.value })}
                 placeholder="Gujarat"
@@ -1006,6 +1043,7 @@ export function BookingForm({
               <input
                 className={field}
                 inputMode={contact.countryCode === "IN" ? "numeric" : "text"}
+                autoComplete="postal-code"
                 maxLength={10}
                 value={contact.pin}
                 onChange={(e) =>
@@ -1034,6 +1072,7 @@ export function BookingForm({
               </label>
               <Select
                 value={contact.countryCode}
+                autoComplete="country"
                 onChange={(e) =>
                   updateContact({ countryCode: e.target.value, pin: "" })
                 }
@@ -1071,6 +1110,8 @@ export function BookingForm({
                 <input
                   className={field}
                   value={gst.GSTCompanyName}
+                  autoComplete="organization"
+                  autoCapitalize="words"
                   onChange={(e) =>
                     setGst({ ...gst, GSTCompanyName: e.target.value })
                   }
@@ -1081,6 +1122,7 @@ export function BookingForm({
                 <input
                   className={field}
                   value={gst.GSTNumber}
+                  autoCapitalize="characters"
                   onChange={(e) =>
                     setGst({ ...gst, GSTNumber: e.target.value.toUpperCase() })
                   }
@@ -1090,11 +1132,13 @@ export function BookingForm({
           )}
         </div>
 
-        {booked && !booked.ok && (
-          <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.9rem] text-ink">
-            <b>Booking not completed.</b> {booked.error}
-          </p>
-        )}
+        <div ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive">
+          {booked && !booked.ok && (
+            <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-[0.9rem] text-ink">
+              <b>Booking not completed.</b> {booked.error}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* ── summary ── */}

@@ -23,6 +23,7 @@ export function AboutSplit() {
                 alt="Two travellers planning a journey with a map"
                 width={900}
                 height={1050}
+                sizes="(min-width: 1024px) 46vw, 92vw"
                 className="h-full w-full object-cover"
               />
             </div>

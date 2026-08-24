@@ -84,7 +84,6 @@ export function Header() {
               alt=""
               width={216}
               height={81}
-              priority
               className={cn(
                 "absolute left-0 top-0 h-9 w-auto transition-opacity duration-300 sm:h-11",
                 onLight ? "opacity-100" : "opacity-0",
