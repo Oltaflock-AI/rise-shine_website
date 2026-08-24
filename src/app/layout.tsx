@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Roboto, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
@@ -26,6 +26,24 @@ const dancing = Dancing_Script({
   display: "swap",
   preload: false,
 });
+
+/**
+ * Next already emits `width=device-width, initial-scale=1`, so this is not
+ * about the defaults. It is about `viewportFit`: while it stays "auto" every
+ * `env(safe-area-inset-*)` in the codebase resolves to 0, which silently made
+ * the safe-area padding on the sticky pay bars, the WhatsApp float and the
+ * mobile drawer do nothing on the notched phones it was written for.
+ *
+ * `maximumScale`/`userScalable` are deliberately absent — capping zoom is an
+ * accessibility failure, not a polish item.
+ */
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#083249" },
+    { media: "(prefers-color-scheme: dark)", color: "#083249" },
+  ],
+};
 
 const description =
   "Rise & Shine Travels is Ahmedabad's trusted travel house, established 2011. We handle domestic, international and cruise holidays, flights, hotels, visas and custom tours, all from one team.";

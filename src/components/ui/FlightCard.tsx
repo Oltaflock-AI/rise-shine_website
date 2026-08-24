@@ -398,7 +398,7 @@ export function FlightCard({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="inline-flex items-center gap-1 text-[0.88rem] font-semibold text-red hover:underline"
+          className="-my-2 inline-flex min-h-11 items-center gap-1 py-2 text-[0.88rem] font-semibold text-red hover:underline"
         >
           {open ? "Hide details" : "Flight details & baggage"}
           <ChevronDown

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -28,6 +28,50 @@ export function Header() {
     return () => {
       document.body.style.overflow = "";
     };
+  }, [menuOpen]);
+
+  /**
+   * The drawer was `aria-hidden` while still holding ten tabbable links, so a
+   * keyboard or screen-reader user could tab into a pane nobody can see. Keep
+   * focus inside it while it is open, close it on Escape, and hand focus back
+   * to the button that opened it.
+   */
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const focusables = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+
+    focusables()[0]?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
 
   // Close the mobile menu whenever the route changes.
@@ -143,6 +187,7 @@ export function Header() {
                 "grid h-11 w-11 place-items-center rounded-full lg:hidden",
                 navText,
               )}
+              ref={menuButtonRef}
               aria-label="Open menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen(true)}
@@ -156,16 +201,24 @@ export function Header() {
       {/* Mobile menu */}
       <div
         className={cn(
-          "grad-navy fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain px-8 pb-10 pt-24 transition-transform duration-300 lg:hidden",
+          "grad-navy fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain px-8 pt-24 transition-transform duration-300 lg:hidden",
+          "pb-[calc(2.5rem+env(safe-area-inset-bottom))]",
           menuOpen ? "translate-x-0" : "translate-x-full",
         )}
-        aria-hidden={!menuOpen}
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        inert={!menuOpen}
       >
         <button
           type="button"
           className="absolute right-6 top-6 grid h-11 w-11 place-items-center rounded-full text-white"
           aria-label="Close menu"
-          onClick={() => setMenuOpen(false)}
+          onClick={() => {
+            setMenuOpen(false);
+            menuButtonRef.current?.focus();
+          }}
         >
           <X size={28} />
         </button>

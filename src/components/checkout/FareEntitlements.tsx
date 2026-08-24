@@ -198,7 +198,7 @@ export function FareEntitlements({ details }: { details: QuoteDetails }) {
               type="button"
               onClick={() => setRulesOpen((v) => !v)}
               aria-expanded={rulesOpen}
-              className="mt-4 inline-flex items-center gap-1.5 text-[0.88rem] font-semibold text-red hover:underline"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 py-2 text-[0.88rem] font-semibold text-red hover:underline"
             >
               <FileText className="h-4 w-4" aria-hidden />
               {rulesOpen
