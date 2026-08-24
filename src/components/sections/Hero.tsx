@@ -36,8 +36,13 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
     return () => clearInterval(id);
   }, []);
 
+  // min-h-dvh is right on a laptop and wrong on a phone: measured at 390px the
+  // hero content ran to ~762px, so the search card — the one thing this page
+  // exists to put in front of someone — started at y=780 and no visitor ever
+  // saw it without scrolling. A phone gets a hero sized to its content with a
+  // floor; the full-height treatment starts at sm:.
   return (
-    <section className="relative flex min-h-dvh items-center overflow-hidden bg-navy text-white">
+    <section className="relative flex min-h-[70dvh] items-center overflow-hidden bg-navy text-white sm:min-h-dvh">
       <div className="absolute inset-0">
         {heroPhotos.map((p, i) =>
           i > 0 && !restLoaded ? null : (
@@ -78,7 +83,7 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
       />
 
       <Container className="relative z-10 w-full">
-        <div className="max-w-2xl pb-28 pt-24 lg:pb-0">
+        <div className="max-w-2xl pb-16 pt-20 sm:pb-28 sm:pt-24 lg:pb-0">
           <span className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-white/10 py-2 pl-2.5 pr-4 text-[0.82rem] font-medium backdrop-blur">
             <span className="grad-red rounded-full px-2.5 py-1 text-meta font-bold tracking-wide">
               EST. {site.established}
@@ -95,13 +100,13 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
             </span>
           </h1>
 
-          <p className="mt-6 max-w-xl text-lg font-light text-white/85">
+          <p className="mt-4 max-w-xl font-light text-white/85 sm:mt-6 sm:text-lg">
             We plan thinking of you: your pace, your people, your budget. And
             we sweat the little details so your holiday turns out exceptional.
             Domestic, international and at sea.
           </p>
 
-          <div className="mt-9 flex flex-wrap gap-3.5">
+          <div className="mt-6 flex flex-wrap gap-3.5 sm:mt-9">
             <Button href="/packages" arrow>
               Explore Journeys
             </Button>
@@ -110,7 +115,7 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
             </Button>
           </div>
 
-          <div className="mt-12">
+          <div className="mt-7 sm:mt-12">
             <GoogleReviews tone="dark" {...reviews} />
           </div>
         </div>

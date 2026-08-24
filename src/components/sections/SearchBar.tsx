@@ -321,7 +321,7 @@ export function SearchBar({
   const noteColor = overlap ? "text-muted" : "text-white/85";
 
   return (
-    <div className={cn("relative z-20", overlap && "-mt-16")}>
+    <div className={cn("relative z-40", overlap && "-mt-16")}>
       <Container>
         {collapsible && (
           <button
@@ -341,318 +341,328 @@ export function SearchBar({
         )}
 
         <div className={cn(collapsible && !formOpen && "hidden lg:block")}>
-        {/* Product tabs */}
-        <div className="mx-auto mb-3 flex w-fit gap-1 rounded-full bg-white/95 p-1.5 shadow-brand-sm backdrop-blur">
-          {(
-            [
-              { id: "flights", label: "Flights", Icon: PlaneTakeoff },
-              { id: "hotels", label: "Hotels", Icon: BedDouble },
-            ] as const
-          ).map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setProduct(id)}
-              className={cn(
-                "flex items-center gap-2 rounded-full px-5 py-2 text-[0.9rem] font-semibold transition-colors",
-                product === id
-                  ? "grad-red text-white shadow-brand-red"
-                  : "text-ink hover:text-red",
-              )}
-            >
-              <Icon size={17} aria-hidden />
-              {label}
-            </button>
-          ))}
-        </div>
+          {/* Product tabs */}
+          <div className="mx-auto mb-3 flex w-fit gap-1 rounded-full bg-white/95 p-1.5 shadow-brand-sm backdrop-blur">
+            {(
+              [
+                { id: "flights", label: "Flights", Icon: PlaneTakeoff },
+                { id: "hotels", label: "Hotels", Icon: BedDouble },
+              ] as const
+            ).map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setProduct(id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-5 py-2 text-[0.9rem] font-semibold transition-colors",
+                  product === id
+                    ? "grad-red text-white shadow-brand-red"
+                    : "text-ink hover:text-red",
+                )}
+              >
+                <Icon size={17} aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
 
-        <div className="rounded-[22px] bg-white shadow-brand-lg">
-          {product === "flights" ? (
-            <>
-              {/* trip toggle */}
-              <div className="flex items-center gap-1 border-b border-line px-5 pt-4">
-                <span className="mr-2 hidden text-[0.9rem] font-bold text-ink sm:inline">
-                  Book Flight
-                </span>
-                {(["oneway", "round"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTrip(t)}
-                    className={cn(
-                      "rounded-t-lg px-4 py-2 text-[0.9rem] font-semibold transition-colors",
-                      trip === t
-                        ? "bg-red/10 text-red"
-                        : "text-muted hover:text-ink",
-                    )}
-                  >
-                    {t === "oneway" ? "One-way" : "Round-trip"}
-                  </button>
-                ))}
-              </div>
-
-              <form onSubmit={onSubmitFlights} aria-label="Search flights">
-                <div className="relative grid lg:grid-cols-[1.35fr_1.35fr_0.75fr_0.75fr_1.1fr_auto]">
-                  <span
-                    className="grad-red absolute bottom-3 left-0 top-3 hidden w-1 rounded-r-full lg:block"
-                    aria-hidden
-                  />
-                  <AirportField
-                    label="From"
-                    icon={PlaneTakeoff}
-                    value={from}
-                    onChange={setFrom}
-                    placeholder="Ahmedabad (AMD)"
-                    ariaLabel="From airport"
-                  />
-                  <AirportField
-                    label="To"
-                    icon={MapPin}
-                    value={to}
-                    onChange={setTo}
-                    placeholder="Where to?"
-                    ariaLabel="To airport"
-                    required
-                  />
-                  <Field label="Depart">
-                    <DateField
-                      bare
-                      showDay
-                      value={depart}
-                      min={today || undefined}
-                      onChange={pickDepart}
-                      aria-label="Departure date"
-                    />
-                  </Field>
-                  <Field
-                    label="Return"
-                    className={trip === "oneway" ? "opacity-40" : undefined}
-                  >
-                    <DateField
-                      bare
-                      showDay
-                      value={ret}
-                      min={depart || today || undefined}
-                      disabled={trip === "oneway"}
-                      onChange={setRet}
-                      aria-label="Return date"
-                    />
-                  </Field>
-
-                  {/* Travellers & class */}
-                  <div
-                    className="relative border-b border-line lg:border-b-0 lg:border-l"
-                    ref={paxRef}
-                  >
+          <div className="rounded-[22px] bg-white shadow-brand-lg">
+            {product === "flights" ? (
+              <>
+                {/* trip toggle */}
+                <div className="flex items-center gap-1 border-b border-line px-5 pt-4">
+                  <span className="mr-2 hidden text-[0.9rem] font-bold text-ink sm:inline">
+                    Book Flight
+                  </span>
+                  {(["oneway", "round"] as const).map((t) => (
                     <button
+                      key={t}
                       type="button"
-                      onClick={() => setPaxOpen((o) => !o)}
-                      className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
-                      aria-expanded={paxOpen}
-                    >
-                      <span className="text-meta font-bold uppercase tracking-[0.12em] text-muted">
-                        Travellers &amp; class
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Users
-                          size={17}
-                          className="flex-none text-red"
-                          aria-hidden
-                        />
-                        <span className="flex-1">
-                          <span className="block text-[0.95rem] font-semibold leading-tight text-ink">
-                            {paxTotal} Traveller{paxTotal > 1 ? "s" : ""}
-                          </span>
-                          <span className="block text-[0.82rem] text-muted">
-                            {cabin}
-                          </span>
-                        </span>
-                        <ChevronDown
-                          size={15}
-                          className={cn(
-                            "flex-none text-muted transition-transform",
-                            paxOpen && "rotate-180",
-                          )}
-                          aria-hidden
-                        />
-                      </span>
-                    </button>
-
-                    {paxOpen && (
-                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-2xl border border-line bg-white p-4 shadow-brand lg:left-auto lg:right-0 lg:w-80">
-                        <Stepper
-                          label="Adults"
-                          sub="12+ years"
-                          value={adults}
-                          onChange={setAdultsClamped}
-                          min={1}
-                          max={maxAdults}
-                        />
-                        <Stepper
-                          label="Children"
-                          sub="2–12 years"
-                          value={children}
-                          onChange={(n) =>
-                            setChildren(Math.max(0, Math.min(maxChildren, n)))
-                          }
-                          min={0}
-                          max={maxChildren}
-                        />
-                        <Stepper
-                          label="Infants"
-                          sub="Under 2 years"
-                          value={infants}
-                          onChange={(n) =>
-                            setInfants(Math.max(0, Math.min(maxInfants, n)))
-                          }
-                          min={0}
-                          max={maxInfants}
-                        />
-                        <div className="mt-3 border-t border-line pt-3">
-                          <div className="mb-2 text-[0.82rem] font-bold uppercase tracking-wide text-muted">
-                            Cabin class
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {CABINS.map((c) => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => setCabin(c)}
-                                className={cn(
-                                  "rounded-lg border px-2 py-2 text-[0.88rem] font-semibold transition-colors",
-                                  cabin === c
-                                    ? "border-red bg-red/10 text-red"
-                                    : "border-line text-ink hover:border-red/50",
-                                )}
-                              >
-                                {c}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <Button
-                          variant="navy"
-                          size="sm"
-                          fullWidth
-                          className="mt-3"
-                          onClick={() => setPaxOpen(false)}
-                        >
-                          Done
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid place-items-center p-3.5">
-                    <Button
-                      type="submit"
-                      arrow={!searching}
-                      fullWidth
-                      disabled={searching || sameRoute}
-                    >
-                      {searching ? (
-                        <>
-                          <Loader2
-                            size={17}
-                            className="animate-spin"
-                            aria-hidden
-                          />{" "}
-                          Searching…
-                        </>
-                      ) : (
-                        "Search Flights"
+                      onClick={() => setTrip(t)}
+                      className={cn(
+                        "rounded-t-lg px-4 py-2 text-[0.9rem] font-semibold transition-colors",
+                        trip === t
+                          ? "bg-red/10 text-red"
+                          : "text-muted hover:text-ink",
                       )}
-                    </Button>
-                  </div>
+                    >
+                      {t === "oneway" ? "One-way" : "Round-trip"}
+                    </button>
+                  ))}
                 </div>
 
-                {sameRoute && (
-                  <p
-                    role="alert"
-                    className="flex items-center gap-1.5 border-t border-line bg-red/5 px-5 py-2.5 text-[0.88rem] font-semibold text-red"
-                  >
-                    <TriangleAlert size={14} className="flex-none" aria-hidden />
-                    Departure and destination can&apos;t be the same airport —
-                    pick somewhere to fly to.
-                  </p>
-                )}
-
-                {/* Options row */}
-                <div className="flex flex-col gap-3 border-t border-line px-5 py-3.5 lg:flex-row lg:items-center lg:gap-6">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className="text-[0.82rem] font-bold uppercase tracking-wide text-muted">
-                      Fare type
-                    </span>
-                    {FARE_TYPES.map((f) => (
-                      <label
-                        key={f}
-                        className="flex cursor-pointer items-center gap-1.5 py-2 text-[0.9rem] text-ink lg:py-0"
-                      >
-                        <input
-                          type="radio"
-                          name="fare"
-                          checked={fare === f}
-                          onChange={() => setFare(f)}
-                          className="peer sr-only"
+                <form onSubmit={onSubmitFlights} aria-label="Search flights">
+                  <div className="relative grid lg:grid-cols-[1.35fr_1.35fr_0.75fr_0.75fr_1.1fr_auto]">
+                    <span
+                      className="grad-red absolute bottom-3 left-0 top-3 hidden w-1 rounded-r-full lg:block"
+                      aria-hidden
+                    />
+                    <AirportField
+                      label="From"
+                      icon={PlaneTakeoff}
+                      value={from}
+                      onChange={setFrom}
+                      placeholder="Ahmedabad (AMD)"
+                      ariaLabel="From airport"
+                    />
+                    <AirportField
+                      label="To"
+                      icon={MapPin}
+                      value={to}
+                      onChange={setTo}
+                      placeholder="Where to?"
+                      ariaLabel="To airport"
+                      required
+                    />
+                    {/* Two dates side by side even at 360px — every OTA does this, and
+                      stacked they cost ~110px of a form whose submit button was
+                      already below the fold. `lg:contents` dissolves the wrapper
+                      so the desktop grid still owns the columns. */}
+                    <div className="grid grid-cols-2 border-b border-line [&>*:last-child]:border-l [&>*]:border-b-0 lg:contents lg:border-b-0 lg:[&>*:last-child]:border-l-0">
+                      <Field label="Depart">
+                        <DateField
+                          bare
+                          showDay
+                          value={depart}
+                          min={today || undefined}
+                          onChange={pickDepart}
+                          aria-label="Departure date"
                         />
-                        <span className="grid h-4 w-4 place-items-center rounded-full border-[1.6px] border-line peer-checked:border-red">
-                          <span
+                      </Field>
+                      <Field
+                        label="Return"
+                        className={trip === "oneway" ? "opacity-40" : undefined}
+                      >
+                        <DateField
+                          bare
+                          showDay
+                          value={ret}
+                          min={depart || today || undefined}
+                          disabled={trip === "oneway"}
+                          onChange={setRet}
+                          aria-label="Return date"
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Travellers & class */}
+                    <div
+                      className="relative border-b border-line lg:border-b-0 lg:border-l"
+                      ref={paxRef}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPaxOpen((o) => !o)}
+                        className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
+                        aria-expanded={paxOpen}
+                      >
+                        <span className="text-meta font-bold uppercase tracking-[0.12em] text-muted">
+                          Travellers &amp; class
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <Users
+                            size={17}
+                            className="flex-none text-red"
+                            aria-hidden
+                          />
+                          <span className="flex-1">
+                            <span className="block text-[0.95rem] font-semibold leading-tight text-ink">
+                              {paxTotal} Traveller{paxTotal > 1 ? "s" : ""}
+                            </span>
+                            <span className="block text-[0.82rem] text-muted">
+                              {cabin}
+                            </span>
+                          </span>
+                          <ChevronDown
+                            size={15}
                             className={cn(
-                              "h-2 w-2 rounded-full",
-                              fare === f ? "bg-red" : "bg-transparent",
+                              "flex-none text-muted transition-transform",
+                              paxOpen && "rotate-180",
                             )}
+                            aria-hidden
                           />
                         </span>
-                        {f}
-                      </label>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:ml-auto">
-                    <label className="flex items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
-                      <Plane size={15} className="text-red" aria-hidden />
-                      <Select
-                        bare
-                        value={airline}
-                        onChange={(e) => setAirline(e.target.value)}
-                        aria-label="Preferred airline"
-                        className="font-semibold"
-                      >
-                        {AIRLINES.map((a) => (
-                          <option key={a.code} value={a.code}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
-                      <input
-                        type="checkbox"
-                        checked={nonStop}
-                        onChange={(e) => setNonStop(e.target.checked)}
-                        className="h-5 w-5 accent-red lg:h-4 lg:w-4"
-                      />
-                      Non-stop only
-                    </label>
-                  </div>
-                </div>
-              </form>
-            </>
-          ) : (
-            <HotelsPanel initial={initial} />
-          )}
-        </div>
+                      </button>
 
-        <p
-          className={cn(
-            "mt-3 flex items-center justify-center gap-1.5 text-center text-[0.88rem]",
-            noteColor,
-          )}
-        >
-          <ArrowRightLeft size={13} aria-hidden />
-          {product === "flights"
-            ? "Live fares across 500+ airlines, powered by our booking system."
-            : "Live hotel rates for popular destinations, powered by our booking system."}
-        </p>
+                      {paxOpen && (
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-2xl border border-line bg-white p-4 shadow-brand lg:left-auto lg:right-0 lg:w-80">
+                          <Stepper
+                            label="Adults"
+                            sub="12+ years"
+                            value={adults}
+                            onChange={setAdultsClamped}
+                            min={1}
+                            max={maxAdults}
+                          />
+                          <Stepper
+                            label="Children"
+                            sub="2–12 years"
+                            value={children}
+                            onChange={(n) =>
+                              setChildren(Math.max(0, Math.min(maxChildren, n)))
+                            }
+                            min={0}
+                            max={maxChildren}
+                          />
+                          <Stepper
+                            label="Infants"
+                            sub="Under 2 years"
+                            value={infants}
+                            onChange={(n) =>
+                              setInfants(Math.max(0, Math.min(maxInfants, n)))
+                            }
+                            min={0}
+                            max={maxInfants}
+                          />
+                          <div className="mt-3 border-t border-line pt-3">
+                            <div className="mb-2 text-[0.82rem] font-bold uppercase tracking-wide text-muted">
+                              Cabin class
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {CABINS.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setCabin(c)}
+                                  className={cn(
+                                    "rounded-lg border px-2 py-2 text-[0.88rem] font-semibold transition-colors",
+                                    cabin === c
+                                      ? "border-red bg-red/10 text-red"
+                                      : "border-line text-ink hover:border-red/50",
+                                  )}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <Button
+                            variant="navy"
+                            size="sm"
+                            fullWidth
+                            className="mt-3"
+                            onClick={() => setPaxOpen(false)}
+                          >
+                            Done
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid place-items-center p-3.5">
+                      <Button
+                        type="submit"
+                        arrow={!searching}
+                        fullWidth
+                        disabled={searching || sameRoute}
+                      >
+                        {searching ? (
+                          <>
+                            <Loader2
+                              size={17}
+                              className="animate-spin"
+                              aria-hidden
+                            />{" "}
+                            Searching…
+                          </>
+                        ) : (
+                          "Search Flights"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {sameRoute && (
+                    <p
+                      role="alert"
+                      className="flex items-center gap-1.5 border-t border-line bg-red/5 px-5 py-2.5 text-[0.88rem] font-semibold text-red"
+                    >
+                      <TriangleAlert
+                        size={14}
+                        className="flex-none"
+                        aria-hidden
+                      />
+                      Departure and destination can&apos;t be the same airport —
+                      pick somewhere to fly to.
+                    </p>
+                  )}
+
+                  {/* Options row */}
+                  <div className="flex flex-col gap-3 border-t border-line px-5 py-3.5 lg:flex-row lg:items-center lg:gap-6">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <span className="text-[0.82rem] font-bold uppercase tracking-wide text-muted">
+                        Fare type
+                      </span>
+                      {FARE_TYPES.map((f) => (
+                        <label
+                          key={f}
+                          className="flex cursor-pointer items-center gap-1.5 py-2 text-[0.9rem] text-ink lg:py-0"
+                        >
+                          <input
+                            type="radio"
+                            name="fare"
+                            checked={fare === f}
+                            onChange={() => setFare(f)}
+                            className="peer sr-only"
+                          />
+                          <span className="grid h-4 w-4 place-items-center rounded-full border-[1.6px] border-line peer-checked:border-red">
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                fare === f ? "bg-red" : "bg-transparent",
+                              )}
+                            />
+                          </span>
+                          {f}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:ml-auto">
+                      <label className="flex items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
+                        <Plane size={15} className="text-red" aria-hidden />
+                        <Select
+                          bare
+                          value={airline}
+                          onChange={(e) => setAirline(e.target.value)}
+                          aria-label="Preferred airline"
+                          className="font-semibold"
+                        >
+                          {AIRLINES.map((a) => (
+                            <option key={a.code} value={a.code}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 py-2 text-[0.9rem] font-medium text-ink lg:py-0">
+                        <input
+                          type="checkbox"
+                          checked={nonStop}
+                          onChange={(e) => setNonStop(e.target.checked)}
+                          className="h-5 w-5 accent-red lg:h-4 lg:w-4"
+                        />
+                        Non-stop only
+                      </label>
+                    </div>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <HotelsPanel initial={initial} />
+            )}
+          </div>
+
+          <p
+            className={cn(
+              "mt-3 flex items-center justify-center gap-1.5 text-center text-[0.88rem]",
+              noteColor,
+            )}
+          >
+            <ArrowRightLeft size={13} aria-hidden />
+            {product === "flights"
+              ? "Live fares across 500+ airlines, powered by our booking system."
+              : "Live hotel rates for popular destinations, powered by our booking system."}
+          </p>
         </div>
       </Container>
     </div>
@@ -1083,42 +1093,45 @@ function HotelsPanel({ initial }: { initial?: SearchInitial }) {
             )}
           </div>
         </Field>
-        <Field label="Check-in">
-          <div className="flex items-center gap-2">
-            <CalendarDays
-              size={17}
-              className="flex-none text-red"
-              aria-hidden
-            />
-            <DateField
-              bare
-              showDay
-              className="flex-1"
-              value={checkIn}
-              min={today || undefined}
-              onChange={pickCheckIn}
-              aria-label="Check-in date"
-            />
-          </div>
-        </Field>
-        <Field label="Check-out">
-          <div className="flex items-center gap-2">
-            <CalendarDays
-              size={17}
-              className="flex-none text-red"
-              aria-hidden
-            />
-            <DateField
-              bare
-              showDay
-              className="flex-1"
-              value={checkOut}
-              min={checkIn || today || undefined}
-              onChange={setCheckOut}
-              aria-label="Check-out date"
-            />
-          </div>
-        </Field>
+        {/* Same pairing as the flights form. */}
+        <div className="grid grid-cols-2 border-b border-line [&>*:last-child]:border-l [&>*]:border-b-0 lg:contents lg:border-b-0 lg:[&>*:last-child]:border-l-0">
+          <Field label="Check-in">
+            <div className="flex items-center gap-2">
+              <CalendarDays
+                size={17}
+                className="flex-none text-red"
+                aria-hidden
+              />
+              <DateField
+                bare
+                showDay
+                className="flex-1"
+                value={checkIn}
+                min={today || undefined}
+                onChange={pickCheckIn}
+                aria-label="Check-in date"
+              />
+            </div>
+          </Field>
+          <Field label="Check-out">
+            <div className="flex items-center gap-2">
+              <CalendarDays
+                size={17}
+                className="flex-none text-red"
+                aria-hidden
+              />
+              <DateField
+                bare
+                showDay
+                className="flex-1"
+                value={checkOut}
+                min={checkIn || today || undefined}
+                onChange={setCheckOut}
+                aria-label="Check-out date"
+              />
+            </div>
+          </Field>
+        </div>
         {/* Guests & rooms — popover mirroring the flights travellers control */}
         <div
           className="relative border-b border-line lg:border-b-0 lg:border-l"
