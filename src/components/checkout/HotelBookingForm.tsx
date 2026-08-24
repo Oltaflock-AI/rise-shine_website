@@ -749,7 +749,7 @@ export function HotelBookingForm({
 
       {/* Mobile sticky pay bar — the summary card sits below the form on small
           screens, so surface the total + CTA without scrolling past it. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
         <div className="min-w-0">
           <p className="text-meta font-bold uppercase tracking-wide text-muted">
             Total

@@ -359,32 +359,55 @@ export function BookingForm({
   const totalFare =
     quote?.publishedFare ?? Number(b.fare || 0) * (adults + children);
 
-  const canSubmit = useMemo(() => {
-    if (!quote?.ok || booking) return false;
-    if (!/^\d{10}$/.test(contact.phone.trim())) return false;
-    if (!contact.email.trim()) return false;
-    if (!contact.address1.trim() || !contact.city.trim() || !pinValid)
-      return false;
+  /**
+   * The FIRST thing stopping this booking, named.
+   *
+   * This used to be a boolean that greyed the pay button out across twenty-odd
+   * fields without saying which one was empty. On a phone the offending field
+   * is usually off-screen, so the guest was left tapping a dead button with no
+   * idea what it wanted. The button stays live now and a tap says what is
+   * missing — the error is announced and scrolled to, see errorRef above.
+   */
+  const problem = useMemo<string | null>(() => {
+    if (!quote?.ok) return "We could not confirm this fare. Please try again.";
+    if (!/^\d{10}$/.test(contact.phone.trim()))
+      return "Enter a 10-digit mobile number for the booking contact.";
+    if (!contact.email.trim())
+      return "Enter an email address — the e-ticket goes there.";
+    if (!contact.address1.trim()) return "Enter the billing address.";
+    if (!contact.city.trim()) return "Enter the billing city.";
+    if (!pinValid)
+      return contact.countryCode === "IN"
+        ? "Enter a 6-digit PIN code for the billing address."
+        : "Enter a postal code for the billing address.";
     if (needGst && (!gst.GSTNumber.trim() || !gst.GSTCompanyName.trim()))
-      return false;
-    return pax.every((p) => {
-      if (!p.FirstName.trim() || p.LastName.trim().length < 2) return false;
-      if ((p.PaxType === 2 || p.PaxType === 3) && !p.DateOfBirth) return false;
-      if (needPassport && (!p.PassportNo.trim() || !p.PassportExpiry))
-        return false;
-      if (needFullPassport && !p.PassportIssueDate) return false;
+      return "This fare needs a GST company name and GSTIN.";
+
+    for (const [i, p] of pax.entries()) {
+      const who = `${TYPE_LABEL[p.PaxType]} ${i + 1}`;
+      if (!p.FirstName.trim()) return `${who} needs a first name.`;
+      if (p.LastName.trim().length < 2)
+        return `${who} needs a last name of at least two letters.`;
+      if ((p.PaxType === 2 || p.PaxType === 3) && !p.DateOfBirth)
+        return `${who} needs a date of birth.`;
+      if (needPassport && !p.PassportNo.trim())
+        return `${who} needs a passport number.`;
+      if (needPassport && !p.PassportExpiry)
+        return `${who} needs a passport expiry date.`;
+      if (needFullPassport && !p.PassportIssueDate)
+        return `${who} needs a passport issue date.`;
       if (needPan) {
         // Adult pax type enters their own PAN (the form has no guardian fields
         // for adults — TBO rejects guardian PAN for 18+ anyway); child/infant
         // bookings carry a guardian's.
-        if (p.PaxType === 1) return Boolean(p.PAN.trim());
-        return Boolean(p.GuardianPAN.trim());
+        if (p.PaxType === 1 && !p.PAN.trim()) return `${who} needs a PAN.`;
+        if (p.PaxType !== 1 && !p.GuardianPAN.trim())
+          return `${who} needs a parent or guardian PAN.`;
       }
-      return true;
-    });
+    }
+    return null;
   }, [
     quote,
-    booking,
     contact,
     gst,
     pax,
@@ -525,6 +548,11 @@ export function BookingForm({
    * credentials would issue a real ticket on agency credit with no money collected.
    */
   async function submit() {
+    // Say what is missing rather than sitting there greyed out.
+    if (problem) {
+      setBooked({ ok: false, error: problem });
+      return;
+    }
     setBooking(true);
     setBooked(null);
     const passengers = buildPassengers();
@@ -1195,7 +1223,7 @@ export function BookingForm({
 
           <button
             type="button"
-            disabled={!canSubmit}
+            disabled={booking}
             onClick={submit}
             className="grad-red hidden w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 lg:inline-flex"
           >
@@ -1217,7 +1245,7 @@ export function BookingForm({
 
       {/* Mobile sticky pay bar — the summary card sits below the form on small
           screens, so surface the total + CTA without scrolling past it. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
         <div className="min-w-0">
           <p className="text-meta font-bold uppercase tracking-wide text-muted">
             Total
@@ -1228,7 +1256,7 @@ export function BookingForm({
         </div>
         <button
           type="button"
-          disabled={!canSubmit}
+          disabled={booking}
           onClick={submit}
           className="grad-red inline-flex min-h-11 flex-none items-center justify-center gap-2 rounded-full px-5 text-[0.9rem] font-semibold text-white shadow-brand-red disabled:cursor-not-allowed disabled:opacity-50"
         >

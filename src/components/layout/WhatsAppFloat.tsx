@@ -1,8 +1,23 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import { waHref } from "@/lib/whatsapp";
+
+/**
+ * Pages that own the bottom of the phone screen. Both checkouts pin a pay bar
+ * there, and the float landed on top of it — so the bars each reserved 84px of
+ * their own width to dodge it, which left 58px for the total and truncated a
+ * real fare to "Rs 1,23...". A chat button is not worth a mangled price on the
+ * screen where someone is about to pay, so it stands down instead.
+ */
+const NO_FLOAT = ["/checkout", "/hotels/checkout"];
 
 /** Floating WhatsApp contact button (keeps WhatsApp's official green). */
 export function WhatsAppFloat() {
+  const pathname = usePathname();
   const href = waHref();
+  if (NO_FLOAT.some((p) => pathname === p || pathname.startsWith(`${p}/`)))
+    return null;
   // Nothing to float to while the mobile is not on WhatsApp.
   if (!href) return null;
   return (

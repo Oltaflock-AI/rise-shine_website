@@ -58,7 +58,12 @@ export function Select({
             : cn(
                 controlClass,
                 size === "sm"
-                  ? "min-h-10 px-3 py-2 pr-9 text-[0.9rem]"
+                  // 16px, not 14.4px: iOS Safari zooms the whole page in when
+                  // a control under 16px takes focus, and never zooms back out
+                  // — which on the guests popover meant picking a child's age
+                  // left the search bar magnified and half off-screen. Dense
+                  // means shorter and tighter, not smaller type.
+                  ? "min-h-11 px-3 py-2 pr-9 text-base"
                   : "pr-11",
               ),
           className,

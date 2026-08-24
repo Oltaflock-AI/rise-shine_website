@@ -982,7 +982,10 @@ export function FlightResultsClient({
 
       {/* Round-trip pairing bar — appears once either leg is selected. */}
       {pairing && (selOut || selIn) && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 shadow-[0_-4px_20px_rgba(8,50,73,0.12)] backdrop-blur">
+        /* z-40 so it clears the WhatsApp float (z-30), which otherwise sat
+           directly on "Book both", and safe-area padding so the home indicator
+           does not. */
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(8,50,73,0.12)] backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-1">
               {/* Each leg names its own date. Two legs of a round trip are
