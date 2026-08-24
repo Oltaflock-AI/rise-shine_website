@@ -116,7 +116,7 @@ export function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="inline-block py-1.5 text-[0.93rem] text-white/65 transition-all duration-200 hover:translate-x-1 hover:text-white"
+                      className="inline-flex min-h-11 items-center py-1.5 text-[0.93rem] text-white/65 transition-all duration-200 hover:translate-x-1 hover:text-white"
                     >
                       {l.label}
                     </Link>
@@ -145,17 +145,17 @@ export function Footer() {
                   aria-hidden
                 />
                 <span className="flex flex-col">
-                  <a href={site.phone.landlineHref} className="hover:text-white">
+                  <a href={site.phone.landlineHref} className="inline-flex min-h-11 items-center hover:text-white">
                     {site.phone.landlineDisplay}
                   </a>
-                  <a href={site.phone.mobileHref} className="hover:text-white">
+                  <a href={site.phone.mobileHref} className="inline-flex min-h-11 items-center hover:text-white">
                     {site.phone.mobileDisplay}
                   </a>
                 </span>
               </li>
               <li className="flex gap-3">
                 <Mail size={18} className="flex-none text-silver" aria-hidden />
-                <a href={`mailto:${site.email}`} className="break-all hover:text-white">
+                <a href={`mailto:${site.email}`} className="inline-flex min-h-11 items-center break-all hover:text-white">
                   {site.email}
                 </a>
               </li>

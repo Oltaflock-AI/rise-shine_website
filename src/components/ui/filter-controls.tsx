@@ -103,10 +103,8 @@ export function CheckRow({
   );
 }
 
-const THUMB =
-  "pointer-events-none absolute inset-0 h-6 w-full appearance-none bg-transparent " +
-  "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-red [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer " +
-  "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-red [&::-moz-range-thumb]:cursor-pointer";
+/** See `.range-thumb` in globals.css — a 44px target around a small dot. */
+const THUMB = "range-thumb";
 
 export function DualRange({
   min,
@@ -136,7 +134,7 @@ export function DualRange({
       <div className="mb-1.5 text-[0.9rem] font-medium text-ink">
         {format(lo)} – {format(hi)}
       </div>
-      <div className="relative h-6">
+      <div className="relative h-11">
         <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-line" />
         <div
           className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-red"

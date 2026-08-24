@@ -89,7 +89,7 @@ export function HotelLocation({
           {phone && (
             <a
               href={`tel:${phone.replace(/[^+\d]/g, "")}`}
-              className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-red"
+              className="inline-flex min-h-11 items-center gap-1.5 font-medium text-ink hover:text-red"
             >
               <Phone size={13} className="text-red" aria-hidden />
               {phone}
@@ -100,7 +100,7 @@ export function HotelLocation({
               href={website}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-red"
+              className="inline-flex min-h-11 items-center gap-1.5 font-medium text-ink hover:text-red"
             >
               <Globe size={13} className="text-red" aria-hidden />
               Hotel website

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
   Search,
+  X,
   SlidersHorizontal,
 } from "lucide-react";
 import { HotelCard, type HotelStub } from "./HotelCard";
@@ -138,6 +139,23 @@ export function HotelResultsClient({
       : "reco",
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // The sheet scrolls; the list behind it must not. Without this a flick that
+  // runs past the end of the sheet keeps going and the results move under it.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const mobile = window.matchMedia("(max-width: 1023px)");
+    if (!mobile.matches) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [filtersOpen]);
 
   // Filter domain from the raw result set.
   const domain = useMemo(() => {
@@ -238,16 +256,40 @@ export function HotelResultsClient({
     : SORT_TABS.filter((t) => t.key !== "reviews");
   const activeHint = tabs.find((t) => t.key === sort)?.hint;
 
+  /**
+   * On a phone this used to expand inline, injecting ~886px between the button
+   * that opened it and the results it filters — you tapped "Filters", the list
+   * left the screen, and there was no close control anywhere near your thumb.
+   * It is a bottom sheet on mobile and the same sidebar panel from lg: up.
+   */
   const filtersPanel = (
     <div
       className={cn(
-        "rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm",
-        filtersOpen ? "block" : "hidden",
-        "lg:block",
+        "border-line bg-white",
+        // Mobile: a sheet pinned to the bottom of the viewport, scrollable,
+        // never taller than 85% of the screen, clear of the home indicator.
+        filtersOpen
+          ? "fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-brand-lg border-t p-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-brand-lg"
+          : "hidden",
+        // Desktop: back to a plain card in the sidebar.
+        "lg:static lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-brand-lg lg:border lg:p-5 lg:pb-5 lg:shadow-brand-sm",
       )}
+      role={filtersOpen ? "dialog" : undefined}
+      aria-modal={filtersOpen ? true : undefined}
+      aria-label="Filters"
     >
       <div className="flex items-center justify-between pb-1">
         <h2 className="text-lead font-bold text-ink">Filters</h2>
+        {/* The sheet is dismissible three ways — scrim, this, and the CTA —
+            because it covers the list it is filtering. */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(false)}
+          aria-label="Close filters"
+          className="-mr-2 grid h-11 w-11 place-items-center rounded-full text-muted hover:text-ink lg:hidden"
+        >
+          <X className="h-5 w-5" aria-hidden />
+        </button>
         {clientFiltersActive && (
           <button
             type="button"
@@ -375,7 +417,28 @@ export function HotelResultsClient({
           {filtersOpen ? "Hide filters" : "Filters"}
           {anyFiltersActive && !filtersOpen ? " · on" : ""}
         </button>
+        {/* The scrim is the other half of the sheet: it dims the list, catches
+            the tap that closes it, and stops the page scrolling underneath. */}
+        {filtersOpen && (
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={() => setFiltersOpen(false)}
+            className="fixed inset-0 z-40 bg-navy/40 lg:hidden"
+          />
+        )}
         {filtersPanel}
+        {filtersOpen && (
+          <div className="fixed inset-x-0 bottom-0 z-[51] border-t border-line bg-white px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="grad-red flex min-h-11 w-full items-center justify-center rounded-full text-body font-semibold text-white shadow-brand-red"
+            >
+              Show {sorted.length} hotel{sorted.length === 1 ? "" : "s"}
+            </button>
+          </div>
+        )}
       </aside>
 
       <div className="min-w-0 flex-1" ref={listTop}>

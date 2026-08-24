@@ -357,3 +357,49 @@
 .fare-rule-html strong {
   font-weight: 700;
 }
+
+/**
+ * Dual price slider thumbs.
+ *
+ * These were 16px squares on a track with `pointer-events: none` (needed so the
+ * two overlapping inputs do not block each other), which left a 16px target for
+ * a fingertip and made the price filter effectively undraggable on a phone.
+ *
+ * The thumb is now a 44px transparent box — the WCAG target size — with the
+ * visible dot painted inside it by a radial gradient. What the guest sees is
+ * unchanged in size; what the guest can hit is nearly three times bigger.
+ */
+.range-thumb {
+  --thumb: radial-gradient(
+    circle at center,
+    var(--color-red) 0 7px,
+    #fff 7px 9.5px,
+    transparent 9.5px
+  );
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  background: transparent;
+}
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  height: 44px;
+  width: 44px;
+  border: 0;
+  border-radius: 9999px;
+  background-image: var(--thumb);
+  cursor: pointer;
+}
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 44px;
+  width: 44px;
+  border: 0;
+  border-radius: 9999px;
+  background-image: var(--thumb);
+  cursor: pointer;
+}
