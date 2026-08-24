@@ -174,7 +174,7 @@ export default async function PackageDetailPage({
             <span className="text-white">{pkg.name}</span>
           </nav>
 
-          <span className="grad-red mb-4 inline-block rounded-full px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-wide">
+          <span className="grad-red mb-4 inline-block rounded-full px-3 py-1.5 text-meta font-bold uppercase tracking-wide">
             {CATEGORY_LABEL[pkg.category]} · {pkg.durationNights}N / {pkg.durationDays}D
           </span>
           <h1 className="h-lg max-w-3xl text-white">{pkg.title}</h1>
@@ -203,7 +203,7 @@ export default async function PackageDetailPage({
                   <f.icon size={18} strokeWidth={2} aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     {f.label}
                   </dt>
                   <dd className="text-[0.95rem] font-semibold text-ink">
@@ -230,7 +230,7 @@ export default async function PackageDetailPage({
               <div className="relative mt-8 space-y-8 border-l-2 border-line pl-8">
                 {pkg.narrativeDays.map((d) => (
                   <Reveal key={d.dayIndex} className="relative">
-                    <span className="grad-red absolute -left-[41px] grid h-8 w-8 place-items-center rounded-full text-[0.8rem] font-bold text-white ring-4 ring-cream">
+                    <span className="grad-red absolute -left-[41px] grid h-8 w-8 place-items-center rounded-full text-meta font-bold text-white ring-4 ring-cream">
                       {d.dayIndex + 1}
                     </span>
                     <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
@@ -238,7 +238,7 @@ export default async function PackageDetailPage({
                         <h3 className="text-[1.15rem] font-bold text-ink">
                           Day {d.dayIndex + 1}: {d.headline}
                         </h3>
-                        <span className="inline-flex items-center gap-1.5 text-[0.8rem] font-medium text-muted">
+                        <span className="inline-flex items-center gap-1.5 text-meta font-medium text-muted">
                           <MapPin size={13} className="text-red" aria-hidden />
                           {d.cityLabel}
                         </span>
@@ -259,7 +259,7 @@ export default async function PackageDetailPage({
                                   href={a.place.mapsUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="mt-1 inline-flex items-center gap-1 text-[0.8rem] font-medium text-red hover:underline"
+                                  className="mt-1 inline-flex items-center gap-1 text-meta font-medium text-red hover:underline"
                                 >
                                   <MapPin size={12} aria-hidden /> {a.place.name}
                                 </a>
@@ -269,7 +269,7 @@ export default async function PackageDetailPage({
                         ))}
                       </ul>
                       {d.overnight && d.overnight !== "Departure" && (
-                        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-[0.8rem] font-medium text-navy">
+                        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-meta font-medium text-navy">
                           <BedDouble size={13} className="text-red" aria-hidden />
                           Overnight: {d.overnight}
                         </p>
@@ -294,7 +294,7 @@ export default async function PackageDetailPage({
                       key={leg.label}
                       className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm"
                     >
-                      <div className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                      <div className="text-meta font-bold uppercase tracking-wide text-muted">
                         {leg.label}
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-[1.05rem] font-bold text-ink">
@@ -377,14 +377,14 @@ export default async function PackageDetailPage({
                       ["Fee", pkg.visa.fee],
                     ].map(([k, v]) => (
                       <div key={k}>
-                        <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                        <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                           {k}
                         </dt>
                         <dd className="text-[0.9rem] text-ink">{v}</dd>
                       </div>
                     ))}
                     <div className="sm:col-span-2">
-                      <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                      <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                         Documents
                       </dt>
                       <dd className="text-[0.9rem] text-ink">{pkg.visa.docs}</dd>
@@ -428,7 +428,7 @@ export default async function PackageDetailPage({
             <aside className="lg:relative">
               <div className="lg:sticky lg:top-28">
                 <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand">
-                  <div className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <div className="text-meta font-bold uppercase tracking-wide text-muted">
                     {CATEGORY_LABEL[pkg.category]} · {pkg.durationNights}N / {pkg.durationDays}D
                   </div>
                   <div className="mt-1 text-[1.2rem] font-bold leading-tight text-ink">
@@ -439,7 +439,7 @@ export default async function PackageDetailPage({
                   </div>
 
                   <div className="my-5 border-t border-dashed border-line pt-5">
-                    <div className="text-[0.72rem] font-semibold uppercase tracking-wide text-muted">
+                    <div className="text-meta font-semibold uppercase tracking-wide text-muted">
                       Starting price
                     </div>
                     <div className="text-[1.5rem] font-extrabold text-navy">
@@ -482,7 +482,7 @@ export default async function PackageDetailPage({
           <div className="truncate text-[0.9rem] font-bold text-ink">
             {pkg.tourName}
           </div>
-          <div className="text-[0.75rem] text-muted">
+          <div className="text-meta text-muted">
             {pkg.durationNights}N / {pkg.durationDays}D · On enquiry
           </div>
         </div>

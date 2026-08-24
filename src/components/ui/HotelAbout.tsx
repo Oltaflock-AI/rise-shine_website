@@ -28,7 +28,7 @@ export function HotelAbout({
         {sections.map((s, i) => (
           <section key={i}>
             {s.heading && (
-              <h4 className="mb-1.5 text-[0.8rem] font-bold uppercase tracking-[0.08em] text-red">
+              <h4 className="mb-1.5 text-meta font-bold uppercase tracking-[0.08em] text-red">
                 {s.heading}
               </h4>
             )}

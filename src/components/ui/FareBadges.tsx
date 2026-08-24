@@ -33,7 +33,7 @@ export function FareBadges({
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {offer.fareType && (
         <span
-          className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.76rem] font-semibold text-ink"
+          className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-meta font-semibold text-ink"
           style={
             offer.fareType.color
               ? {
@@ -47,12 +47,12 @@ export function FareBadges({
         </span>
       )}
       {offer.freeMeal && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[0.76rem] font-semibold text-emerald-700">
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-meta font-semibold text-emerald-700">
           <UtensilsCrossed size={11} aria-hidden /> Meal included
         </span>
       )}
       {scarce && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-red/10 px-2.5 py-0.5 text-[0.76rem] font-semibold text-red">
+        <span className="inline-flex items-center gap-1 rounded-full bg-red/10 px-2.5 py-0.5 text-meta font-semibold text-red">
           <Flame size={11} aria-hidden />
           {offer.seatsLeft === 1
             ? "1 seat left"

@@ -21,6 +21,7 @@ import {
   Plane,
   PlaneTakeoff,
   Plus,
+  SlidersHorizontal,
   TriangleAlert,
   Users,
 } from "lucide-react";
@@ -99,7 +100,7 @@ function Field({
         className,
       )}
     >
-      <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
+      <span className="text-meta font-bold uppercase tracking-[0.12em] text-muted">
         {label}
       </span>
       {children}
@@ -195,11 +196,21 @@ function Stepper({
 export function SearchBar({
   initial,
   overlap = true,
+  collapsible = false,
 }: {
   initial?: SearchInitial;
   overlap?: boolean;
+  /**
+   * Results pages only. The full form is ~850px tall on a phone, which pushed
+   * the first flight result to y=1618 and the first hotel to y=1182 — nobody
+   * arrives at a results page wanting to look at the form they just filled in.
+   * Collapsed to a single button on small screens; desktop is unaffected,
+   * where the form costs one row and re-searching is the common action.
+   */
+  collapsible?: boolean;
 }) {
   const router = useRouter();
+  const [formOpen, setFormOpen] = useState(false);
 
   const [product, setProduct] = useState<"flights" | "hotels">(
     initial?.product ?? "flights",
@@ -312,6 +323,24 @@ export function SearchBar({
   return (
     <div className={cn("relative z-20", overlap && "-mt-16")}>
       <Container>
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setFormOpen((o) => !o)}
+            aria-expanded={formOpen}
+            className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 text-[0.95rem] font-semibold text-white backdrop-blur transition-colors hover:bg-white/20 lg:hidden"
+          >
+            <SlidersHorizontal size={17} aria-hidden />
+            {formOpen ? "Hide search" : "Change search"}
+            <ChevronDown
+              size={17}
+              aria-hidden
+              className={cn("transition-transform", formOpen && "rotate-180")}
+            />
+          </button>
+        )}
+
+        <div className={cn(collapsible && !formOpen && "hidden lg:block")}>
         {/* Product tabs */}
         <div className="mx-auto mb-3 flex w-fit gap-1 rounded-full bg-white/95 p-1.5 shadow-brand-sm backdrop-blur">
           {(
@@ -421,7 +450,7 @@ export function SearchBar({
                       className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
                       aria-expanded={paxOpen}
                     >
-                      <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
+                      <span className="text-meta font-bold uppercase tracking-[0.12em] text-muted">
                         Travellers &amp; class
                       </span>
                       <span className="flex items-center gap-2">
@@ -624,6 +653,7 @@ export function SearchBar({
             ? "Live fares across 500+ airlines, powered by our booking system."
             : "Live hotel rates for popular destinations, powered by our booking system."}
         </p>
+        </div>
       </Container>
     </div>
   );
@@ -769,7 +799,7 @@ function AirportField({
           >
             {typed.length < 2 ? (
               <>
-                <div className="mb-2 text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
+                <div className="mb-2 text-meta font-bold uppercase tracking-[0.12em] text-muted">
                   Popular in India
                 </div>
                 <div className="grid grid-cols-1 gap-1">
@@ -777,7 +807,7 @@ function AirportField({
                     <AirportOption key={a.code} airport={a} onPick={pick} />
                   ))}
                 </div>
-                <div className="mb-2 mt-4 text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
+                <div className="mb-2 mt-4 text-meta font-bold uppercase tracking-[0.12em] text-muted">
                   Popular international
                 </div>
                 <div className="grid grid-cols-1 gap-1">
@@ -1100,7 +1130,7 @@ function HotelsPanel({ initial }: { initial?: SearchInitial }) {
             className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
             aria-expanded={paxOpen}
           >
-            <span className="text-[0.76rem] font-bold uppercase tracking-[0.12em] text-muted">
+            <span className="text-meta font-bold uppercase tracking-[0.12em] text-muted">
               Guests &amp; rooms
             </span>
             <span className="flex items-center gap-2">

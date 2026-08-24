@@ -280,7 +280,7 @@ export function FlightCard({
                 unoptimized
               />
             ) : (
-              <span className="text-[0.76rem] font-bold text-navy">
+              <span className="text-meta font-bold text-navy">
                 {offer.airlineCode}
               </span>
             )}

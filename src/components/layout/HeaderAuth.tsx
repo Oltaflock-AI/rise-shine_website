@@ -70,7 +70,7 @@ export function HeaderAuth({ scrolled }: { scrolled: boolean }) {
         >
           <div className="border-b border-line px-3 py-2.5">
             <p className="truncate text-[0.9rem] font-bold text-ink">{user.name}</p>
-            <p className="truncate text-[0.78rem] text-muted">{user.email}</p>
+            <p className="truncate text-meta text-muted">{user.email}</p>
           </div>
           <Link
             href="/account"
@@ -130,7 +130,7 @@ export function HeaderAuthMobile({ onNavigate }: { onNavigate: () => void }) {
         </span>
         <div className="min-w-0">
           <p className="truncate font-bold text-white">{user.name}</p>
-          <p className="truncate text-[0.8rem] text-white/70">{user.email}</p>
+          <p className="truncate text-meta text-white/70">{user.email}</p>
         </div>
       </div>
       <div className="mt-3 flex gap-2">

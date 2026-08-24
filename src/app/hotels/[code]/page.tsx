@@ -420,12 +420,12 @@ async function RoomOptions({
                   {(room.withTransfers || room.packageFare) && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {room.withTransfers && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[0.76rem] font-semibold text-sky-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-meta font-semibold text-sky-800">
                           <CarFront size={11} aria-hidden /> Transfers included
                         </span>
                       )}
                       {room.packageFare && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-0.5 text-[0.76rem] font-semibold text-violet-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-0.5 text-meta font-semibold text-violet-800">
                           <Package size={11} aria-hidden /> Package rate
                         </span>
                       )}
@@ -435,7 +435,7 @@ async function RoomOptions({
                     content={matchRoomContent(room.name, roomContent)}
                   />
                   {room.inclusion && (
-                    <p className="mt-1 text-[0.78rem] text-muted/90">
+                    <p className="mt-1 text-meta text-muted/90">
                       {room.inclusion.toLowerCase().replace(/,/g, " · ")}
                     </p>
                   )}
@@ -445,7 +445,7 @@ async function RoomOptions({
                       {room.roomPromotions!.map((p, k) => (
                         <li
                           key={k}
-                          className="flex items-start gap-1.5 text-[0.78rem] font-medium text-green-700"
+                          className="flex items-start gap-1.5 text-meta font-medium text-green-700"
                         >
                           <BadgePercent
                             size={13}
@@ -458,7 +458,7 @@ async function RoomOptions({
                     </ul>
                   )}
                   {(room.amenities?.length ?? 0) > 0 && (
-                    <p className="mt-1.5 flex items-start gap-1.5 text-[0.78rem] text-muted">
+                    <p className="mt-1.5 flex items-start gap-1.5 text-meta text-muted">
                       <Check
                         size={13}
                         className="mt-0.5 flex-none text-red"
@@ -470,7 +470,7 @@ async function RoomOptions({
                   {/* Mandatory charges collected BY THE HOTEL, usually in
                               its local currency — TBO portal checkpoint 19. */}
                   {(room.supplements?.length ?? 0) > 0 && (
-                    <div className="mt-2 rounded-brand border border-amber-300 bg-amber-50 px-3 py-2 text-[0.78rem] text-amber-900">
+                    <div className="mt-2 rounded-brand border border-amber-300 bg-amber-50 px-3 py-2 text-meta text-amber-900">
                       <span className="font-semibold">
                         Payable at the hotel
                       </span>{" "}
@@ -503,7 +503,7 @@ async function RoomOptions({
                     </div>
                   )}
                   {room.beddingNote && (
-                    <p className="mt-1.5 text-[0.76rem] italic text-muted/90">
+                    <p className="mt-1.5 text-meta italic text-muted/90">
                       {room.beddingNote}
                     </p>
                   )}
@@ -517,7 +517,7 @@ async function RoomOptions({
                     <div className="text-[1.15rem] font-extrabold text-navy">
                       {money.format(room.totalFare)}
                     </div>
-                    <div className="text-[0.72rem] text-muted">
+                    <div className="text-meta text-muted">
                       total · {nights} night{nights > 1 ? "s" : ""} · incl.
                       taxes
                     </div>

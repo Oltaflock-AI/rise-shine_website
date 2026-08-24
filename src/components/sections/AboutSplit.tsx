@@ -35,7 +35,7 @@ export function AboutSplit() {
                 <div className="text-[1.2rem] font-bold leading-tight text-navy">
                   Years
                 </div>
-                <div className="text-[0.78rem] text-muted">
+                <div className="text-meta text-muted">
                   of happy travellers
                 </div>
               </div>

@@ -33,7 +33,7 @@ export function RecentSearches({
 
   return (
     <div className={cn("text-left", className)}>
-      <p className="mb-2 flex items-center gap-1.5 text-[0.76rem] font-bold uppercase tracking-wide text-muted">
+      <p className="mb-2 flex items-center gap-1.5 text-meta font-bold uppercase tracking-wide text-muted">
         <History size={13} aria-hidden /> Recent searches
       </p>
       <div className="flex flex-wrap gap-2">

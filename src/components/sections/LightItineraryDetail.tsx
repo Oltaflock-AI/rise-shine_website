@@ -110,7 +110,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
             <span className="text-white">{it.name}</span>
           </nav>
 
-          <span className="grad-red mb-4 inline-block rounded-full px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-wide">
+          <span className="grad-red mb-4 inline-block rounded-full px-3 py-1.5 text-meta font-bold uppercase tracking-wide">
             {CATEGORY_LABEL[it.category]} · {durationLabel}
           </span>
           <h1 className="h-lg max-w-3xl text-white">{it.name}</h1>
@@ -139,7 +139,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
                   <f.icon size={18} strokeWidth={2} aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     {f.label}
                   </dt>
                   <dd className="text-[0.95rem] font-semibold text-ink">
@@ -169,11 +169,11 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
               <div className="relative space-y-6 border-l-2 border-line pl-8">
                 {it.itinerary.map((d) => (
                   <Reveal key={d.day} className="relative">
-                    <span className="grad-red absolute -left-[41px] grid h-8 w-8 place-items-center rounded-full text-[0.8rem] font-bold text-white ring-4 ring-cream">
+                    <span className="grad-red absolute -left-[41px] grid h-8 w-8 place-items-center rounded-full text-meta font-bold text-white ring-4 ring-cream">
                       {d.day}
                     </span>
                     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                      <h3 className="text-[0.8rem] font-bold uppercase tracking-wide text-red">
+                      <h3 className="text-meta font-bold uppercase tracking-wide text-red">
                         Day {d.day}
                       </h3>
                       <p className="mt-1 text-[0.95rem] text-ink-soft">{d.text}</p>
@@ -217,7 +217,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
             <aside className="lg:relative">
               <div className="lg:sticky lg:top-28">
                 <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand">
-                  <div className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                  <div className="text-meta font-bold uppercase tracking-wide text-muted">
                     {CATEGORY_LABEL[it.category]} · {durationLabel}
                   </div>
                   <div className="mt-1 text-[1.2rem] font-bold leading-tight text-ink">
@@ -226,7 +226,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
                   <div className="mt-1 text-[0.85rem] text-muted">{it.region}</div>
 
                   <div className="my-5 border-t border-dashed border-line pt-5">
-                    <div className="text-[0.72rem] font-semibold uppercase tracking-wide text-muted">
+                    <div className="text-meta font-semibold uppercase tracking-wide text-muted">
                       Starting price
                     </div>
                     <div className="text-[1.5rem] font-extrabold text-navy">
@@ -267,7 +267,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
       <div className="sticky inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-white/95 px-4 py-3 pr-[84px] shadow-[0_-6px_24px_rgba(8,50,73,0.1)] backdrop-blur lg:hidden">
         <div className="min-w-0 flex-1">
           <div className="truncate text-[0.9rem] font-bold text-ink">{it.name}</div>
-          <div className="text-[0.75rem] text-muted">
+          <div className="text-meta text-muted">
             {durationLabel} · On enquiry
           </div>
         </div>

@@ -109,7 +109,7 @@ export function HotelLocation({
 
       {near.length > 0 && (
         <div className="p-5 pt-4">
-          <h4 className="mb-2.5 flex items-center gap-1.5 text-[0.8rem] font-bold uppercase tracking-[0.08em] text-red">
+          <h4 className="mb-2.5 flex items-center gap-1.5 text-meta font-bold uppercase tracking-[0.08em] text-red">
             <Landmark size={13} aria-hidden /> What&apos;s nearby
           </h4>
           <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
@@ -127,7 +127,7 @@ export function HotelLocation({
             ))}
           </ul>
           {(attractions?.length ?? 0) > near.length && (
-            <p className="mt-2.5 text-[0.8rem] text-muted">
+            <p className="mt-2.5 text-meta text-muted">
               …and {attractions!.length - near.length} more within reach.
             </p>
           )}

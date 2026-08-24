@@ -40,7 +40,7 @@ export function PackageCard({
           className="absolute inset-0 bg-gradient-to-t from-navy/55 via-transparent to-transparent"
           aria-hidden
         />
-        <span className="grad-red absolute left-4 top-4 rounded-full px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-wide text-white">
+        <span className="grad-red absolute left-4 top-4 rounded-full px-3 py-1.5 text-meta font-bold uppercase tracking-wide text-white">
           {categoryMeta[pkg.category].label}
         </span>
         <span className="absolute bottom-3.5 left-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white drop-shadow">
@@ -60,7 +60,7 @@ export function PackageCard({
 
         <div className="mt-auto flex items-center justify-between border-t border-dashed border-line pt-4">
           <span className="inline-flex flex-col leading-tight">
-            <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted">
+            <span className="text-meta font-semibold uppercase tracking-wide text-muted">
               Starting price
             </span>
             <span className="text-[1.05rem] font-bold text-navy">

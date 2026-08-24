@@ -100,7 +100,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                 ))}
               </ul>
             </div>
-            <p className="relative text-[0.8rem] text-white/60">
+            <p className="relative text-meta text-white/60">
               Ahmedabad&apos;s trusted travel house · Est. 2011
             </p>
           </div>
@@ -117,7 +117,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
             <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
               {isSignup && (
                 <label className="block">
-                  <span className="mb-1.5 block text-[0.8rem] font-semibold text-ink">Full name</span>
+                  <span className="mb-1.5 block text-meta font-semibold text-ink">Full name</span>
                   <span className={inputWrap}>
                     <User size={18} className="flex-none text-muted" aria-hidden />
                     <input
@@ -133,7 +133,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               )}
 
               <label className="block">
-                <span className="mb-1.5 block text-[0.8rem] font-semibold text-ink">Email</span>
+                <span className="mb-1.5 block text-meta font-semibold text-ink">Email</span>
                 <span className={inputWrap}>
                   <Mail size={18} className="flex-none text-muted" aria-hidden />
                   <input
@@ -153,7 +153,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[0.8rem] font-semibold text-ink">Password</span>
+                <span className="mb-1.5 block text-meta font-semibold text-ink">Password</span>
                 <span className={inputWrap}>
                   <Lock size={18} className="flex-none text-muted" aria-hidden />
                   <input
@@ -178,7 +178,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
 
               {isSignup && (
                 <label className="block">
-                  <span className="mb-1.5 block text-[0.8rem] font-semibold text-ink">
+                  <span className="mb-1.5 block text-meta font-semibold text-ink">
                     Confirm password
                   </span>
                   <span
@@ -201,7 +201,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                     />
                   </span>
                   {confirm.length > 0 && confirm !== password && (
-                    <span className="mt-1 block text-[0.75rem] font-medium text-red-deep">
+                    <span className="mt-1 block text-meta font-medium text-red-deep">
                       Passwords do not match.
                     </span>
                   )}
@@ -234,7 +234,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               </Link>
             </p>
 
-            <p className="mt-6 text-center text-[0.75rem] leading-relaxed text-muted/80">
+            <p className="mt-6 text-center text-meta leading-relaxed text-muted/80">
               Your details are kept private and secure. By continuing you agree to our{" "}
               <Link href="/terms" className="font-medium text-red hover:underline">
                 Terms

@@ -109,7 +109,13 @@ export default async function FlightsPage({
         )}
       </Container>
       <div className="mt-6">
-        <SearchBar overlap={false} initial={initial} />
+        {/* Collapsed only when there is a result set behind it — on the
+                 "pick a destination" prompt the form IS the page. */}
+            <SearchBar
+              overlap={false}
+              collapsible={Boolean(toA)}
+              initial={initial}
+            />
       </div>
     </section>
   );

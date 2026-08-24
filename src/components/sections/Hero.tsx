@@ -80,7 +80,7 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
       <Container className="relative z-10 w-full">
         <div className="max-w-2xl pb-28 pt-24 lg:pb-0">
           <span className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-white/10 py-2 pl-2.5 pr-4 text-[0.82rem] font-medium backdrop-blur">
-            <span className="grad-red rounded-full px-2.5 py-1 text-[0.72rem] font-bold tracking-wide">
+            <span className="grad-red rounded-full px-2.5 py-1 text-meta font-bold tracking-wide">
               EST. {site.established}
             </span>
             Ahmedabad&apos;s trusted travel house
@@ -135,7 +135,7 @@ export function Hero({ reviews }: { reviews?: HeroReviews }) {
       </div>
 
       <div
-        className="absolute bottom-36 left-6 z-10 hidden items-center gap-3 text-[0.72rem] uppercase tracking-[0.2em] text-white/60 [writing-mode:vertical-rl] lg:flex"
+        className="absolute bottom-36 left-6 z-10 hidden items-center gap-3 text-meta uppercase tracking-[0.2em] text-white/60 [writing-mode:vertical-rl] lg:flex"
         aria-hidden
       >
         Scroll

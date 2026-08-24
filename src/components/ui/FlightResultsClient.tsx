@@ -988,7 +988,7 @@ export function FlightResultsClient({
               {/* Each leg names its own date. Two legs of a round trip are
                   otherwise indistinguishable here bar the airline. */}
               <div className="min-w-0">
-                <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                <div className="text-meta font-bold uppercase tracking-wide text-muted">
                   Outbound
                 </div>
                 <div className="truncate text-[0.95rem] font-semibold text-ink">
@@ -998,7 +998,7 @@ export function FlightResultsClient({
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                <div className="text-meta font-bold uppercase tracking-wide text-muted">
                   Return
                 </div>
                 <div className="truncate text-[0.95rem] font-semibold text-ink">
@@ -1011,7 +1011,7 @@ export function FlightResultsClient({
             <div className="flex items-center gap-4">
               {selOut && selIn && (
                 <div className="text-right">
-                  <div className="text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                  <div className="text-meta font-bold uppercase tracking-wide text-muted">
                     Total / adult
                   </div>
                   <div className="text-[1.15rem] font-extrabold leading-tight text-navy">

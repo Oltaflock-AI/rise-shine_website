@@ -264,7 +264,7 @@ export function RoomRateDetails({
                         guest — a deadline in the past contradicts the line
                         above it, and is what made this panel read as broken. */}
                     {deadlineISO && deadlineISO > new Date().toISOString() && (
-                      <p className="mt-1.5 text-[0.8rem] text-muted">
+                      <p className="mt-1.5 text-meta text-muted">
                         Hotel&apos;s stated deadline:{" "}
                         {formatDeadline(deadlineISO)}
                       </p>
@@ -317,7 +317,7 @@ export function RoomRateDetails({
                       {quote.amenities!.map((a) => (
                         <span
                           key={a}
-                          className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[0.8rem] text-ink"
+                          className="rounded-full bg-cream-2 px-2.5 py-0.5 text-meta text-ink"
                         >
                           {a}
                         </span>
@@ -383,7 +383,7 @@ function Row({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <h5 className="mb-1 text-[0.78rem] font-bold uppercase tracking-[0.07em] text-muted">
+        <h5 className="mb-1 text-meta font-bold uppercase tracking-[0.07em] text-muted">
           {title}
         </h5>
         <div className="text-ink">{children}</div>

@@ -114,6 +114,9 @@ export default async function HotelsPage({
       <div className="mt-6">
         <SearchBar
           overlap={false}
+          // Collapsed only when there is a result set behind it — on the
+          // "pick a destination" prompt the form IS the page.
+          collapsible={Boolean(city && sp.checkIn && sp.checkOut)}
           initial={{
             product: "hotels",
             city: city?.label,

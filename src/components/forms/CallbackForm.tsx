@@ -22,7 +22,7 @@ export function CallbackForm({ delayPhrase }: { delayPhrase: string }) {
       action={action}
       className="rounded-brand-lg border border-line bg-white p-7 shadow-brand sm:p-10"
     >
-      <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-red/10 px-3.5 py-1.5 text-[0.8rem] font-semibold text-red-deep">
+      <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-red/10 px-3.5 py-1.5 text-meta font-semibold text-red-deep">
         <PhoneCall size={15} strokeWidth={2.4} aria-hidden />
         We call you in {delayPhrase}
       </div>

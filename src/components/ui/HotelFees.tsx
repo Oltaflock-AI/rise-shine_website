@@ -34,7 +34,7 @@ export function HotelFees({
 
       {fees.mandatory.length > 0 && (
         <div className="mb-4 rounded-brand border border-amber-300 bg-amber-50 p-3.5">
-          <h4 className="mb-1.5 flex items-center gap-1.5 text-[0.8rem] font-bold uppercase tracking-[0.07em] text-amber-800">
+          <h4 className="mb-1.5 flex items-center gap-1.5 text-meta font-bold uppercase tracking-[0.07em] text-amber-800">
             <Wallet size={13} aria-hidden /> You will pay these at the hotel
           </h4>
           <ul className="space-y-1">
@@ -47,7 +47,7 @@ export function HotelFees({
 
       {fees.optional.length > 0 && (
         <div>
-          <h4 className="mb-1.5 flex items-center gap-1.5 text-[0.8rem] font-bold uppercase tracking-[0.07em] text-muted">
+          <h4 className="mb-1.5 flex items-center gap-1.5 text-meta font-bold uppercase tracking-[0.07em] text-muted">
             <Info size={13} aria-hidden /> Available if you want it
           </h4>
           <ul className="space-y-1">
@@ -58,7 +58,7 @@ export function HotelFees({
         </div>
       )}
 
-      <p className="mt-3 text-[0.78rem] text-muted">
+      <p className="mt-3 text-meta text-muted">
         Charged by the hotel in its own currency and not included in the price
         you pay us.
       </p>

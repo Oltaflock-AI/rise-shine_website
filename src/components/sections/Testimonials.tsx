@@ -82,7 +82,7 @@ export async function Testimonials() {
                     <span className="block font-semibold text-ink">
                       {t.name}
                     </span>
-                    <span className="block text-[0.78rem] text-muted">
+                    <span className="block text-meta text-muted">
                       {t.meta}
                     </span>
                   </span>
