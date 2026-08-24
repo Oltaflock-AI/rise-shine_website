@@ -54,7 +54,7 @@ export function Select({
         className={cn(
           "cursor-pointer appearance-none truncate font-medium outline-none",
           bare
-            ? "w-full bg-transparent pr-5 text-ink"
+            ? "w-full bg-transparent pr-5 text-base text-ink"
             : cn(
                 controlClass,
                 size === "sm"
@@ -185,7 +185,11 @@ export function DateField({
         }}
         aria-label={ariaLabel}
         className={cn(
-          "absolute inset-0 h-full w-full opacity-0",
+          "absolute inset-x-0 w-full text-base opacity-0",
+          // Boxed: the control is already 48px. Bare (the search bar): the
+          // visible line is ~25px, so the hit area borrows the surrounding
+          // Field's py-3.5 to clear 44px without moving anything.
+          bare ? "-inset-y-2.5" : "inset-y-0 h-full",
           disabled ? "cursor-not-allowed" : "cursor-pointer",
         )}
       />

@@ -42,6 +42,29 @@ export function HotelGallery({
     [images.length],
   );
 
+  /**
+   * Swipe.
+   *
+   * The lightbox had arrows, a thumbnail strip, Escape, a focus trap and a
+   * scroll lock — everything except the one gesture a person actually makes at
+   * a photo on a phone. A horizontal drag past 48px moves a photo; anything
+   * shorter, or mostly vertical, is left alone so a tap still closes.
+   */
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.changedTouches[0];
+    touch.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touch.current;
+    touch.current = null;
+    if (!start || images.length < 2) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(t.clientY - start.y)) return;
+    show(index + (dx < 0 ? 1 : -1));
+  };
+
   // Keyboard handling, re-bound as the shown photo changes.
   useEffect(() => {
     if (!open) return;
@@ -164,8 +187,10 @@ export function HotelGallery({
           </div>
 
           <div
-            className="relative flex min-h-0 flex-1 items-center justify-center px-2 sm:px-16"
+            className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-2 sm:px-16"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
             <Image
               key={index}

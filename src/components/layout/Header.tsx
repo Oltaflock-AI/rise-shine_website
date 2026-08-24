@@ -109,7 +109,7 @@ export function Header() {
           {/* Logo — white over the dark hero, red once scrolled */}
           <Link
             href="/"
-            className="relative flex items-center"
+            className="relative flex min-h-11 items-center"
             aria-label={`${site.name}, home`}
           >
             <Image

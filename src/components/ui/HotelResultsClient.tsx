@@ -332,7 +332,10 @@ export function HotelResultsClient({
             onChange={(e) => setNameQ(e.target.value)}
             placeholder="Search hotel name"
             aria-label="Filter by hotel name"
-            className="w-full bg-transparent text-body font-medium text-ink outline-none placeholder:text-muted"
+            /* 16px, not text-body's 15px: iOS zooms the page in when a text
+               field under 16px takes focus and never zooms back out, so typing
+               a hotel name left the results magnified and half off-screen. */
+            className="w-full bg-transparent text-base font-medium text-ink outline-none placeholder:text-muted"
           />
         </label>
       </Section>

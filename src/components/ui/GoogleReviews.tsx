@@ -33,7 +33,7 @@ export function GoogleReviews({
       rel="noopener noreferrer"
       aria-label={`${label}. Read them on Google`}
       className={cn(
-        "group inline-flex items-center gap-3.5 rounded-full transition-opacity hover:opacity-90",
+        "group inline-flex min-h-11 items-center gap-3.5 rounded-full transition-opacity hover:opacity-90",
         className,
       )}
     >
