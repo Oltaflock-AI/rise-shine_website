@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   Accessibility,
   ArrowUpDown,
@@ -30,6 +33,7 @@ import {
   WashingMachine,
   Waves,
   Wifi,
+  ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { curateAmenities, type AmenityIconName } from "@/lib/hotel-amenities";
@@ -76,6 +80,11 @@ const ICONS: Record<AmenityIconName, LucideIcon> = {
  * entries under pandemic-era boilerplate; `curateAmenities` collapses that, and
  * each surviving category brings its own icon so the list can be scanned rather
  * than read. See `lib/hotel-amenities.ts` for why a plain de-dupe is not enough.
+ *
+ * Fourteen rows is ~590px — most of a phone screen spent on a list whose top
+ * few entries decide the booking and whose tail ("Lift", "Front desk") is true
+ * of nearly every hotel on the feed. Six show; the rest are one tap away, in
+ * decision-weight order so the six are the six that matter.
  */
 export function HotelAmenities({
   facilities,
@@ -83,7 +92,11 @@ export function HotelAmenities({
   facilities: string[] | undefined;
 }) {
   const amenities = curateAmenities(facilities, 14);
+  const [expanded, setExpanded] = useState(false);
   if (!amenities.length) return null;
+
+  const shown = expanded ? amenities : amenities.slice(0, 6);
+  const hidden = amenities.length - shown.length;
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
@@ -91,7 +104,7 @@ export function HotelAmenities({
         What this place offers
       </h3>
       <ul className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
-        {amenities.map((a) => {
+        {shown.map((a) => {
           const Icon = ICONS[a.icon] ?? Check;
           return (
             <li
@@ -106,6 +119,22 @@ export function HotelAmenities({
           );
         })}
       </ul>
+
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-meta font-semibold text-red hover:underline"
+        >
+          {expanded ? "Show fewer" : `Show all ${amenities.length}`}
+          <ChevronDown
+            size={15}
+            aria-hidden
+            className={expanded ? "rotate-180" : ""}
+          />
+        </button>
+      )}
     </div>
   );
 }

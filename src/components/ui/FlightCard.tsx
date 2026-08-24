@@ -266,9 +266,9 @@ export function FlightCard({
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm transition-shadow hover:shadow-brand">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
         {/* Airline */}
-        <div className="flex items-center gap-3 sm:w-44 sm:flex-none">
+        <div className="flex items-center gap-3 lg:w-44 lg:flex-none">
           <span className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-lg border border-line bg-white">
             {logo ? (
               <Image
@@ -352,8 +352,8 @@ export function FlightCard({
         </div>
 
         {/* Fare + CTA */}
-        <div className="flex items-center justify-between gap-4 border-t border-dashed border-line pt-4 sm:w-52 sm:flex-none sm:flex-col sm:items-end sm:border-l sm:border-t-0 sm:border-dashed sm:pl-6 sm:pt-0">
-          <div className="sm:text-right">
+        <div className="flex items-center justify-between gap-4 border-t border-dashed border-line pt-4 lg:w-52 lg:flex-none lg:flex-col lg:items-end lg:border-l lg:border-t-0 lg:border-dashed lg:pl-6 lg:pt-0">
+          <div className="lg:text-right">
             <div className="text-[1.35rem] font-extrabold text-navy">
               ₹{inr.format(offer.fareINR)}
             </div>

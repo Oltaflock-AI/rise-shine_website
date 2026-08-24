@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { MapPin, Navigation, Landmark, Phone, Globe } from "lucide-react";
+import { cn } from "@/lib/cn";
 
 /**
  * Where the hotel is, and what is near it.
@@ -73,13 +77,11 @@ export function HotelLocation({
       </div>
 
       {hasPoint && (
-        <iframe
-          src={osm}
-          title={`Map showing ${name}`}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="block h-64 w-full border-0 border-y border-line"
-        />
+        /* A full-width map that consumes touch is a scroll trap: a thumb that
+           lands on it drags the map instead of the page, and on a phone the map
+           is the full width of the page. The overlay swallows the first touch
+           and hands the map over only once the guest asks for it. */
+        <MapPanel osm={osm} name={name} />
       )}
 
       {(phone || website) && (
@@ -132,6 +134,43 @@ export function HotelLocation({
             </p>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The embedded map, inert until tapped.
+ *
+ * See the call site: on a phone the iframe spans the viewport, so any scroll
+ * gesture starting inside it pans the map and the page stays put. Pointer
+ * events are off until the guest taps "Use the map", which is also the only
+ * honest way to say that panning it will cost them their scroll.
+ */
+function MapPanel({ osm, name }: { osm: string; name: string }) {
+  const [live, setLive] = useState(false);
+  return (
+    <div className="relative">
+      <iframe
+        src={osm}
+        title={`Map showing ${name}`}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        className={cn(
+          "block h-64 w-full border-0 border-y border-line",
+          !live && "pointer-events-none",
+        )}
+      />
+      {!live && (
+        <button
+          type="button"
+          onClick={() => setLive(true)}
+          className="absolute inset-0 grid place-items-center bg-navy/0 transition-colors hover:bg-navy/10"
+        >
+          <span className="rounded-full bg-white/95 px-4 py-2 text-meta font-semibold text-ink shadow-brand-sm">
+            Use the map
+          </span>
+        </button>
       )}
     </div>
   );

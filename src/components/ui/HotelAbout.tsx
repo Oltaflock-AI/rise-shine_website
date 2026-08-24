@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { parseHotelDescription } from "@/lib/hotel-description";
 
 /**
@@ -10,6 +14,10 @@ import { parseHotelDescription } from "@/lib/hotel-description";
  *
  * Nothing here is `dangerouslySetInnerHTML`: the parser returns plain text
  * only, so supplier markup can never reach the page.
+ *
+ * Recovered structure is still 700-1,100px of supplier prose, which on a phone
+ * is more than a screen of reading placed after the room list. The first
+ * section opens; the rest is behind a count, so the guest chooses to read it.
  */
 export function HotelAbout({
   description,
@@ -17,7 +25,11 @@ export function HotelAbout({
   description: string | undefined;
 }) {
   const sections = parseHotelDescription(description);
+  const [expanded, setExpanded] = useState(false);
   if (!sections.length) return null;
+
+  const shown = expanded ? sections : sections.slice(0, 1);
+  const hidden = sections.length - shown.length;
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm sm:p-6">
@@ -25,7 +37,7 @@ export function HotelAbout({
         About this property
       </h3>
       <div className="space-y-5">
-        {sections.map((s, i) => (
+        {shown.map((s, i) => (
           <section key={i}>
             {s.heading && (
               <h4 className="mb-1.5 text-meta font-bold uppercase tracking-[0.08em] text-red">
@@ -45,6 +57,30 @@ export function HotelAbout({
           </section>
         ))}
       </div>
+
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-meta font-semibold text-red hover:underline"
+        >
+          Read the full description
+          <span className="text-muted">
+            ({hidden} more section{hidden > 1 ? "s" : ""})
+          </span>
+          <ChevronDown size={15} aria-hidden />
+        </button>
+      )}
+      {expanded && sections.length > 1 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-meta font-semibold text-red hover:underline"
+        >
+          Show less
+          <ChevronDown size={15} aria-hidden className="rotate-180" />
+        </button>
+      )}
     </div>
   );
 }
