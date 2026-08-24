@@ -71,6 +71,16 @@ export type SearchInitial = {
   trip?: "oneway" | "round";
   /** Which product tab to open on ("flights" default). */
   product?: "flights" | "hotels";
+  /* Hotels. The results page hands back the resolved city so the bar shows the
+     search the guest is looking at; without these the bar re-rendered its own
+     defaults and the next tap on "Search Hotels" threw the search away. */
+  city?: string;
+  cityCode?: string;
+  checkIn?: string;
+  checkOut?: string;
+  rooms?: string;
+  ages?: string;
+  nat?: string;
 };
 
 function Field({
@@ -599,7 +609,7 @@ export function SearchBar({
               </form>
             </>
           ) : (
-            <HotelsPanel />
+            <HotelsPanel initial={initial} />
           )}
         </div>
 
@@ -826,24 +836,36 @@ function CityOption({
   );
 }
 
-function HotelsPanel() {
+function HotelsPanel({ initial }: { initial?: SearchInitial }) {
   const router = useRouter();
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState(initial?.city ?? "");
+  /* The label the guest reads is not what TBO is asked for. Hold the code the
+     search actually ran with and keep using it until the text is edited, so a
+     city whose label does not round-trip through the suggestion list is not
+     quietly downgraded to free text. */
+  const [cityCode, setCityCode] = useState(initial?.cityCode ?? "");
   const [cityOpen, setCityOpen] = useState(false);
   const cityRef = useRef<HTMLDivElement>(null);
   const [suggestions, setSuggestions] = useState<HotelCity[]>([]);
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const [checkIn, setCheckIn] = useState(initial?.checkIn ?? "");
+  const [checkOut, setCheckOut] = useState(initial?.checkOut ?? "");
   const [today, setToday] = useState("");
 
   // Occupancy — uniform per room (TBO PaxRooms: adults 1–8, children 0–4 + ages).
-  const [rooms, setRooms] = useState(1);
-  const [adults, setAdults] = useState(2);
-  const [childCount, setChildCount] = useState(0);
-  const [childAges, setChildAges] = useState<number[]>([]);
+  const [rooms, setRooms] = useState(Number(initial?.rooms) || 1);
+  const [adults, setAdults] = useState(Number(initial?.adults) || 2);
+  // "".split(",") is [""], and Number("") is 0 — parsed naively that invents a
+  // child aged 0 on every childless search.
+  const initialAges = (initial?.ages ?? "")
+    .split(",")
+    .filter((a) => a.trim() !== "")
+    .map((a) => Number(a))
+    .filter((a) => Number.isFinite(a) && a >= 0 && a <= 17);
+  const [childCount, setChildCount] = useState(initialAges.length);
+  const [childAges, setChildAges] = useState<number[]>(initialAges);
   // TBO prices some rates by guest nationality and requires it on Search AND
   // Book — collected here and carried unchanged all the way to the Book RQ.
-  const [nationality, setNationality] = useState("IN");
+  const [nationality, setNationality] = useState(initial?.nat || "IN");
   const [paxOpen, setPaxOpen] = useState(false);
   const paxRef = useRef<HTMLDivElement>(null);
 
@@ -919,6 +941,7 @@ function HotelsPanel() {
 
   const pickCity = (c: HotelCity) => {
     setCity(c.label);
+    setCityCode(c.cityCode);
     setCityOpen(false);
   };
 
@@ -929,6 +952,9 @@ function HotelsPanel() {
     // its TBO CityCode. Unmatched free text is resolved server-side.
     const q = city.trim().toLowerCase();
     const match =
+      // Typing in the box clears cityCode, so if it is still set the text is
+      // exactly the city that code belongs to.
+      (cityCode ? { cityCode, label: city.trim() } : undefined) ||
       suggestions.find((c) => c.label.toLowerCase() === q) ||
       POPULAR_CITIES.find((c) => c.label.toLowerCase() === q) ||
       (q.length > 1
@@ -976,6 +1002,7 @@ function HotelsPanel() {
                 value={city}
                 onChange={(e) => {
                   setCity(e.target.value);
+                  setCityCode("");
                   setCityOpen(true);
                 }}
                 onFocus={() => setCityOpen(true)}

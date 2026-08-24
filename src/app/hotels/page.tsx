@@ -112,7 +112,20 @@ export default async function HotelsPage({
         )}
       </Container>
       <div className="mt-6">
-        <SearchBar overlap={false} initial={{ product: "hotels" }} />
+        <SearchBar
+          overlap={false}
+          initial={{
+            product: "hotels",
+            city: city?.label,
+            cityCode: city?.cityCode,
+            checkIn: sp.checkIn,
+            checkOut: sp.checkOut,
+            rooms: String(rooms),
+            adults: String(adultsPerRoom),
+            ages: childAges.join(","),
+            nat: nationality,
+          }}
+        />
       </div>
     </section>
   );
