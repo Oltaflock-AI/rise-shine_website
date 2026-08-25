@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, User } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/cn";
@@ -28,6 +28,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -48,7 +49,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
     }
     setBusy(true);
     try {
-      if (isSignup) await signup(name, email, password);
+      if (isSignup) await signup(name, email, phone, password);
       else await login(email, password);
       router.replace(safeRedirect());
     } catch (err) {
@@ -151,6 +152,32 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                   />
                 </span>
               </label>
+
+              {isSignup && (
+                <label className="block">
+                  <span className="mb-1.5 block text-meta font-semibold text-ink">
+                    Mobile number
+                  </span>
+                  <span className={inputWrap}>
+                    <Phone size={18} className="flex-none text-muted" aria-hidden />
+                    <input
+                      className={inputCls}
+                      type="tel"
+                      inputMode="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="98765 43210"
+                      autoComplete="tel"
+                      aria-describedby="signup-phone-hint"
+                      required
+                    />
+                  </span>
+                  <span id="signup-phone-hint" className="mt-1 block text-meta text-muted">
+                    So we can reach you about your booking. Indian mobile, or
+                    include your country code.
+                  </span>
+                </label>
+              )}
 
               <label className="block">
                 <span className="mb-1.5 block text-meta font-semibold text-ink">Password</span>

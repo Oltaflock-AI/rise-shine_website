@@ -4,10 +4,17 @@
  * Auth provider — backed by Supabase Auth (email + password).
  *
  * The public API (`useAuth()` → user / ready / login / signup / logout) is
- * intentionally unchanged from the earlier localStorage demo, so every consumer
- * (Header, AuthScreen, AccountView) keeps working untouched. What changed is the
- * engine: real server-verified sessions in httpOnly cookies (via @supabase/ssr),
- * with data protected by Row Level Security — not the browser.
+ * intentionally stable, so every consumer (Header, AuthScreen, AccountView)
+ * keeps working untouched. What changed under it is the engine: real
+ * server-verified sessions in httpOnly cookies (via @supabase/ssr), with data
+ * protected by Row Level Security — not the browser.
+ *
+ * Signup collects name, mobile number and email:
+ * `signup(name, email, phone, password)`, in the order the form asks. The phone
+ * is normalised to E.164 before it is stored, and lands both in
+ * `user_metadata.phone` and — via the `on_auth_user_created` trigger — in
+ * `profiles.phone` (migration 0009). `user.phone` is "" for accounts created
+ * before the field existed; treat it as optional when reading.
  *
  * The site still runs before Supabase is configured: with no env keys,
  * `ready` becomes true with a null user and auth calls throw a friendly notice.
@@ -27,14 +34,20 @@ import {
 } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
+import { isDiallableIndianNumber, normalisePhone } from "@/lib/phone";
 
-export type User = { name: string; email: string };
+export type User = { name: string; email: string; phone: string };
 
 type AuthContextValue = {
   user: User | null;
   /** false until we've resolved the session on the client (avoids UI flash). */
   ready: boolean;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (
+    name: string,
+    email: string,
+    phone: string,
+    password: string,
+  ) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -52,7 +65,12 @@ function toUser(u: SupabaseUser | null): User | null {
     (typeof meta.full_name === "string" && meta.full_name) ||
     (typeof meta.name === "string" && meta.name) ||
     (u.email ? u.email.split("@")[0] : "Traveller");
-  return { name, email: u.email ?? "" };
+  // `phone` is our own metadata key, not Supabase's native `u.phone` — that one
+  // belongs to SMS-OTP auth, which we do not use. Accounts created before the
+  // field was collected have no phone, hence the empty-string fallback.
+  const phone =
+    (typeof meta.phone === "string" && meta.phone) || u.phone || "";
+  return { name, email: u.email ?? "", phone };
 }
 
 /** Turn Supabase's terse auth errors into copy that fits the brand voice. */
@@ -66,6 +84,7 @@ function friendly(message: string): string {
     return "Password must be at least 6 characters.";
   if (m.includes("unable to validate email") || m.includes("invalid email"))
     return "Please enter a valid email address.";
+  if (m.includes("phone")) return "Please enter a valid mobile number.";
   return message;
 }
 
@@ -93,16 +112,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signup = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, phone: string, password: string) => {
       const n = name.trim();
       if (!n) throw new Error("Please enter your name.");
+      // Store E.164, not what was typed. The number is the join key between an
+      // account and a callback/voice-call record (callback_queue.phone,
+      // voice_calls.lead_phone), and "98765 43210" would never match "+919876543210".
+      const p = normalisePhone(phone);
+      if (!isDiallableIndianNumber(p))
+        throw new Error("Please enter a valid mobile number, e.g. 98765 43210.");
       if (!supabaseConfigured) throw new Error(NOT_CONFIGURED);
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
-          data: { full_name: n },
+          data: { full_name: n, phone: p },
           emailRedirectTo:
             typeof window !== "undefined"
               ? `${window.location.origin}/auth/callback`
