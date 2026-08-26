@@ -55,3 +55,6 @@ next-env.d.ts
 
 # Local tooling config, not part of the site
 /config/
+
+# Generated email previews (scripts/email-preview.mts)
+.email-preview/

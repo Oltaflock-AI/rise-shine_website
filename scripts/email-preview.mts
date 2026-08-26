@@ -1,0 +1,268 @@
+/**
+ * Render every Rise & Shine email — to look at, and to paste into Supabase.
+ *
+ * Two outputs, one design system, which is the point:
+ *
+ * 1. `<scratch>/email-preview/*.html` — every template with realistic sample
+ *    data, plus an index page. Open them in a browser. Email HTML cannot be
+ *    reviewed by reading the source; you have to see it.
+ *
+ * 2. `supabase/templates/*.html` — the auth emails. Supabase Auth sends the
+ *    signup confirmation and the password reset itself, because only Supabase
+ *    can mint the token in `{{ .ConfirmationURL }}`. Those templates are pasted
+ *    into the dashboard (Authentication → Emails), so they cannot import
+ *    anything. Generating them from the same `shell()` is what stops the auth
+ *    mail drifting into looking like a different company from the booking mail.
+ *    Re-run this after any change to the design system and re-paste.
+ *
+ * Usage: npx tsx --conditions=react-server scripts/email-preview.mts
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { loadEnvLocal } from "./load-env.mjs";
+
+try {
+  loadEnvLocal();
+} catch {
+  // Templates need no credentials; only the live-send script does.
+}
+
+const {
+  button,
+  callout,
+  esc,
+  heading,
+  paragraph,
+  shell,
+  detailsTable,
+  row,
+} = await import("../src/lib/email-brand.js");
+const {
+  flightConfirmationEmail,
+  hotelConfirmationEmail,
+  refundNoticeEmail,
+  welcomeEmail,
+  passwordResetEmail,
+  offerEmail,
+} = await import("../src/lib/email.js");
+
+const OUT = process.env.PREVIEW_DIR || join(process.cwd(), ".email-preview");
+mkdirSync(OUT, { recursive: true });
+
+// ── 1. transactional + marketing, with sample data ───────────────────────────
+
+const sampleFlight = flightConfirmationEmail(
+  {
+    origin: "AMD",
+    destination: "GOI",
+    airlineCode: "6E",
+    flightNumber: "6592",
+    departDate: "2026-09-14",
+    passengers: [
+      { FirstName: "Hardik", LastName: "Patel", Email: "hardik@example.com" },
+      { FirstName: "Meera", LastName: "Patel" },
+    ],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any,
+  { pnr: "QK4TZP", ticketNumbers: ["0982416558231", "0982416558232"] } as never,
+  24680,
+);
+
+const sampleHotel = hotelConfirmationEmail(
+  { rooms: [{ passengers: [{ firstName: "Hardik", lastName: "Patel", email: "hardik@example.com" }] }] } as never,
+  { hotelName: "Taj Exotica Resort & Spa", city: "Goa", checkIn: "2026-09-14", checkOut: "2026-09-18" } as never,
+  { confirmationNo: "TBO-99341827", bookingId: 99341827 } as never,
+  61200,
+);
+
+const samples: Array<{ file: string; label: string; note: string; subject: string; html: string }> = [
+  {
+    file: "flight-confirmation.html",
+    label: "Flight booking confirmed",
+    note: "Sent from /api/book after a ticket is issued. Green accent = confirmed.",
+    ...sampleFlight,
+  },
+  {
+    file: "hotel-confirmation.html",
+    label: "Hotel booking confirmed",
+    note: "Sent from /api/hotels/book after a confirmed Book.",
+    ...sampleHotel,
+  },
+  {
+    file: "welcome.html",
+    label: "Account created",
+    note: "Sent once, after signup. Navy accent = account. NOT the confirm-email mail.",
+    ...welcomeEmail({ name: "Hardik Patel", email: "hardik@example.com" }),
+  },
+  {
+    file: "password-reset.html",
+    label: "Password reset",
+    note: "Amber accent = action needed. Supabase sends the live one — see supabase/templates/.",
+    ...passwordResetEmail({
+      name: "Hardik Patel",
+      resetUrl: "https://www.riseandshinetravel.in/auth/callback?token=sample",
+    }),
+  },
+  {
+    file: "refund.html",
+    label: "Payment refunded",
+    note: "Sent when a paid booking could not be completed.",
+    ...refundNoticeEmail({ kind: "flight", amountInr: 24680, reference: "order_RS_8842190" }),
+  },
+  {
+    file: "offer.html",
+    label: "Offers / campaign",
+    note: "Red accent = marketing. Carries a required unsubscribe link.",
+    ...offerEmail({
+      name: "Hardik Patel",
+      headline: "Three monsoon escapes, held until the 12th",
+      intro:
+        "The rains make these three cheaper and emptier than they will be all year. Fares below are per person, twin sharing, ex-Ahmedabad.",
+      validUntil: "12-09-26",
+      unsubscribeUrl: "https://www.riseandshinetravel.in/unsubscribe?t=sample",
+      items: [
+        {
+          title: "Kerala · 6 nights",
+          blurb: "Backwaters at Alleppey, tea country at Munnar, two nights on the coast.",
+          fromInr: 38900,
+          url: "https://www.riseandshinetravel.in/packages/domestic/kerala",
+        },
+        {
+          title: "Andaman · 5 nights",
+          blurb: "Havelock and Neil, with the ferry transfers and permits handled.",
+          fromInr: 44500,
+          url: "https://www.riseandshinetravel.in/packages/domestic/andaman",
+        },
+        {
+          title: "Rajasthan · 7 nights",
+          blurb: "Udaipur, Jodhpur and Jaisalmer, ending with a night in the dunes.",
+          fromInr: 31200,
+          url: "https://www.riseandshinetravel.in/packages/domestic/rajasthan",
+        },
+      ],
+    }),
+  },
+];
+
+for (const s of samples) writeFileSync(join(OUT, s.file), s.html);
+
+// ── 2. Supabase Auth templates ───────────────────────────────────────────────
+//
+// `{{ .ConfirmationURL }}` is Go template syntax, interpolated by Supabase at
+// send time. It must survive into the pasted HTML verbatim — do not URL-encode
+// it, and do not run it through esc().
+
+const CONFIRM = "{{ .ConfirmationURL }}";
+
+const authTemplates: Array<{ file: string; dashboard: string; html: string }> = [
+  {
+    file: "confirm-signup.html",
+    dashboard: "Authentication → Emails → Confirm signup",
+    html: shell(
+      heading("Confirm your email") +
+        paragraph(
+          "Thanks for creating a Rise &amp; Shine account. Confirm this address and your account is ready to use.",
+        ) +
+        button("Confirm my email", CONFIRM, "account") +
+        callout(
+          "If you did not create an account with us, ignore this email and nothing further will happen.",
+          "account",
+        ),
+      {
+        kicker: "Your account",
+        tone: "account",
+        preheader: "Confirm your email address to finish setting up your account.",
+      },
+    ),
+  },
+  {
+    file: "reset-password.html",
+    dashboard: "Authentication → Emails → Reset password",
+    html: shell(
+      heading("Reset your password") +
+        paragraph(
+          "We received a request to reset the password on your Rise &amp; Shine account. Choose a new one using the button below.",
+        ) +
+        button("Choose a new password", CONFIRM, "notice") +
+        callout(
+          "This link can be used once, and expires shortly. <strong>If you did not ask for a reset, ignore this email</strong> &mdash; your password stays exactly as it is.",
+          "notice",
+        ),
+      {
+        kicker: "Account security",
+        tone: "notice",
+        preheader: "Reset your password. This link can be used once and expires shortly.",
+      },
+    ),
+  },
+  {
+    file: "magic-link.html",
+    dashboard: "Authentication → Emails → Magic Link",
+    html: shell(
+      heading("Your sign-in link") +
+        paragraph("Use the button below to sign in to your Rise &amp; Shine account. No password needed.") +
+        button("Sign in", CONFIRM, "account") +
+        callout(
+          "This link can be used once and expires shortly. If you did not request it, ignore this email.",
+          "account",
+        ),
+      {
+        kicker: "Your account",
+        tone: "account",
+        preheader: "Your one-time sign-in link.",
+      },
+    ),
+  },
+  {
+    file: "change-email.html",
+    dashboard: "Authentication → Emails → Change Email Address",
+    html: shell(
+      heading("Confirm your new email") +
+        paragraph(
+          "You asked to change the email address on your Rise &amp; Shine account to <strong>{{ .NewEmail }}</strong>. Confirm it below.",
+        ) +
+        button("Confirm the change", CONFIRM, "notice") +
+        callout(
+          "Until you confirm, your account keeps its current address. If you did not request this change, ignore this email and tell us &mdash; someone may have your password.",
+          "notice",
+        ),
+      {
+        kicker: "Account security",
+        tone: "notice",
+        preheader: "Confirm the new email address on your account.",
+      },
+    ),
+  },
+];
+
+const SUPA = join(process.cwd(), "supabase", "templates");
+mkdirSync(SUPA, { recursive: true });
+for (const t of authTemplates) writeFileSync(join(SUPA, t.file), t.html);
+
+// ── 3. an index so the whole set can be reviewed side by side ────────────────
+
+const card = (href: string, label: string, note: string) =>
+  `<li style="margin:0 0 14px;"><a href="${href}" style="font-weight:700;color:#083249;">${esc(label)}</a>
+   <div style="font-size:13px;color:#5e6a72;margin-top:3px;">${esc(note)}</div></li>`;
+
+writeFileSync(
+  join(OUT, "index.html"),
+  `<!doctype html><meta charset="utf-8"><title>Rise &amp; Shine — email templates</title>
+<body style="font-family:Roboto,Arial,sans-serif;background:#f7f8f9;color:#102a39;padding:40px;max-width:720px;margin:0 auto;">
+<h1 style="font-weight:800;">Email templates</h1>
+<p style="color:#5e6a72;line-height:1.6;">Sent by the site, via Resend:</p>
+<ul style="list-style:none;padding:0;">
+${samples.map((s) => card(s.file, s.label, s.note)).join("\n")}
+</ul>
+<p style="color:#5e6a72;line-height:1.6;">Sent by Supabase Auth — paste each into the dashboard:</p>
+<ul style="list-style:none;padding:0;">
+${authTemplates.map((t) => card(`../supabase/templates/${t.file}`, t.file, t.dashboard)).join("\n")}
+</ul>
+</body>`,
+);
+
+console.log(`\nPreviews  → ${OUT}/index.html`);
+for (const s of samples) console.log(`  ${s.file.padEnd(26)} ${s.subject}`);
+console.log(`\nSupabase  → supabase/templates/`);
+for (const t of authTemplates) console.log(`  ${t.file.padEnd(26)} ${t.dashboard}`);
+console.log("");

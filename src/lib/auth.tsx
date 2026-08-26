@@ -142,6 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       }
       setUser(toUser(data.user));
+
+      // Welcome email, best-effort and deliberately not awaited-for-success: the
+      // account exists either way, and a mail failure must not read as a failed
+      // signup. The route takes no body and mails the session's own address.
+      fetch("/api/account/welcome", { method: "POST" }).catch(() => {});
     },
     [],
   );
