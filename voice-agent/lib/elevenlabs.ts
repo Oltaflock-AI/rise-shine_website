@@ -34,9 +34,13 @@ export function phoneNumberId(): string {
 }
 
 function apiKey(): string {
-  // ELEVENLABS_API_KEY is preferred; ELEVEN_API (the original .env name) works too.
-  const k = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_API;
-  if (!k) throw new Error("ELEVENLABS_API_KEY / ELEVEN_API is not set");
+  // ELEVENLABS_API_KEY is preferred; ELEVEN_LABS_API_KEY and ELEVEN_API (older
+  // .env spellings) work too.
+  const k =
+    process.env.ELEVENLABS_API_KEY ||
+    process.env.ELEVEN_LABS_API_KEY ||
+    process.env.ELEVEN_API;
+  if (!k) throw new Error("ELEVENLABS_API_KEY / ELEVEN_LABS_API_KEY / ELEVEN_API is not set");
   return k;
 }
 
