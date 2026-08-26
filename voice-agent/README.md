@@ -53,36 +53,52 @@ An admin-managed list of who may open the dashboard, and at what level:
 | **Editor** | Everything a viewer can, plus lead actions once those ship. |
 | **Admin** | Everything an editor can, plus adding, re-roling and removing people. |
 
-**Sign-in is not built yet** — management deferred the production
-authentication/database design on 2026-07-31. So the permission model is real and
-enforced server-side, but the *identity* lookup is stubbed: with
-`DASHBOARD_AUTH_ENABLED` unset, anyone who can open the page is treated as an
-admin, and the page says so in a banner. Building the list now means access works
-the day sign-in is switched on.
+**Sign-in is Supabase Auth**, the same project the main site uses. `/login`
+posts email + password to `/api/auth/login`; `emailFromSession()` in
+`lib/session.ts` reads the session cookie and verifies it with
+`supabase.auth.getUser()`. With `DASHBOARD_AUTH_ENABLED=true` (production) a
+visitor with no session is redirected to `/login`, and every API route returns
+401/403 through `requireCapability()`. Unset (local dev) the old behaviour
+remains: anyone who opens the page is treated as an admin and a banner says so.
 
-To switch it on, implement `emailFromSession()` in `lib/session.ts` (read the
-session cookie / Supabase user and return a **verified** email) and set
-`DASHBOARD_AUTH_ENABLED=true`. Nothing else changes — the routes already return
-401/403 through `requireCapability()`, which you can confirm today by setting that
-variable and watching every request get refused.
+Having a Supabase account is not enough — the access list is the authorisation.
+A customer who signs up on the main site and tries the dashboard gets
+"This account does not have dashboard access" and is signed straight back out.
 
-The list lives in `.data/access.json` (git-ignored), not a database, because this
-app is excluded from the Vercel deploy and runs locally. Swap the four functions in
-`lib/access-store.ts` for queries when a database arrives. On a read-only
-filesystem writes fall back to memory and the page warns that changes won't survive
-a restart. Seed the first admin with `DASHBOARD_ADMIN_EMAILS`, otherwise nobody can
-grant access to anybody. The store refuses to remove or demote the last admin.
+The list lives in the `dashboard_access` table (main repo migration
+`0013_dashboard_access.sql`), read and written with the service-role key through
+the four functions in `lib/access-store.ts` (unit-tested against a memory store
+in `tests/`). Seed the first admin with `DASHBOARD_ADMIN_EMAILS`, otherwise
+nobody can grant access to anybody. The store refuses to remove or demote the
+last admin.
+
+## Data sources
+
+| Page | Source |
+|---|---|
+| Overview · Voice Calls · call detail | ElevenLabs Conversation API, live (transcript, summary, collected fields) |
+| Callback Queue (`/queue`) | `callback_queue` table — `/request-a-call` requests waiting for or through the dialler |
+| Trips & Leads → CRM Records | `voice_calls` table (post-call webhook), joined to the queue on phone |
+
+## Hosting
+
+Deployed as its own Vercel project at **admin.riseandshinetravel.in** (Cloudflare
+CNAME `admin` → `cname.vercel-dns.com`, DNS-only). Still excluded from the main
+site's deploy by the root `.vercelignore`.
 
 ## Environment
 
 `.env.local` (already populated for the demo):
 
 ```env
-ELEVENLABS_API_KEY=sk_…                 # ElevenLabs API key (also reads ELEVEN_API from .env)
-ELEVENLABS_AGENT_ID=agent_6901kth2…     # Rise & Shine Travel agent
-ELEVENLABS_PHONE_NUMBER_ID=phnum_9601…  # VoBiz SIP trunk number for the outbound leg
-DASHBOARD_ADMIN_EMAILS=you@oltaflock.ai # comma-separated bootstrap admins for /access
-# DASHBOARD_AUTH_ENABLED=true           # only once emailFromSession() is implemented
+ELEVENLABS_API_KEY=sk_…                 # ElevenLabs API key (ELEVEN_LABS_API_KEY / ELEVEN_API also read)
+ELEVENLABS_AGENT_ID=agent_7001kxp…      # Rise & Shine Travel agent — read the current id from ElevenLabs
+ELEVENLABS_PHONE_NUMBER_ID=phnum_2301…  # Rise-Shine SIP trunk number
+NEXT_PUBLIC_SUPABASE_URL=…              # same three values as the main site
+NEXT_PUBLIC_SUPABASE_ANON_KEY=…
+SUPABASE_SERVICE_ROLE_KEY=…
+DASHBOARD_ADMIN_EMAILS=you@example.com  # comma-separated bootstrap admins for /access
+# DASHBOARD_AUTH_ENABLED=true           # set in production; unset locally = simulated admin
 ```
 
 ## Run

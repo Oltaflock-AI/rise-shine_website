@@ -24,14 +24,18 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
 - **`voice-agent/`** — separate Next.js 15 app: a dashboard over the ElevenLabs
   conversation API. Its own package manifest; run it from that directory. It is
   excluded from this project's deploy by `.vercelignore`, so it never ships with
-  the website. The call data is read-only — the submit form, WhatsApp preview and
-  outbound-call route were removed, and placing calls now belongs to
-  `/request-a-call` (see **Voice** below). Its one write surface is `/access`, the
-  team list (`lib/access.ts` · `access-store.ts` · `session.ts`). Sign-in is not
-  built, so `getViewer()` stands in as an admin and the page says so; the
-  capability checks behind it are real and already return 401/403. Do not add a
-  header- or query-supplied email to `emailFromSession()` — that is an
-  impersonation hole wearing a login's clothes.
+  the website; it deploys as its **own Vercel project at
+  admin.riseandshinetravel.in**. The call data is read-only — the submit form,
+  WhatsApp preview and outbound-call route were removed, and placing calls now
+  belongs to `/request-a-call` (see **Voice** below). It also reads
+  `callback_queue` (`/queue`) and `voice_calls` (CRM panel on leads) with the
+  service-role key. Its one write surface is `/access`, the team list
+  (`lib/access.ts` · `access-store.ts` → `dashboard_access` table, migration
+  `0013` · `session.ts`). Sign-in is Supabase Auth from the main site's project:
+  `emailFromSession()` verifies the cookie with `getUser()`, and
+  `DASHBOARD_AUTH_ENABLED=true` turns the gate on (unset locally = simulated
+  admin, banner says so). Do not add a header- or query-supplied email to
+  `emailFromSession()` — that is an impersonation hole wearing a login's clothes.
 
 ### The TBO booking layer (`src/lib/`) — server only
 
