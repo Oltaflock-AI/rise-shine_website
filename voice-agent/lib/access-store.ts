@@ -1,15 +1,15 @@
-// Where the team list lives: the `dashboard_access` table in the main site's
-// Supabase project (migration 0013), read and written with the service-role
+// Where the team list lives: the `dashboard_users` table in the main site's
+// Supabase project (migration 0014), read and written with the service-role
 // key. SERVER ONLY — reach this file through /api/access or session.ts.
+//
+// Each row is a dashboard account: email, role AND credentials. The password
+// hash is handled by dashboard-auth.ts; this file only stores what it is
+// given and never reads it back out to a caller.
 //
 // This replaced the git-ignored .data/access.json file when the dashboard
 // moved onto Vercel (admin.riseandshinetravel.in): a serverless filesystem is
 // ephemeral, and a team list that silently resets on a cold start is worse
-// than none. Every caller is written against the five exported functions, so
-// nothing above this file changed.
-//
-// Nothing here authenticates anybody. It answers "what may this email do",
-// not "is this really them" — that is sign-in's job (see session.ts).
+// than none.
 
 import {
   isRole,
@@ -17,19 +17,23 @@ import {
   type AccessMember,
   type Role,
 } from "./access";
+import { hashPassword } from "./dashboard-auth";
 import { serviceClient } from "./supabase";
 
-// Bootstrap admins, comma-separated. Without at least one, the very first
-// person to open the dashboard could never be granted access by anyone.
-const SEED_ENV = "DASHBOARD_ADMIN_EMAILS";
-const TABLE = "dashboard_access";
+// Bootstrap admin(s), comma-separated, plus the password they sign in with the
+// first time. Both are needed: without at least one admin nobody could ever be
+// granted access, and without a password the admin could never get in.
+const SEED_EMAILS_ENV = "DASHBOARD_ADMIN_EMAILS";
+const SEED_PASSWORD_ENV = "DASHBOARD_ADMIN_PASSWORD";
+const TABLE = "dashboard_users";
 
 // The storage seam. Production uses Supabase; tests inject a memory copy so
 // the last-admin and duplicate rules are pinned without a network.
 export interface AccessDb {
   all(): Promise<AccessMember[]>;
-  insert(m: AccessMember): Promise<void>;
+  insert(m: AccessMember, passwordHash: string): Promise<void>;
   update(email: string, role: Role): Promise<void>;
+  updatePassword(email: string, passwordHash: string): Promise<void>;
   remove(email: string): Promise<void>;
 }
 
@@ -40,27 +44,21 @@ function supabaseDb(): AccessDb {
   };
   return {
     async all() {
-      const { data, error } = await sb
-        .from(TABLE)
-        .select("email, role, added_at, added_by");
+      const { data, error } = await sb.from(TABLE).select("email, role, added_at, added_by");
       if (error) fail("read", error.message);
       const out: AccessMember[] = [];
       for (const row of data ?? []) {
         const email = normaliseEmail(row.email);
         if (!email || !isRole(row.role)) continue; // never let a bad row take the dashboard down
-        out.push({
-          email,
-          role: row.role,
-          addedAt: row.added_at,
-          addedBy: row.added_by,
-        });
+        out.push({ email, role: row.role, addedAt: row.added_at, addedBy: row.added_by });
       }
       return out;
     },
-    async insert(m) {
+    async insert(m, passwordHash) {
       const { error } = await sb.from(TABLE).insert({
         email: m.email,
         role: m.role,
+        password_hash: passwordHash,
         added_at: m.addedAt,
         added_by: m.addedBy,
       });
@@ -69,6 +67,13 @@ function supabaseDb(): AccessDb {
     async update(email, role) {
       const { error } = await sb.from(TABLE).update({ role }).eq("email", email);
       if (error) fail("update", error.message);
+    },
+    async updatePassword(email, passwordHash) {
+      const { error } = await sb
+        .from(TABLE)
+        .update({ password_hash: passwordHash, failed_attempts: 0, locked_until: null })
+        .eq("email", email);
+      if (error) fail("password update", error.message);
     },
     async remove(email) {
       const { error } = await sb.from(TABLE).delete().eq("email", email);
@@ -94,27 +99,31 @@ export function isPersistent(): boolean {
   return true;
 }
 
-function seedMembers(): AccessMember[] {
-  const now = new Date().toISOString();
-  return (process.env[SEED_ENV] ?? "")
-    .split(",")
-    .map(normaliseEmail)
-    .filter(Boolean)
-    .map((email) => ({ email, role: "admin" as Role, addedAt: now, addedBy: null }));
+function seedEmails(): string[] {
+  return (process.env[SEED_EMAILS_ENV] ?? "").split(",").map(normaliseEmail).filter(Boolean);
 }
 
-// Seed once per process: an empty table gets the bootstrap admins written in,
-// so they are visible in the table from day one (mirrors the old file seed).
+// Seed once per process: an empty table gets the bootstrap admin(s) written in
+// with the bootstrap password. Without the password nothing is seeded — an
+// account that cannot sign in is not a bootstrap, it is a locked door.
 let seeded = false;
 
 async function load(): Promise<AccessMember[]> {
   const store = db();
   let members = await store.all();
   if (!seeded && members.length === 0) {
-    for (const m of seedMembers()) {
-      await store.insert(m);
+    const emails = seedEmails();
+    const password = process.env[SEED_PASSWORD_ENV];
+    if (emails.length && password) {
+      const hash = hashPassword(password);
+      const now = new Date().toISOString();
+      for (const email of emails) {
+        await store.insert({ email, role: "admin", addedAt: now, addedBy: null }, hash);
+      }
+      members = await store.all();
+    } else if (emails.length) {
+      console.warn(`${SEED_EMAILS_ENV} is set but ${SEED_PASSWORD_ENV} is not — no admin seeded.`);
     }
-    members = await store.all();
   }
   seeded = true;
   return members;
@@ -156,6 +165,7 @@ export async function addMember(
   email: string,
   role: Role,
   actor: string | null,
+  passwordHash: string,
 ): Promise<StoreResult> {
   const target = normaliseEmail(email);
   return serial(async () => {
@@ -169,7 +179,7 @@ export async function addMember(
       addedAt: new Date().toISOString(),
       addedBy: actor,
     };
-    await db().insert(member);
+    await db().insert(member, passwordHash);
     return { ok: true, members: sorted([...members, member]) };
   });
 }
@@ -187,6 +197,18 @@ export async function setRole(email: string, role: Role): Promise<StoreResult> {
     await db().update(target, role);
     const next = members.map((m) => (m.email === target ? { ...m, role } : m));
     return { ok: true, members: sorted(next) };
+  });
+}
+
+export async function setPassword(email: string, passwordHash: string): Promise<StoreResult> {
+  const target = normaliseEmail(email);
+  return serial(async () => {
+    const members = await load();
+    if (!members.some((m) => m.email === target)) {
+      return { ok: false, error: `${target} does not have access.` };
+    }
+    await db().updatePassword(target, passwordHash);
+    return { ok: true, members: sorted(members) };
   });
 }
 

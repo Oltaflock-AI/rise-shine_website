@@ -112,6 +112,26 @@ DASHBOARD_ADMIN_EMAILS
   repo's `npm test` / `tsc` / build for the migration commit; Playwright
   smoke against a local run (login → calls list → queue) before pointing DNS.
 
+## Amendment (2026-08-26, same day): own credentials
+
+Owner decision after the first deploy: the dashboard must NOT share the
+customer Supabase Auth pool, and must block unauthorized sign-ins visibly.
+Section 2 and 3 are superseded by migration `0014_dashboard_users.sql` and
+`voice-agent/lib/dashboard-auth.ts`:
+
+- `dashboard_users` (email, scrypt `password_hash`, role, lockout columns)
+  replaces `dashboard_access`; admins create accounts with an initial password
+  on Team Access and can reset them (resets revoke that user's sessions).
+- `dashboard_sessions` holds server-side sessions (12 h, sha256 token hash,
+  revocable); the cookie is `rs_dash_session`.
+- `dashboard_login_events` records every attempt with reason
+  (ok / unknown_user / wrong_password / locked / inactive); admins see the log
+  on Team Access. Unknown email and wrong password answer identically; five
+  wrong passwords lock the account for 15 minutes.
+- Bootstrap: `DASHBOARD_ADMIN_EMAILS` + `DASHBOARD_ADMIN_PASSWORD`.
+- `@supabase/ssr` was removed; the service-role client is the only Supabase
+  surface left.
+
 ## Out of scope
 
 - Lead actions (editor role features) — role exists, actions ship later.

@@ -10,13 +10,32 @@ import {
   type AccessMember,
   type Role,
 } from "@/lib/access";
+import { fmtWhen } from "@/lib/format";
+
+interface LoginEvent {
+  id: number;
+  email: string;
+  ok: boolean;
+  reason: "ok" | "unknown_user" | "wrong_password" | "locked" | "inactive";
+  ip: string | null;
+  at: string;
+}
 
 interface Snapshot {
   members: AccessMember[];
   viewer: { email: string; role: Role; simulated: boolean } | null;
   authEnabled: boolean;
   persistent: boolean;
+  events: LoginEvent[] | null;
 }
+
+const REASON_LABEL: Record<LoginEvent["reason"], string> = {
+  ok: "Signed in",
+  unknown_user: "Unknown email",
+  wrong_password: "Wrong password",
+  locked: "Locked out",
+  inactive: "Deactivated",
+};
 
 function fmtAdded(iso: string): string {
   const d = new Date(iso);
@@ -27,9 +46,13 @@ function fmtAdded(iso: string): string {
 export default function AccessPage() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("viewer");
+  const [password, setPassword] = useState("");
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +77,7 @@ export default function AccessPage() {
   // leave the screen showing something the server didn't agree to.
   const mutate = useCallback(async (url: string, init: RequestInit): Promise<boolean> => {
     setBusy(true);
+    setNotice(null);
     try {
       const r = await fetch(url, { ...init, cache: "no-store" });
       const j = await r.json().catch(() => ({}));
@@ -78,28 +102,66 @@ export default function AccessPage() {
     const added = await mutate("/api/access", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ email, role, password }),
     });
     if (added) {
+      setNotice(`${email.trim().toLowerCase()} can now sign in with the password you set.`);
       setEmail("");
       setRole("viewer");
+      setPassword("");
     }
   }
 
-  const onChangeRole = (member: AccessMember, next: Role) =>
+  const onChangeRole = (member: AccessMember, nextRole: Role) =>
     mutate("/api/access", {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ email: member.email, role: next }),
+      body: JSON.stringify({ email: member.email, role: nextRole }),
     });
 
+  const onResetPassword = async (member: AccessMember) => {
+    const fresh = window.prompt(`New password for ${member.email} (at least 10 characters):`);
+    if (fresh === null) return;
+    const ok = await mutate("/api/access", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ email: member.email, password: fresh }),
+    });
+    if (ok) setNotice(`Password reset for ${member.email}. Their other sessions were signed out.`);
+  };
+
   const onRemove = (member: AccessMember) => {
-    if (!window.confirm(`Remove access for ${member.email}?`)) return;
+    if (!window.confirm(`Remove access for ${member.email}? They will be signed out immediately.`)) return;
     void mutate(`/api/access?email=${encodeURIComponent(member.email)}`, { method: "DELETE" });
   };
 
+  async function onChangeOwnPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await fetch("/api/auth/password", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ current, next }),
+        cache: "no-store",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Could not change your password.");
+      setCurrent("");
+      setNext("");
+      setError(null);
+      setNotice("Your password was changed. Other devices were signed out.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not change your password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const members = snap?.members ?? [];
   const canManage = can(snap?.viewer?.role ?? null, "manage_access");
+  const signedIn = !!snap?.viewer && !snap.viewer.simulated;
 
   return (
     <>
@@ -109,31 +171,20 @@ export default function AccessPage() {
         <div className="notice">
           <IconInfo className="notice-icon" />
           <div>
-            <strong>Sign-in is not live yet.</strong> This list is being kept ready — it
-            is saved and enforced by the server, but until the login screen ships
-            anyone who can open this page is treated as an admin. Adding people now
-            means access works the day sign-in is switched on.
-          </div>
-        </div>
-      )}
-
-      {snap && !snap.persistent && (
-        <div className="notice warn">
-          <IconInfo className="notice-icon" />
-          <div>
-            <strong>Changes are not being saved to disk.</strong> This copy is running
-            somewhere with a read-only filesystem, so the list will reset when the
-            server restarts.
+            <strong>Sign-in is off on this copy.</strong> Local development only:
+            anyone who can open this page is treated as an admin. On the hosted
+            dashboard every visitor signs in with the credentials on this list.
           </div>
         </div>
       )}
 
       {error && <div className="notice warn"><IconInfo className="notice-icon" /><div>{error}</div></div>}
+      {notice && <div className="notice"><IconInfo className="notice-icon" /><div>{notice}</div></div>}
 
       {canManage && (
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Give someone access</div>
+            <div className="panel-title">Create an account</div>
             <IconUsers className="panel-head-icon" />
           </div>
           <div className="panel-body">
@@ -146,6 +197,17 @@ export default function AccessPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 aria-label="Email address"
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="Initial password (10+ characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={10}
+                required
+                autoComplete="new-password"
+                aria-label="Initial password"
               />
               <select
                 className="select"
@@ -161,7 +223,10 @@ export default function AccessPage() {
                 {busy ? "Saving…" : "Add"}
               </button>
             </form>
-            <p className="access-hint">{ROLE_INFO[role].blurb}</p>
+            <p className="access-hint">
+              {ROLE_INFO[role].blurb} Share the password with them directly; they can
+              change it once signed in.
+            </p>
           </div>
         </div>
       )}
@@ -175,8 +240,9 @@ export default function AccessPage() {
             <div className="panel-empty">Loading…</div>
           ) : members.length === 0 ? (
             <div className="panel-empty">
-              Nobody has been added yet. Set <code>DASHBOARD_ADMIN_EMAILS</code> in
-              <code>.env.local</code> to seed the first admin, or add an email above.
+              Nobody has been added yet. Set <code>DASHBOARD_ADMIN_EMAILS</code> and
+              <code>DASHBOARD_ADMIN_PASSWORD</code> to seed the first admin, or add an
+              account above.
             </div>
           ) : (
             <div className="member-table">
@@ -209,16 +275,26 @@ export default function AccessPage() {
                     {m.addedBy && <em className="member-by"> by {m.addedBy}</em>}
                   </span>
                   {canManage ? (
-                    <button
-                      className="icon-btn"
-                      type="button"
-                      onClick={() => onRemove(m)}
-                      disabled={busy}
-                      aria-label={`Remove ${m.email}`}
-                      title="Remove access"
-                    >
-                      <IconTrash className="i" />
-                    </button>
+                    <span className="member-actions">
+                      <button
+                        className="btn-quiet"
+                        type="button"
+                        onClick={() => void onResetPassword(m)}
+                        disabled={busy}
+                      >
+                        Reset password
+                      </button>
+                      <button
+                        className="icon-btn"
+                        type="button"
+                        onClick={() => onRemove(m)}
+                        disabled={busy}
+                        aria-label={`Remove ${m.email}`}
+                        title="Remove access"
+                      >
+                        <IconTrash className="i" />
+                      </button>
+                    </span>
                   ) : (
                     <span />
                   )}
@@ -228,6 +304,75 @@ export default function AccessPage() {
           )}
         </div>
       </div>
+
+      {signedIn && (
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title">Change my password</div>
+          </div>
+          <div className="panel-body">
+            <form className="access-form" onSubmit={onChangeOwnPassword}>
+              <input
+                className="input"
+                type="password"
+                placeholder="Current password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                required
+                autoComplete="current-password"
+                aria-label="Current password"
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="New password (10+ characters)"
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+                minLength={10}
+                required
+                autoComplete="new-password"
+                aria-label="New password"
+              />
+              <button className="btn btn-inline" type="submit" disabled={busy}>
+                {busy ? "Saving…" : "Change"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {snap?.events && (
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title">Recent sign-in attempts</div>
+            <div className="panel-sub">every attempt is recorded, refused ones included</div>
+          </div>
+          <div className="panel-body flush">
+            {snap.events.length === 0 ? (
+              <div className="panel-empty">No sign-in attempts yet.</div>
+            ) : (
+              <div className="member-table">
+                <div className="member-row member-head">
+                  <span>Email</span>
+                  <span>Result</span>
+                  <span>When</span>
+                  <span>IP</span>
+                </div>
+                {snap.events.map((ev) => (
+                  <div className="member-row" key={ev.id}>
+                    <span className="member-email">{ev.email}</span>
+                    <span>
+                      <span className={`badge ${ev.ok ? "q" : "fail"}`}>{REASON_LABEL[ev.reason]}</span>
+                    </span>
+                    <span className="member-added">{fmtWhen(Date.parse(ev.at) / 1000)}</span>
+                    <span className="dim">{ev.ip ?? "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <div className="panel-head">
@@ -243,9 +388,9 @@ export default function AccessPage() {
             ))}
           </div>
           <p className="access-hint">
-            The dashboard is read-only today, so viewers and editors currently see the
-            same thing. Editor exists so that lead actions land on a permission that is
-            already being checked.
+            Five wrong passwords lock an account for 15 minutes. Accounts here are
+            separate from customer accounts on the website — a customer login never
+            opens this dashboard.
           </p>
         </div>
       </div>

@@ -30,12 +30,15 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
   belongs to `/request-a-call` (see **Voice** below). It also reads
   `callback_queue` (`/queue`) and `voice_calls` (CRM panel on leads) with the
   service-role key. Its one write surface is `/access`, the team list
-  (`lib/access.ts` · `access-store.ts` → `dashboard_access` table, migration
-  `0013` · `session.ts`). Sign-in is Supabase Auth from the main site's project:
-  `emailFromSession()` verifies the cookie with `getUser()`, and
-  `DASHBOARD_AUTH_ENABLED=true` turns the gate on (unset locally = simulated
-  admin, banner says so). Do not add a header- or query-supplied email to
-  `emailFromSession()` — that is an impersonation hole wearing a login's clothes.
+  (`lib/access.ts` · `access-store.ts` → `dashboard_users` table, migration
+  `0014` · `session.ts`). Sign-in is the dashboard's OWN
+  (`lib/dashboard-auth.ts`): scrypt passwords, server-side sessions
+  (`dashboard_sessions`), an attempt log (`dashboard_login_events`), 5-strike
+  15-min lockout — deliberately NOT Supabase Auth, whose users are the site's
+  customers. `DASHBOARD_AUTH_ENABLED=true` turns the gate on (unset locally =
+  simulated admin, banner says so). Do not add a header- or query-supplied
+  email to `emailFromSession()` — that is an impersonation hole wearing a
+  login's clothes.
 
 ### The TBO booking layer (`src/lib/`) — server only
 

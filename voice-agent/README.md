@@ -53,24 +53,23 @@ An admin-managed list of who may open the dashboard, and at what level:
 | **Editor** | Everything a viewer can, plus lead actions once those ship. |
 | **Admin** | Everything an editor can, plus adding, re-roling and removing people. |
 
-**Sign-in is Supabase Auth**, the same project the main site uses. `/login`
-posts email + password to `/api/auth/login`; `emailFromSession()` in
-`lib/session.ts` reads the session cookie and verifies it with
-`supabase.auth.getUser()`. With `DASHBOARD_AUTH_ENABLED=true` (production) a
-visitor with no session is redirected to `/login`, and every API route returns
-401/403 through `requireCapability()`. Unset (local dev) the old behaviour
-remains: anyone who opens the page is treated as an admin and a banner says so.
+**Sign-in is the dashboard's own** (`lib/dashboard-auth.ts`) — deliberately NOT
+Supabase Auth, whose user pool is the main site's customer base. Accounts live
+in `dashboard_users` (main repo migration `0014_dashboard_users.sql`) with a
+scrypt password hash and role; sessions are server-side rows in
+`dashboard_sessions` (12 h, revocable); every attempt lands in
+`dashboard_login_events` and the admin sees the log on Team Access. Blocking:
+unknown email and wrong password answer identically, five wrong passwords lock
+the account for 15 minutes, and a removed user's sessions die with the row.
+With `DASHBOARD_AUTH_ENABLED=true` (production) everything is gated; unset
+(local dev) anyone who opens the page is treated as an admin and a banner says
+so.
 
-Having a Supabase account is not enough — the access list is the authorisation.
-A customer who signs up on the main site and tries the dashboard gets
-"This account does not have dashboard access" and is signed straight back out.
-
-The list lives in the `dashboard_access` table (main repo migration
-`0013_dashboard_access.sql`), read and written with the service-role key through
-the four functions in `lib/access-store.ts` (unit-tested against a memory store
-in `tests/`). Seed the first admin with `DASHBOARD_ADMIN_EMAILS`, otherwise
-nobody can grant access to anybody. The store refuses to remove or demote the
-last admin.
+Admins create accounts on Team Access (email + role + initial password), can
+reset any password (which signs that user out everywhere), and everyone can
+change their own. Seed the first admin with `DASHBOARD_ADMIN_EMAILS` +
+`DASHBOARD_ADMIN_PASSWORD`, otherwise nobody can sign in to grant anything.
+The store refuses to remove or demote the last admin.
 
 ## Data sources
 
@@ -94,10 +93,10 @@ site's deploy by the root `.vercelignore`.
 ELEVENLABS_API_KEY=sk_…                 # ElevenLabs API key (ELEVEN_LABS_API_KEY / ELEVEN_API also read)
 ELEVENLABS_AGENT_ID=agent_7001kxp…      # Rise & Shine Travel agent — read the current id from ElevenLabs
 ELEVENLABS_PHONE_NUMBER_ID=phnum_2301…  # Rise-Shine SIP trunk number
-NEXT_PUBLIC_SUPABASE_URL=…              # same three values as the main site
-NEXT_PUBLIC_SUPABASE_ANON_KEY=…
+NEXT_PUBLIC_SUPABASE_URL=…              # same values as the main site (tables live there)
 SUPABASE_SERVICE_ROLE_KEY=…
-DASHBOARD_ADMIN_EMAILS=you@example.com  # comma-separated bootstrap admins for /access
+DASHBOARD_ADMIN_EMAILS=you@example.com  # comma-separated bootstrap admins
+DASHBOARD_ADMIN_PASSWORD=…              # bootstrap password for the seed admin(s)
 # DASHBOARD_AUTH_ENABLED=true           # set in production; unset locally = simulated admin
 ```
 
