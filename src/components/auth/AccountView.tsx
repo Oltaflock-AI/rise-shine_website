@@ -14,6 +14,10 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { ProfileCard } from "@/components/account/ProfileCard";
+import { TravellersCard } from "@/components/account/TravellersCard";
+import { AddressesCard } from "@/components/account/AddressesCard";
+import { PasswordCard } from "@/components/account/PasswordCard";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -129,6 +133,12 @@ const PAX_TYPE: Record<number, string> = {
 export function AccountView() {
   const { user, ready, logout } = useAuth();
   const router = useRouter();
+  /**
+   * Bookings first, deliberately. Someone opening this page mid-trip is looking
+   * for a PNR, not a settings form — the details only matter before the NEXT
+   * booking, which is a calmer moment.
+   */
+  const [tab, setTab] = useState<"bookings" | "details" | "security">("bookings");
   const [bookings, setBookings] = useState<BookingRow[] | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -445,37 +455,64 @@ export function AccountView() {
         </Container>
       </section>
 
-      <section className="py-12 sm:py-16">
+      <section className="border-b border-line bg-white">
         <Container>
-          <div className="grid items-start gap-6 lg:grid-cols-[1fr_1.4fr]">
-            {/* Profile */}
-            <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
-              <h2 className="text-[1.05rem] font-bold text-ink">Profile</h2>
-              <dl className="mt-4 space-y-3 text-body">
-                <div>
-                  <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
-                    Name
-                  </dt>
-                  <dd className="text-ink">{user.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-meta font-semibold uppercase tracking-wide text-muted">
-                    Email
-                  </dt>
-                  <dd className="text-ink">{user.email}</dd>
-                </div>
-              </dl>
+          <nav className="flex gap-1 overflow-x-auto" aria-label="Account sections">
+            {(
+              [
+                ["bookings", "My bookings"],
+                ["details", "My details"],
+                ["security", "Security"],
+              ] as const
+            ).map(([key, label]) => (
               <button
-                onClick={() => {
-                  logout();
-                  router.push("/");
-                }}
-                className="mt-6 inline-flex items-center gap-2 rounded-full border-[1.6px] border-line px-5 py-2.5 text-body font-semibold text-ink transition-colors hover:border-red hover:text-red"
+                key={key}
+                onClick={() => setTab(key)}
+                aria-current={tab === key ? "page" : undefined}
+                className={cn(
+                  "min-h-12 whitespace-nowrap border-b-2 px-4 text-body font-semibold transition-colors",
+                  tab === key
+                    ? "border-red text-red"
+                    : "border-transparent text-muted hover:text-ink",
+                )}
               >
-                <LogOut size={17} aria-hidden /> Log out
+                {label}
               </button>
-            </div>
+            ))}
+          </nav>
+        </Container>
+      </section>
 
+      <section className="py-10 sm:py-14">
+        <Container>
+          {tab === "details" && (
+            <div className="grid items-start gap-6">
+              <ProfileCard email={user.email} />
+              <TravellersCard />
+              <AddressesCard />
+            </div>
+          )}
+
+          {tab === "security" && (
+            <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
+              <PasswordCard />
+              <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
+                <h2 className="text-[1.05rem] font-bold text-ink">Signed in as</h2>
+                <p className="mt-2 text-body text-ink">{user.email}</p>
+                <button
+                  onClick={() => {
+                    logout();
+                    router.push("/");
+                  }}
+                  className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full border-[1.6px] border-line px-5 py-2.5 text-body font-semibold text-ink transition-colors hover:border-red hover:text-red"
+                >
+                  <LogOut size={17} aria-hidden /> Log out
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={cn(tab === "bookings" ? "block" : "hidden")}>
             {/* Bookings */}
             <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
               <h2 className="text-[1.05rem] font-bold text-ink">My bookings</h2>
