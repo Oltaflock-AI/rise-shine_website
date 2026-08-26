@@ -8,7 +8,6 @@ import {
   IconOverview,
   IconPhone,
   IconPlane,
-  IconSun,
   IconUsers,
 } from "@/components/icons";
 
@@ -33,11 +32,9 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <Link href="/" className="brand">
-        <span className="brand-mark"><IconSun className="brand-sun" /></span>
-        <span>
-          <span className="brand-title">Rise <em>&amp; Shine</em></span>
-          <span className="brand-sub">AI Sales Engine</span>
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, fixed size */}
+        <img src="/brand/logo.png" alt="Rise & Shine Travels" className="brand-logo" />
+        <span className="brand-sub">AI Sales Engine</span>
       </Link>
 
       <nav className="nav" aria-label="Primary">
@@ -75,7 +72,7 @@ export function Sidebar() {
         </div>
         <button
           type="button"
-          className="btn-inline"
+          className="btn-quiet"
           onClick={async () => {
             await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
             window.location.href = "/login";

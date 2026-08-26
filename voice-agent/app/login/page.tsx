@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconSun } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,11 +33,9 @@ export default function LoginPage() {
     <main className="login-shell">
       <form className="panel login-panel" onSubmit={submit}>
         <div className="brand login-brand">
-          <span className="brand-mark"><IconSun className="brand-sun" /></span>
-          <span>
-            <span className="brand-title">Rise <em>&amp; Shine</em></span>
-            <span className="brand-sub">Admin Dashboard</span>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, fixed size */}
+          <img src="/brand/logo.png" alt="Rise & Shine Travels" className="brand-logo" />
+          <span className="brand-sub">Admin Dashboard</span>
         </div>
         <div className="field">
           <label className="label" htmlFor="email">Email</label>
