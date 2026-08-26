@@ -40,6 +40,13 @@ export async function sendEmail(args: {
   to: string;
   subject: string;
   html: string;
+  /**
+   * Extra RFC headers. Used for `List-Unsubscribe` on marketing sends — Gmail
+   * and Yahoo's bulk-sender rules require a one-click opt-out in the headers,
+   * not merely a link in the footer, and mail without it lands in spam
+   * regardless of how clean the domain's DKIM and SPF are.
+   */
+  headers?: Record<string, string>;
 }): Promise<void> {
   if (!emailConfigured) return;
   const res = await fetch("https://api.resend.com/emails", {
@@ -54,6 +61,7 @@ export async function sendEmail(args: {
       reply_to: site.email,
       subject: args.subject,
       html: args.html,
+      ...(args.headers ? { headers: args.headers } : {}),
     }),
     cache: "no-store",
   });
@@ -210,10 +218,11 @@ export function refundNoticeEmail(args: {
 /**
  * Sent once, after a customer creates an account.
  *
- * Deliberately NOT a "confirm your email" mail — that one is Supabase Auth's,
- * and it must stay Supabase's, because only Supabase can mint the confirmation
- * token. See `supabase/templates/` for the branded versions of those. This is
- * the welcome that follows.
+ * Deliberately NOT a "confirm your email" mail. The project runs with Supabase's
+ * "Confirm email" OFF, so signup yields a session immediately and this is the
+ * only mail a new customer gets. If confirmation is ever turned back on,
+ * Supabase's own mailer starts sending it and this route stops firing — see the
+ * session check in `/api/account/welcome`.
  */
 export function welcomeEmail(args: { name: string; email: string }): {
   subject: string;
@@ -243,12 +252,12 @@ export function welcomeEmail(args: { name: string; email: string }): {
 }
 
 /**
- * Password reset, for the day we send it ourselves.
+ * Password reset. WE send this, through Resend.
  *
- * Today Supabase Auth sends this and owns the token, so the branded copy that is
- * actually in use lives in `supabase/templates/reset-password.html`. This exists
- * so the design system covers the email, and so a future in-app reset flow has
- * something to call. Keep the two in step if you change the wording.
+ * The token comes from `admin.generateLink()`, which mints one without sending
+ * anything, and the URL is built on our own origin — so Supabase's mailer is
+ * never invoked and the link works on localhost. See `lib/auth-links.ts` and
+ * `/api/auth/forgot-password`.
  */
 export function passwordResetEmail(args: { resetUrl: string; name?: string }): {
   subject: string;

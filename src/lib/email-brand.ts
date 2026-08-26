@@ -23,6 +23,10 @@
  * - **Dark mode inverts what it likes.** Colours are declared explicitly on every
  *   element, including backgrounds, so a client's auto-invert has less to guess at.
  *
+ * Every email the site sends goes through Resend, including password resets —
+ * Supabase's mailer is not used. `supabase/templates/` holds branded fallbacks
+ * for the case where someone re-enables it in the dashboard.
+ *
  * Preview all of them: `npx tsx --conditions=react-server scripts/email-preview.mts`
  */
 

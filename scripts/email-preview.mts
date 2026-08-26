@@ -7,13 +7,13 @@
  *    data, plus an index page. Open them in a browser. Email HTML cannot be
  *    reviewed by reading the source; you have to see it.
  *
- * 2. `supabase/templates/*.html` — the auth emails. Supabase Auth sends the
- *    signup confirmation and the password reset itself, because only Supabase
- *    can mint the token in `{{ .ConfirmationURL }}`. Those templates are pasted
- *    into the dashboard (Authentication → Emails), so they cannot import
- *    anything. Generating them from the same `shell()` is what stops the auth
- *    mail drifting into looking like a different company from the booking mail.
- *    Re-run this after any change to the design system and re-paste.
+ * 2. `supabase/templates/*.html` — FALLBACKS, not the live path. The site sends
+ *    its own password reset through Resend (`lib/auth-links.ts` mints the token
+ *    with `admin.generateLink()`, which sends nothing), so Supabase's mailer is
+ *    not used. These exist because the dashboard can re-enable it — "Confirm
+ *    email", a magic link, an email change — and if it ever does, the mail
+ *    should still look like us instead of like a default Supabase template.
+ *    Paste into Authentication → Emails. Re-run after any design change.
  *
  * Usage: npx tsx --conditions=react-server scripts/email-preview.mts
  */
@@ -97,7 +97,7 @@ const samples: Array<{ file: string; label: string; note: string; subject: strin
   {
     file: "password-reset.html",
     label: "Password reset",
-    note: "Amber accent = action needed. Supabase sends the live one — see supabase/templates/.",
+    note: "Amber accent = action needed. Sent by us via Resend from /api/auth/forgot-password.",
     ...passwordResetEmail({
       name: "Hardik Patel",
       resetUrl: "https://www.riseandshinetravel.in/auth/callback?token=sample",

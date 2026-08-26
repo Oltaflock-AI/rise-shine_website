@@ -47,6 +47,8 @@ type AuthContextValue = {
     email: string,
     phone: string,
     password: string,
+    /** Ticked the "send me offers" box. Consent, so it must be explicit. */
+    offers?: boolean,
   ) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -112,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signup = useCallback(
-    async (name: string, email: string, phone: string, password: string) => {
+    async (name: string, email: string, phone: string, password: string, offers = false) => {
       const n = name.trim();
       if (!n) throw new Error("Please enter your name.");
       // Store E.164, not what was typed. The number is the join key between an
@@ -145,8 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Welcome email, best-effort and deliberately not awaited-for-success: the
       // account exists either way, and a mail failure must not read as a failed
-      // signup. The route takes no body and mails the session's own address.
-      fetch("/api/account/welcome", { method: "POST" }).catch(() => {});
+      // signup. The body carries only the offers opt-in — the ADDRESS always
+      // comes from the session on the server, never from here.
+      fetch("/api/account/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offers }),
+      }).catch(() => {});
     },
     [],
   );
