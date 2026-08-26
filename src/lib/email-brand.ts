@@ -47,28 +47,31 @@ export const C = {
   inkSoft: "#45525c",
   muted: "#5e6a72",
   white: "#ffffff",
-  // Status accents. Deliberately few: the brand is red + navy, and a rainbow of
-  // states would read as a different company each time.
-  success: "#0f7a4d",
-  successSoft: "#e8f4ee",
-  warn: "#9a5b00",
-  warnSoft: "#fdf3e3",
+  /** The tint behind a callout — red at 6%, so it reads as brand, not as a state. */
+  redSoft: "#fdeced",
 } as const;
 
 /**
- * The accent a given email leads with. This is the "colour coding" — the kicker,
- * the rule under the header and any status pill take the tone, while the rest of
- * the layout stays identical, so the category is legible at a glance without the
- * email looking like it came from somewhere else.
+ * What KIND of email this is.
+ *
+ * It no longer changes any colour, and that is deliberate. An earlier version
+ * tinted each category — green for a confirmed booking, amber for anything
+ * needing action — which is a common transactional-email pattern and wrong for
+ * this brand: Rise & Shine is navy, red and white, and a green email is simply
+ * not one of the company's emails. Four palettes across six templates read as
+ * four different senders in one inbox, which is exactly what a customer uses to
+ * judge whether a message is genuine.
+ *
+ * Every email now takes the same navy header, the same red rule and kicker, the
+ * same red CTA. The category is carried by WORDS — the kicker line and the
+ * headline — which survive dark mode, image blocking and a monochrome print,
+ * none of which a colour code does.
+ *
+ * The type is kept rather than deleted because it still records intent at each
+ * call site, and because `offer` is the one value with real behaviour attached:
+ * marketing mail must carry an unsubscribe link and transactional mail must not.
  */
 export type Tone = "confirm" | "account" | "offer" | "notice";
-
-const TONES: Record<Tone, { accent: string; soft: string; label: string }> = {
-  confirm: { accent: C.success, soft: C.successSoft, label: "Confirmed" },
-  account: { accent: C.navyLight, soft: C.cream2, label: "Your account" },
-  offer: { accent: C.red, soft: "#fdeaeb", label: "Offer" },
-  notice: { accent: C.warn, soft: C.warnSoft, label: "Action needed" },
-};
 
 export const FONT = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
@@ -90,10 +93,9 @@ export const rupees = (n: number): string => `&#8377;${inr.format(n)}`;
  * A call-to-action. Padding on the `<a>` rather than the cell, so the whole
  * button is clickable in clients that ignore cell padding on links.
  */
-export function button(label: string, href: string, tone: Tone = "offer"): string {
-  const bg = tone === "confirm" ? C.navy : TONES[tone].accent;
+export function button(label: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 6px;">
-  <tr><td align="center" bgcolor="${bg}" style="border-radius:999px;">
+  <tr><td align="center" bgcolor="${C.red}" style="background:${C.red};background-image:linear-gradient(135deg,${C.red} 0%,${C.redDeep} 100%);border-radius:999px;">
     <a href="${esc(href)}" style="display:inline-block;padding:13px 30px;font-family:${FONT};font-size:15px;font-weight:700;color:${C.white};text-decoration:none;border-radius:999px;">${esc(label)}</a>
   </td></tr>
 </table>`;
@@ -114,10 +116,9 @@ export function detailsTable(rowsHtml: string): string {
 </table>`;
 }
 
-/** A tinted aside — the one place a tone colour carries meaning in the body. */
-export function callout(html: string, tone: Tone = "account"): string {
-  const t = TONES[tone];
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;background:${t.soft};border-left:4px solid ${t.accent};border-radius:8px;">
+/** A tinted aside. Same red rule in every email — see the note on `Tone`. */
+export function callout(html: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;background:${C.redSoft};border-left:4px solid ${C.red};border-radius:8px;">
   <tr><td style="padding:14px 16px;font-family:${FONT};font-size:13.5px;line-height:1.6;color:${C.inkSoft};">${html}</td></tr>
 </table>`;
 }
@@ -147,7 +148,6 @@ export interface ShellOpts {
 }
 
 export function shell(body: string, opts: ShellOpts): string {
-  const t = TONES[opts.tone];
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -168,10 +168,10 @@ export function shell(body: string, opts: ShellOpts): string {
     <img src="${LOGO}" width="150" height="56" alt="Rise &amp; Shine Travels" style="display:block;border:0;height:auto;max-width:150px;">
   </td></tr>
 
-  <tr><td style="height:4px;background:${t.accent};font-size:0;line-height:0;">&nbsp;</td></tr>
+  <tr><td style="height:4px;background:${C.red};font-size:0;line-height:0;">&nbsp;</td></tr>
 
   <tr><td style="padding:30px 30px 8px;">
-    <div style="font-family:${FONT};font-size:11.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${t.accent};margin-bottom:10px;">${esc(opts.kicker)}</div>
+    <div style="font-family:${FONT};font-size:11.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${C.red};margin-bottom:10px;">${esc(opts.kicker)}</div>
     ${body}
   </td></tr>
 

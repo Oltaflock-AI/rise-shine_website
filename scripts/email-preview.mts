@@ -58,11 +58,9 @@ const authTemplates: Array<{ file: string; dashboard: string; html: string }> = 
         paragraph(
           "Thanks for creating a Rise &amp; Shine account. Confirm this address and your account is ready to use.",
         ) +
-        button("Confirm my email", CONFIRM, "account") +
+        button("Confirm my email", CONFIRM) +
         callout(
-          "If you did not create an account with us, ignore this email and nothing further will happen.",
-          "account",
-        ),
+          "If you did not create an account with us, ignore this email and nothing further will happen."),
       {
         kicker: "Your account",
         tone: "account",
@@ -78,10 +76,9 @@ const authTemplates: Array<{ file: string; dashboard: string; html: string }> = 
         paragraph(
           "We received a request to reset the password on your Rise &amp; Shine account. Choose a new one using the button below.",
         ) +
-        button("Choose a new password", CONFIRM, "notice") +
+        button("Choose a new password", CONFIRM) +
         callout(
           "This link can be used once, and expires shortly. <strong>If you did not ask for a reset, ignore this email</strong> &mdash; your password stays exactly as it is.",
-          "notice",
         ),
       {
         kicker: "Account security",
@@ -96,11 +93,9 @@ const authTemplates: Array<{ file: string; dashboard: string; html: string }> = 
     html: shell(
       heading("Your sign-in link") +
         paragraph("Use the button below to sign in to your Rise &amp; Shine account. No password needed.") +
-        button("Sign in", CONFIRM, "account") +
+        button("Sign in", CONFIRM) +
         callout(
-          "This link can be used once and expires shortly. If you did not request it, ignore this email.",
-          "account",
-        ),
+          "This link can be used once and expires shortly. If you did not request it, ignore this email."),
       {
         kicker: "Your account",
         tone: "account",
@@ -116,10 +111,9 @@ const authTemplates: Array<{ file: string; dashboard: string; html: string }> = 
         paragraph(
           "You asked to change the email address on your Rise &amp; Shine account to <strong>{{ .NewEmail }}</strong>. Confirm it below.",
         ) +
-        button("Confirm the change", CONFIRM, "notice") +
+        button("Confirm the change", CONFIRM) +
         callout(
           "Until you confirm, your account keeps its current address. If you did not request this change, ignore this email and tell us &mdash; someone may have your password.",
-          "notice",
         ),
       {
         kicker: "Account security",

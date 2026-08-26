@@ -109,10 +109,8 @@ export function flightConfirmationEmail(
       callout(
         `Carry a government photo ID to the airport. Web check-in opens with the airline${
           result.pnr ? ` using PNR <strong>${esc(result.pnr)}</strong>` : ""
-        }.`,
-        "confirm",
-      ) +
-      button("View this booking", `${ACCOUNT_URL}`, "confirm"),
+        }.`) +
+      button("View this booking", `${ACCOUNT_URL}`),
     {
       kicker: "Booking confirmed",
       tone: "confirm",
@@ -164,10 +162,8 @@ export function hotelConfirmationEmail(
       ) +
       detailsTable(rows) +
       callout(
-        "The lead guest should carry a government photo ID. Check-in and check-out times follow the hotel's own policy.",
-        "confirm",
-      ) +
-      button("View this booking", `${ACCOUNT_URL}`, "confirm"),
+        "The lead guest should carry a government photo ID. Check-in and check-out times follow the hotel's own policy.") +
+      button("View this booking", `${ACCOUNT_URL}`),
     {
       kicker: "Booking confirmed",
       tone: "confirm",
@@ -200,9 +196,7 @@ export function refundNoticeEmail(args: {
       ) +
       (args.reference ? detailsTable(row("Payment reference", esc(args.reference))) : "") +
       callout(
-        "Want us to rebook this, or find an alternative? Reply to this email or WhatsApp us and a human will pick it up.",
-        "notice",
-      ),
+        "Want us to rebook this, or find an alternative? Reply to this email or WhatsApp us and a human will pick it up."),
     {
       kicker: "Payment refunded",
       tone: "notice",
@@ -239,9 +233,8 @@ export function welcomeEmail(args: { name: string; email: string }): {
       ) +
       callout(
         `We have been sending people places from Ahmedabad since ${site.established}. If you would rather talk it through than fill in a form, call us &mdash; that is still the fastest way to plan something complicated.`,
-        "account",
       ) +
-      button("Go to my account", ACCOUNT_URL, "account"),
+      button("Go to my account", ACCOUNT_URL),
     {
       kicker: "Your account",
       tone: "account",
@@ -269,10 +262,9 @@ export function passwordResetEmail(args: { resetUrl: string; name?: string }): {
       paragraph(
         `${who ? `Hi ${esc(who)}, we` : "We"} received a request to reset the password on your Rise &amp; Shine account. Choose a new one using the button below.`,
       ) +
-      button("Choose a new password", args.resetUrl, "notice") +
+      button("Choose a new password", args.resetUrl) +
       callout(
         "This link expires in 60 minutes and can be used once. <strong>If you did not ask for this, ignore this email</strong> &mdash; your password stays as it is, and nobody has access to your account.",
-        "notice",
       ),
     {
       kicker: "Account security",
@@ -336,9 +328,9 @@ export function offerEmail(args: {
       paragraph(`${who ? `Hi ${esc(who)}, ` : ""}${esc(args.intro)}`) +
       cards +
       (args.validUntil
-        ? callout(`These fares are held until <strong>${esc(args.validUntil)}</strong>, subject to availability.`, "offer")
+        ? callout(`These fares are held until <strong>${esc(args.validUntil)}</strong>, subject to availability.`)
         : "") +
-      button("Talk to a travel expert", "https://www.riseandshinetravel.in/request-a-call", "offer"),
+      button("Talk to a travel expert", "https://www.riseandshinetravel.in/request-a-call"),
     {
       kicker: "Offer",
       tone: "offer",
