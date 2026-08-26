@@ -1,15 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCalls } from "@/lib/useCalls";
 import { PageHeader } from "@/components/PageHeader";
 import { initial, fmtWhen } from "@/lib/format";
 import { IconStar, IconPlane } from "@/components/icons";
 
+// One voice_calls row from /api/crm — the post-call webhook's record, joined
+// to the callback queue on phone so the lead's whole lifecycle is one line.
+interface CrmCall {
+  conversation_id: string;
+  lead_name: string | null;
+  lead_phone: string | null;
+  summary: string | null;
+  qualified: boolean | null;
+  destination: string | null;
+  started_at: string | null;
+  call_successful: string | null;
+  queue_status: string | null;
+}
+
 export default function Leads() {
   const { calls, loading } = useCalls();
   const [qualifiedOnly, setQualifiedOnly] = useState(true);
+  const [crm, setCrm] = useState<CrmCall[] | null>(null);
+  const [crmError, setCrmError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/crm")
+      .then(async (res) => {
+        const json = await res.json().catch(() => null);
+        if (!alive) return;
+        if (!res.ok) setCrmError(json?.error ?? `CRM request failed (${res.status})`);
+        else setCrm(json.calls ?? []);
+      })
+      .catch(() => alive && setCrmError("CRM request failed."));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const rows = useMemo(() => {
     return [...calls]
@@ -90,6 +121,43 @@ export default function Leads() {
                       <span className="badge fail">Other</span>
                     )}
                   </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-head">
+          <div className="panel-title">CRM Records</div>
+          <div className="panel-sub">from the post-call webhook, joined to the callback queue</div>
+        </div>
+        <div className="panel-body flush">
+          {crmError ? (
+            <div className="panel-empty err">{crmError}</div>
+          ) : crm === null ? (
+            <div className="panel-empty">Loading…</div>
+          ) : crm.length === 0 ? (
+            <div className="panel-empty">No webhook records yet — they appear after the next completed call.</div>
+          ) : (
+            <div className="trip-table">
+              <div className="trip-row trip-head">
+                <span>Lead</span>
+                <span>Destination</span>
+                <span>Summary</span>
+                <span>Queue</span>
+                <span>Outcome</span>
+                <span>When</span>
+              </div>
+              {crm.map((c) => (
+                <Link key={c.conversation_id} href={`/calls/${c.conversation_id}`} className="trip-row">
+                  <span className="trip-name">{c.lead_name ?? c.lead_phone ?? "Unknown"}</span>
+                  <span>{c.destination ?? "—"}</span>
+                  <span className="dim">{c.summary ? `${c.summary.slice(0, 90)}…` : "—"}</span>
+                  <span>{c.queue_status ? <span className="chip">{c.queue_status}</span> : "—"}</span>
+                  <span><span className="chip">{c.call_successful ?? "unknown"}</span></span>
+                  <span className="trip-when">{c.started_at ? fmtWhen(Date.parse(c.started_at) / 1000) : "—"}</span>
                 </Link>
               ))}
             </div>
