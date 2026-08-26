@@ -27,122 +27,17 @@ try {
   // Templates need no credentials; only the live-send script does.
 }
 
-const {
-  button,
-  callout,
-  esc,
-  heading,
-  paragraph,
-  shell,
-  detailsTable,
-  row,
-} = await import("../src/lib/email-brand.js");
-const {
-  flightConfirmationEmail,
-  hotelConfirmationEmail,
-  refundNoticeEmail,
-  welcomeEmail,
-  passwordResetEmail,
-  offerEmail,
-} = await import("../src/lib/email.js");
+const { button, callout, esc, heading, paragraph, shell } = await import(
+  "../src/lib/email-brand.js"
+);
+const { buildSamples } = await import("./email-samples.mjs");
 
 const OUT = process.env.PREVIEW_DIR || join(process.cwd(), ".email-preview");
 mkdirSync(OUT, { recursive: true });
 
 // ── 1. transactional + marketing, with sample data ───────────────────────────
 
-const sampleFlight = flightConfirmationEmail(
-  {
-    origin: "AMD",
-    destination: "GOI",
-    airlineCode: "6E",
-    flightNumber: "6592",
-    departDate: "2026-09-14",
-    passengers: [
-      { FirstName: "Hardik", LastName: "Patel", Email: "hardik@example.com" },
-      { FirstName: "Meera", LastName: "Patel" },
-    ],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any,
-  { pnr: "QK4TZP", ticketNumbers: ["0982416558231", "0982416558232"] } as never,
-  24680,
-);
-
-const sampleHotel = hotelConfirmationEmail(
-  { rooms: [{ passengers: [{ firstName: "Hardik", lastName: "Patel", email: "hardik@example.com" }] }] } as never,
-  { hotelName: "Taj Exotica Resort & Spa", city: "Goa", checkIn: "2026-09-14", checkOut: "2026-09-18" } as never,
-  { confirmationNo: "TBO-99341827", bookingId: 99341827 } as never,
-  61200,
-);
-
-const samples: Array<{ file: string; label: string; note: string; subject: string; html: string }> = [
-  {
-    file: "flight-confirmation.html",
-    label: "Flight booking confirmed",
-    note: "Sent from /api/book after a ticket is issued. Green accent = confirmed.",
-    ...sampleFlight,
-  },
-  {
-    file: "hotel-confirmation.html",
-    label: "Hotel booking confirmed",
-    note: "Sent from /api/hotels/book after a confirmed Book.",
-    ...sampleHotel,
-  },
-  {
-    file: "welcome.html",
-    label: "Account created",
-    note: "Sent once, after signup. Navy accent = account. NOT the confirm-email mail.",
-    ...welcomeEmail({ name: "Hardik Patel", email: "hardik@example.com" }),
-  },
-  {
-    file: "password-reset.html",
-    label: "Password reset",
-    note: "Amber accent = action needed. Sent by us via Resend from /api/auth/forgot-password.",
-    ...passwordResetEmail({
-      name: "Hardik Patel",
-      resetUrl: "https://www.riseandshinetravel.in/auth/callback?token=sample",
-    }),
-  },
-  {
-    file: "refund.html",
-    label: "Payment refunded",
-    note: "Sent when a paid booking could not be completed.",
-    ...refundNoticeEmail({ kind: "flight", amountInr: 24680, reference: "order_RS_8842190" }),
-  },
-  {
-    file: "offer.html",
-    label: "Offers / campaign",
-    note: "Red accent = marketing. Carries a required unsubscribe link.",
-    ...offerEmail({
-      name: "Hardik Patel",
-      headline: "Three monsoon escapes, held until the 12th",
-      intro:
-        "The rains make these three cheaper and emptier than they will be all year. Fares below are per person, twin sharing, ex-Ahmedabad.",
-      validUntil: "12-09-26",
-      unsubscribeUrl: "https://www.riseandshinetravel.in/unsubscribe?t=sample",
-      items: [
-        {
-          title: "Kerala · 6 nights",
-          blurb: "Backwaters at Alleppey, tea country at Munnar, two nights on the coast.",
-          fromInr: 38900,
-          url: "https://www.riseandshinetravel.in/packages/domestic/kerala",
-        },
-        {
-          title: "Andaman · 5 nights",
-          blurb: "Havelock and Neil, with the ferry transfers and permits handled.",
-          fromInr: 44500,
-          url: "https://www.riseandshinetravel.in/packages/domestic/andaman",
-        },
-        {
-          title: "Rajasthan · 7 nights",
-          blurb: "Udaipur, Jodhpur and Jaisalmer, ending with a night in the dunes.",
-          fromInr: 31200,
-          url: "https://www.riseandshinetravel.in/packages/domestic/rajasthan",
-        },
-      ],
-    }),
-  },
-];
+const samples = await buildSamples();
 
 for (const s of samples) writeFileSync(join(OUT, s.file), s.html);
 

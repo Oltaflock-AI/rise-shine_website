@@ -39,7 +39,13 @@ export async function subscribeContact(args: {
   const email = args.email.trim().toLowerCase();
   if (!email.includes("@")) return;
 
-  await createAdminClient()
+  // The error is READ, not discarded. This exact write failed silently once:
+  // 0010's uniqueness lived in an index on lower(email), which ON CONFLICT
+  // (email) cannot match, so every opt-in errored with 42P10 and a customer who
+  // ticked the box was simply never added. Nothing in the logs, nothing in the
+  // UI. Migration 0011 fixed the constraint; throwing here is what makes the
+  // next such failure visible on the first attempt instead of the hundredth.
+  const { error } = await createAdminClient()
     .from("marketing_contacts")
     .upsert(
       {
@@ -51,6 +57,8 @@ export async function subscribeContact(args: {
       },
       { onConflict: "email" },
     );
+
+  if (error) throw new Error(`marketing opt-in failed for ${email}: ${error.message}`);
 }
 
 /**
