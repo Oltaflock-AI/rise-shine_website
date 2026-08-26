@@ -50,6 +50,58 @@ export interface MintedLink {
 }
 
 /**
+ * Create an account AND mint its confirmation link, without sending anything.
+ *
+ * `generateLink({ type: "signup" })` does the user creation itself — that is
+ * documented behaviour, not a side effect we are exploiting — and returns the
+ * token instead of mailing it. This is what lets the site keep email
+ * verification while Supabase's mailer stays switched off: the alternative was
+ * `signUp()` from the browser, which triggers Supabase's own unbranded mail and
+ * returns no session, so our welcome email and marketing opt-in never ran.
+ *
+ * `data` becomes `user_metadata` at creation. The marketing opt-in rides along
+ * there because there is no session yet to carry it, and no row to write it to
+ * until the address is confirmed — subscribing an unconfirmed address would
+ * mean anyone could add anyone else's email to the list.
+ *
+ * Returns null when the address already has an account, which the caller must
+ * surface plainly: a signup form that hides this cannot explain why the
+ * password did not work.
+ */
+export async function mintSignupLink(args: {
+  email: string;
+  password: string;
+  data: Record<string, unknown>;
+  next: string;
+  origin: string;
+}): Promise<{ url: string } | { alreadyRegistered: true } | null> {
+  if (!supabaseAdminConfigured) return null;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "signup",
+    email: args.email,
+    password: args.password,
+    options: { data: args.data, redirectTo: `${args.origin}${args.next}` },
+  });
+
+  if (error) {
+    const m = error.message.toLowerCase();
+    if (m.includes("already") || m.includes("registered") || m.includes("exists")) {
+      return { alreadyRegistered: true };
+    }
+    throw new Error(error.message);
+  }
+  if (!data?.properties?.hashed_token) return null;
+
+  const url = new URL(`${args.origin}/auth/confirm`);
+  url.searchParams.set("token_hash", data.properties.hashed_token);
+  url.searchParams.set("type", "signup");
+  url.searchParams.set("next", args.next);
+  return { url: url.toString() };
+}
+
+/**
  * Mint a one-time auth link for `email`, or report that no account exists.
  *
  * Callers must treat "no account" as indistinguishable from success in anything

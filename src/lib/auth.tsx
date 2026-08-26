@@ -49,7 +49,7 @@ type AuthContextValue = {
     password: string,
     /** Ticked the "send me offers" box. Consent, so it must be explicit. */
     offers?: boolean,
-  ) => Promise<void>;
+  ) => Promise<{ confirmationSent: boolean }>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -113,47 +113,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  /**
+   * Create an account.
+   *
+   * Posts to our own `/api/auth/signup` rather than calling
+   * `supabase.auth.signUp()`. That call goes through Supabase's mailer — a
+   * shared, rate-limited sender using an unbranded template — and returns no
+   * session while confirmation is pending, so nothing downstream of signup
+   * (welcome email, marketing opt-in) ever ran. The route mints the link with
+   * `generateLink()`, which sends nothing, and mails it through Resend.
+   *
+   * No session is set here: the account is unconfirmed until the emailed link is
+   * clicked. The caller shows a "check your email" state.
+   */
   const signup = useCallback(
     async (name: string, email: string, phone: string, password: string, offers = false) => {
       const n = name.trim();
       if (!n) throw new Error("Please enter your name.");
-      // Store E.164, not what was typed. The number is the join key between an
-      // account and a callback/voice-call record (callback_queue.phone,
-      // voice_calls.lead_phone), and "98765 43210" would never match "+919876543210".
+      // Normalise before sending so the browser rejects an obvious typo without
+      // a round trip. The server re-checks — this is convenience, not the guard.
       const p = normalisePhone(phone);
       if (!isDiallableIndianNumber(p))
         throw new Error("Please enter a valid mobile number, e.g. 98765 43210.");
       if (!supabaseConfigured) throw new Error(NOT_CONFIGURED);
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: { full_name: n, phone: p },
-          emailRedirectTo:
-            typeof window !== "undefined"
-              ? `${window.location.origin}/auth/callback`
-              : undefined,
-        },
-      });
-      if (error) throw new Error(friendly(error.message));
-      if (!data.session) {
-        // "Confirm email" is ON — no session until the link is clicked.
-        throw new Error(
-          "Almost there — we've emailed you a confirmation link. Confirm it, then log in.",
-        );
-      }
-      setUser(toUser(data.user));
 
-      // Welcome email, best-effort and deliberately not awaited-for-success: the
-      // account exists either way, and a mail failure must not read as a failed
-      // signup. The body carries only the offers opt-in — the ADDRESS always
-      // comes from the session on the server, never from here.
-      fetch("/api/account/welcome", {
+      const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offers }),
-      }).catch(() => {});
+        body: JSON.stringify({ name: n, email: email.trim().toLowerCase(), phone: p, password, offers }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        confirmationSent?: boolean;
+      };
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "We couldn't create that account. Please try again.");
+      }
+      return { confirmationSent: json.confirmationSent !== false };
     },
     [],
   );

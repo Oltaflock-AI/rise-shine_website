@@ -245,6 +245,37 @@ export function welcomeEmail(args: { name: string; email: string }): {
 }
 
 /**
+ * Confirm your email — sent at signup, by us, through Resend.
+ *
+ * The account exists at this point but is unconfirmed, so the link is the only
+ * way into it. Say what happens if they ignore it, because someone who did not
+ * sign up needs to know that ignoring it is the correct action and that no
+ * account of theirs is usable by whoever typed their address.
+ */
+export function confirmSignupEmail(args: { confirmUrl: string; name?: string }): {
+  subject: string;
+  html: string;
+} {
+  const first = args.name?.trim().split(/\s+/)[0];
+  const html = shell(
+    heading("Confirm your email") +
+      paragraph(
+        `${first ? `Hi ${esc(first)}, thanks` : "Thanks"} for creating a Rise &amp; Shine account. Confirm this address and you'll be signed in and ready to book.`,
+      ) +
+      button("Confirm my email", args.confirmUrl) +
+      callout(
+        "This link can be used once and expires in 24 hours. <strong>If you did not sign up with us, ignore this email</strong> &mdash; the account cannot be used until this address is confirmed, so nobody gains access to anything by typing your address.",
+      ),
+    {
+      kicker: "Confirm your email",
+      tone: "account",
+      preheader: "One click to confirm your address and finish setting up your account.",
+    },
+  );
+  return { subject: "Confirm your email · Rise & Shine Travels", html };
+}
+
+/**
  * Password reset. WE send this, through Resend.
  *
  * The token comes from `admin.generateLink()`, which mints one without sending

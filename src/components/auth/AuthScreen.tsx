@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MailCheck, Phone, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { AuthShell, inputCls, inputWrap } from "./AuthShell";
 import { cn } from "@/lib/cn";
@@ -40,6 +40,8 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set once signup succeeds — the account exists but is not yet confirmed. */
+  const [confirmSent, setConfirmSent] = useState(false);
 
   // Surface a failed email link once, on arrival.
   useEffect(() => {
@@ -61,14 +63,45 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
     }
     setBusy(true);
     try {
-      if (isSignup) await signup(name, email, phone, password, offers);
-      else await login(email, password);
+      if (isSignup) {
+        // No redirect: signup leaves no session, because the address is not
+        // confirmed yet. Show the "check your email" state instead.
+        await signup(name, email, phone, password, offers);
+        setConfirmSent(true);
+        setBusy(false);
+        return;
+      }
+      await login(email, password);
       router.replace(safeRedirect());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);
     }
   };
+
+  if (confirmSent) {
+    return (
+      <AuthShell
+        title="Check your email"
+        intro="Your account is created — one click and you're in."
+      >
+        <div className="mt-7 flex items-start gap-3 rounded-xl border border-line bg-cream/60 p-4">
+          <MailCheck size={20} className="mt-0.5 flex-none text-red" aria-hidden />
+          <div className="text-[0.92rem] leading-relaxed text-ink-soft">
+            We&apos;ve sent a confirmation link to <b className="text-ink">{email}</b>. It
+            expires in 24 hours. If it hasn&apos;t arrived in a few minutes, check your spam
+            folder.
+          </div>
+        </div>
+        <p className="mt-6 text-center text-[0.9rem] text-muted">
+          Already confirmed?{" "}
+          <Link href="/login" className="font-semibold text-red hover:underline">
+            Log in
+          </Link>
+        </p>
+      </AuthShell>
+    );
+  }
 
   const other = isSignup
     ? { href: "/login", prompt: "Already have an account?", cta: "Log in" }
