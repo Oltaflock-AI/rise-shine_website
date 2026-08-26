@@ -44,6 +44,16 @@ function apiKey(): string {
   return k;
 }
 
+// The full call recording, straight from ElevenLabs (audio/mpeg). Returned as
+// the raw upstream Response so the API route can stream it without buffering
+// ~400 kB per call in memory. 404s when the conversation has no audio.
+export async function fetchConversationAudio(conversationId: string): Promise<Response> {
+  return fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/audio`, {
+    headers: { "xi-api-key": apiKey() },
+    cache: "no-store",
+  });
+}
+
 // Normalise an Indian number to E.164. 10 digits → +91; already-prefixed kept.
 export function normalisePhone(raw: string): string {
   const trimmed = (raw || "").trim();

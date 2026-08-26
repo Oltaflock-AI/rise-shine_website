@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useCalls } from "@/lib/useCalls";
 import { PageHeader } from "@/components/PageHeader";
 import { initial, fmtWhen } from "@/lib/format";
-import { IconStar, IconPlane } from "@/components/icons";
+import { leadScore } from "@/lib/lead-score";
+import { IconPlane } from "@/components/icons";
 
 // One voice_calls row from /api/crm — the post-call webhook's record, joined
 // to the callback queue on phone so the lead's whole lifecycle is one line.
@@ -42,10 +43,16 @@ export default function Leads() {
     };
   }, []);
 
+  // Highest score first: the follow-up list should open on the best lead, not
+  // merely the newest one. Recency breaks ties.
   const rows = useMemo(() => {
     return [...calls]
       .filter((c) => (qualifiedOnly ? c.qualified === true : true))
-      .sort((a, b) => (b.started_at_unix ?? 0) - (a.started_at_unix ?? 0));
+      .sort(
+        (a, b) =>
+          leadScore(b).score - leadScore(a).score ||
+          (b.started_at_unix ?? 0) - (a.started_at_unix ?? 0),
+      );
   }, [calls, qualifiedOnly]);
 
   const qualifiedCount = calls.filter((c) => c.qualified === true).length;
@@ -95,7 +102,7 @@ export default function Leads() {
                 <span>Travelers</span>
                 <span>Month</span>
                 <span>Callback</span>
-                <span>Status</span>
+                <span>Score</span>
               </div>
               {rows.map((c) => (
                 <Link key={c.conversation_id} href={`/calls/${c.conversation_id}`} className="trip-row">
@@ -115,11 +122,7 @@ export default function Leads() {
                   <span>{c.fields.travel_month ?? <span className="dim">—</span>}</span>
                   <span className="trip-cb">{c.fields.callback_time ?? <span className="dim">—</span>}</span>
                   <span>
-                    {c.qualified === true ? (
-                      <span className="badge q"><IconStar className="badge-star" /> Qualified</span>
-                    ) : (
-                      <span className="badge fail">Other</span>
-                    )}
+                    <span className={`badge score-${leadScore(c).tier}`}>{leadScore(c).label}</span>
                   </span>
                 </Link>
               ))}

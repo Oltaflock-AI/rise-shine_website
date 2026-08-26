@@ -9,6 +9,7 @@ import {
   fmtDuration,
   initial,
 } from "@/lib/format";
+import { leadScore } from "@/lib/lead-score";
 import {
   IconArrowLeft,
   IconStar,
@@ -48,6 +49,7 @@ export default function CallDetail() {
   const processing = call.status === "processing" || call.status === "in-progress";
   const failed = call.status === "failed" || call.call_successful === "failure";
   const filledFields = DETAIL_FIELDS.filter((f) => call.fields[f.key]);
+  const score = leadScore(call);
 
   return (
     <>
@@ -64,6 +66,7 @@ export default function CallDetail() {
           </div>
         </div>
         <div className="detail-badges">
+          <span className={`badge score-${score.tier}`} title="Lead score out of 100">{score.label}</span>
           {call.qualified === true && <span className="badge q"><IconStar className="badge-star" /> Qualified</span>}
           {processing ? (
             <span className="badge proc"><span className="live-spark" />Processing</span>
@@ -74,6 +77,29 @@ export default function CallDetail() {
           )}
         </div>
       </div>
+
+      {/* Recording — streamed through our own gated proxy, never the API key */}
+      {!processing && (call.duration_secs ?? 0) > 0 && (
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title">Call Recording</div>
+            <span className="panel-sub">{fmtDuration(call.duration_secs)}</span>
+          </div>
+          <div className="panel-body">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the transcript below IS the caption */}
+            <audio
+              className="recording"
+              controls
+              preload="none"
+              src={`/api/conversations/${encodeURIComponent(call.conversation_id)}/audio`}
+            />
+            <p className="access-hint">
+              If the player is empty the call has no stored audio — recordings appear
+              once ElevenLabs finishes processing.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Trip details */}
       <div className="panel">

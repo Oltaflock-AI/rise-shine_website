@@ -12,6 +12,7 @@ import {
   isConnected,
   hasCallback,
 } from "@/lib/format";
+import { leadScore } from "@/lib/lead-score";
 import {
   IconPhone,
   IconCheck,
@@ -39,14 +40,32 @@ export default function Overview() {
     }
     const topDest = [...dests.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-    return { total, connected, qualified, callbacks, avg, topDest };
+    // Rates are measured against the right denominator: answer rate over every
+    // call placed, qualification over the ones that actually connected — a
+    // batch of unanswered numbers must not read as poor qualifying.
+    const answerRate = total ? Math.round((connected / total) * 100) : 0;
+    const qualRate = connected ? Math.round((qualified / connected) * 100) : 0;
+    const hot = calls.filter((c) => leadScore(c).tier === "hot").length;
+    const warm = calls.filter((c) => leadScore(c).tier === "warm").length;
+    const talkSecs = calls.reduce((sum, c) => sum + (c.duration_secs ?? 0), 0);
+
+    return {
+      total, connected, qualified, callbacks, avg, topDest,
+      answerRate, qualRate, hot, warm, talkSecs,
+    };
   }, [calls]);
 
+  // Ranked by lead score, not recency: the top of this list should be the call
+  // worth ringing back first.
   const priority = useMemo(
     () =>
       [...calls]
-        .filter((c) => c.qualified === true)
-        .sort((a, b) => (b.started_at_unix ?? 0) - (a.started_at_unix ?? 0))
+        .filter((c) => leadScore(c).tier !== "cold")
+        .sort(
+          (a, b) =>
+            leadScore(b).score - leadScore(a).score ||
+            (b.started_at_unix ?? 0) - (a.started_at_unix ?? 0),
+        )
         .slice(0, 6),
     [calls],
   );
@@ -65,24 +84,31 @@ export default function Overview() {
       <PageHeader title="Overview" subtitle="AI voice sales engine · live travel pipeline" />
 
       <div className="kpis">
-        <Kpi label="Voice Calls" value={m.total} sub={`${m.connected} connected`} icon={<IconPhone className="i" />} />
-        <Kpi label="Qualified Leads" value={m.qualified} sub={m.total ? `${Math.round((m.qualified / m.total) * 100)}% qualification rate` : "—"} icon={<IconCheck className="i" />} />
+        <Kpi label="Voice Calls" value={m.total} sub={m.total ? `${m.answerRate}% answered` : "none yet"} icon={<IconPhone className="i" />} />
+        <Kpi label="Hot Leads" value={m.hot} sub={`${m.warm} warm behind them`} icon={<IconStar className="i" />} />
+        <Kpi label="Qualified Leads" value={m.qualified} sub={m.connected ? `${m.qualRate}% of connected calls` : "—"} icon={<IconCheck className="i" />} />
         <Kpi label="Callbacks Booked" value={m.callbacks} sub="1–4 PM slots locked" icon={<IconCalendar className="i" />} />
+      </div>
+
+      <div className="kpis">
+        <Kpi label="Connected Calls" value={m.connected} sub={`of ${m.total} placed`} icon={<IconPhone className="i" />} />
         <Kpi label="Avg Call Time" value={fmtDuration(m.avg)} sub="per connected call" icon={<IconClock className="i" />} />
+        <Kpi label="Total Talk Time" value={fmtDuration(m.talkSecs)} sub="across every call" icon={<IconClock className="i" />} />
+        <Kpi label="Callback Rate" value={m.connected ? `${Math.round((m.callbacks / m.connected) * 100)}%` : "—"} sub="connected calls that booked" icon={<IconCalendar className="i" />} />
       </div>
 
       <div className="two-col">
         {/* Priority leads */}
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Priority Leads · follow up</div>
+            <div className="panel-title">Priority Leads · highest score first</div>
             <Link href="/leads" className="panel-link">All leads →</Link>
           </div>
           <div className="panel-body flush">
             {loading ? (
               <div className="panel-empty">Loading…</div>
             ) : priority.length === 0 ? (
-              <div className="panel-empty">No qualified leads yet — they appear here ranked by recency.</div>
+              <div className="panel-empty">No warm or hot leads yet — they appear here ranked by score.</div>
             ) : (
               <div className="row-stripe">
                 {priority.map((c) => (
@@ -95,7 +121,7 @@ export default function Overview() {
                         {c.fields.travel_month ? ` · ${c.fields.travel_month}` : ""}
                       </div>
                     </div>
-                    <span className="badge q"><IconStar className="badge-star" /> Qualified</span>
+                    <span className={`badge score-${leadScore(c).tier}`}>{leadScore(c).label}</span>
                   </Link>
                 ))}
               </div>
