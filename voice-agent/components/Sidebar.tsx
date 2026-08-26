@@ -21,6 +21,7 @@ export function Sidebar() {
   const items = [
     { href: "/", label: "Overview", Icon: IconOverview, exact: true },
     { href: "/calls", label: "Voice Calls", Icon: IconPhone, count: calls.length },
+    { href: "/queue", label: "Callback Queue", Icon: IconPhone },
     { href: "/leads", label: "Trips & Leads", Icon: IconPlane, count: qualified },
   ];
 
@@ -72,6 +73,16 @@ export function Sidebar() {
         <div className={`sync-mini${error ? " sync-error-text" : ""}`} title={error ?? undefined}>
           <span className="dot" /> {error ? "Data unavailable" : `Live · ${fmtWhen(Math.floor(lastSync.getTime() / 1000))}`}
         </div>
+        <button
+          type="button"
+          className="btn-inline"
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+            window.location.href = "/login";
+          }}
+        >
+          Sign out
+        </button>
         <div className="sidebar-org">Powered by Oltaflock · v1.1</div>
       </div>
     </aside>

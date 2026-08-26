@@ -351,3 +351,8 @@ a.trip-row:hover { background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
+
+/* Sign-in screen (outside the dashboard shell) */
+.login-shell { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.login-panel { width: min(380px, 100%); padding: 28px; display: grid; gap: 14px; }
+.login-brand { margin-bottom: 6px; }

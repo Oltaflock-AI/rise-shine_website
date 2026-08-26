@@ -14,6 +14,7 @@
 
 import { can, type Capability, type Role } from "./access";
 import { roleFor } from "./access-store";
+import { authClient } from "./supabase";
 
 export const AUTH_ENABLED = process.env.DASHBOARD_AUTH_ENABLED === "true";
 
@@ -33,12 +34,22 @@ const SIMULATED_ADMIN: Viewer = {
 /**
  * The verified email of the signed-in user, or null.
  *
- * THE STUB. It returns null because nothing signs anyone in yet. It deliberately
- * does not read a header or a query parameter — a client-supplied email would be
- * an impersonation hole that looks like a working login.
+ * Identity is a Supabase Auth session cookie from the main site's project.
+ * getUser() re-verifies the JWT with Supabase — never trust getSession(),
+ * which only decodes what the browser sent. It deliberately does not read a
+ * header or a query parameter — a client-supplied email would be an
+ * impersonation hole that looks like a working login.
  */
 async function emailFromSession(): Promise<string | null> {
-  return null;
+  try {
+    const supabase = await authClient();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user?.email) return null;
+    return data.user.email;
+  } catch {
+    // Missing Supabase env: identity is unknowable, so nobody is signed in.
+    return null;
+  }
 }
 
 export async function getViewer(): Promise<Viewer | null> {
