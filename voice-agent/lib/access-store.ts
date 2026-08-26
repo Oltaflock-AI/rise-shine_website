@@ -129,6 +129,17 @@ async function load(): Promise<AccessMember[]> {
   return members;
 }
 
+/**
+ * Run the bootstrap seed if it hasn't happened yet. The login route calls this
+ * BEFORE checking credentials: sign-in reads dashboard_users directly, so on a
+ * brand-new table the very first login would otherwise find no admin to match
+ * — the seed only ran when someone listed the team, which needs a session,
+ * which needs a login. Chicken, meet egg.
+ */
+export async function ensureSeeded(): Promise<void> {
+  await load();
+}
+
 // Mutations are serialised: two overlapping requests would otherwise both read
 // the list and the last-admin check would race.
 let queue: Promise<unknown> = Promise.resolve();
