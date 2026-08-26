@@ -9,3 +9,4 @@
 !.env.example
 next-env.d.ts
 *.tsbuildinfo
+.vercel
