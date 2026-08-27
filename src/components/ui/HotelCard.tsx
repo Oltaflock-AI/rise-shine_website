@@ -119,6 +119,18 @@ export function HotelCard({
     maximumFractionDigits: 0,
   });
 
+  // Breakfast is the rate's business, not the building's. The facility feed
+  // says a hotel HAS breakfast; the meal plan says whether this price includes
+  // it — and the two were rendered a centimetre apart in the same word, so a
+  // room-only card carried a "Breakfast" chip over a price that buys none.
+  // The chip is dropped on every card: the meta line is the one that is true
+  // of the fare being quoted, and the full facility list is on the hotel page.
+  // Cards are curated four deep upstream so dropping it still leaves three.
+  const mealText = mealLabel(cheapest?.mealType);
+  const chips = (amenities ?? [])
+    .filter((a) => a.key !== "breakfast")
+    .slice(0, 3);
+
   // "Free cancellation until <date>" beats a bare "Refundable" — it is the
   // same fact with the deadline the guest actually needs, and the windows
   // helper drops any free window that has already closed.
@@ -240,10 +252,10 @@ export function HotelCard({
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted">
-            {mealLabel(cheapest?.mealType) && (
+            {mealText && (
               <span className="inline-flex items-center gap-1">
                 <Utensils size={14} className="text-red" aria-hidden />
-                {mealLabel(cheapest?.mealType)}
+                {mealText}
               </span>
             )}
             <span
@@ -258,10 +270,13 @@ export function HotelCard({
           </div>
 
           {/* What the hotel offers, at a glance. Without this the guest had to
-            open every property just to find out which ones have a pool. */}
-          {amenities && amenities.length > 0 && (
+            open every property just to find out which ones have a pool.
+            The pay-at-hotel warning rides in the SAME row: as its own line it
+            gave a third of the cards a fourth block and no two cards in a
+            results list stood the same height. */}
+          {(chips.length > 0 || payAtHotel) && (
             <ul className="mt-2 flex flex-wrap gap-1.5">
-              {amenities.map((a) => (
+              {chips.map((a) => (
                 <li
                   key={a.key}
                   className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-meta font-medium text-ink"
@@ -270,18 +285,13 @@ export function HotelCard({
                   {a.label}
                 </li>
               ))}
+              {payAtHotel && (
+                <li className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-meta font-medium text-amber-900">
+                  <Wallet size={12} aria-hidden />
+                  Extra charges at the hotel
+                </li>
+              )}
             </ul>
-          )}
-
-          {payAtHotel && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-meta text-muted">
-              <Wallet
-                size={13}
-                className="mt-0.5 flex-none text-red"
-                aria-hidden
-              />
-              <span>Extra charges payable at the hotel</span>
-            </p>
           )}
         </div>
       </div>

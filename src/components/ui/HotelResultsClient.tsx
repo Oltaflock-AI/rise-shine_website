@@ -459,8 +459,11 @@ export function HotelResultsClient({
                   role="radio"
                   aria-checked={active}
                   onClick={() => setSort(t.key)}
+                  /* The focus ring is inset: sitting outside, it drew a hard
+                     red rectangle straddling the tab strip's own border and
+                     read as a broken tab rather than a focused one. */
                   className={cn(
-                    "relative whitespace-nowrap px-5 py-3.5 text-body font-semibold transition-colors sm:px-6",
+                    "relative whitespace-nowrap rounded-brand px-5 py-3.5 text-body font-semibold transition-colors focus-visible:outline-offset-[-4px] sm:px-6",
                     active ? "text-red" : "text-ink hover:text-red/80",
                   )}
                 >

@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  clockLabel,
+  inclusionItems,
   mealLabel,
+  sentenceCase,
+  supplementCurrencyNote,
   pageCount,
   pageSlice,
   pageWindow,
   perNightFare,
+  roomSizeLabel,
+  roomTitle,
   starBucket,
   STAR_BUCKET_LABEL,
 } from "../src/lib/hotel-display";
@@ -123,5 +129,112 @@ describe("mealLabel — TBO's snake case is not a meal plan", () => {
 
   it("keeps room-only where the rate has to be spelt out", () => {
     expect(mealLabel("Room_Only", true)).toBe("Room Only");
+  });
+});
+
+describe("roomTitle — TBO omits the space after the comma", () => {
+  it("spaces a comma-run room name", () => {
+    expect(roomTitle("Deluxe Room,1 King Bed")).toBe("Deluxe Room, 1 King Bed");
+  });
+
+  it("collapses whitespace and trims dangling separators", () => {
+    expect(roomTitle("  Premier   Room ,  1 King Bed , ")).toBe(
+      "Premier Room, 1 King Bed",
+    );
+  });
+
+  it("never renders an empty heading", () => {
+    expect(roomTitle("")).toBe("Room");
+    expect(roomTitle(undefined)).toBe("Room");
+  });
+});
+
+describe("roomSizeLabel — a bare 'ft' is an area, not a length", () => {
+  it("reads TBO's bare feet as square feet", () => {
+    expect(roomSizeLabel("355 ft")).toBe("355 sq ft");
+    expect(roomSizeLabel("350")).toBe("350 sq ft");
+    expect(roomSizeLabel("420 sqft")).toBe("420 sq ft");
+  });
+
+  it("keeps metric as metric", () => {
+    expect(roomSizeLabel("32 sqm")).toBe("32 sq m");
+    expect(roomSizeLabel("32 m2")).toBe("32 sq m");
+  });
+
+  it("drops sizes that are not a positive measurement", () => {
+    expect(roomSizeLabel("0 ft")).toBe("");
+    expect(roomSizeLabel("king bed")).toBe("");
+    expect(roomSizeLabel(undefined)).toBe("");
+    // A unit we do not recognise is a guess, and a guessed room size is worse
+    // than none: it is the number a guest pictures themselves standing in.
+    expect(roomSizeLabel("355 acres")).toBe("");
+  });
+});
+
+describe("inclusionItems — the supplier's casing is not our casing", () => {
+  it("sentence-cases and de-duplicates", () => {
+    expect(inclusionItems("breakfast buffet, FREE VALET PARKING, Breakfast Buffet")).toEqual([
+      "Breakfast buffet",
+      "Free valet parking",
+    ]);
+  });
+
+  it("caps the line rather than letting it become a paragraph", () => {
+    expect(inclusionItems("a1, b2, c3, d4, e5", 3)).toEqual(["A1", "B2", "C3"]);
+  });
+
+  it("returns nothing for an empty field", () => {
+    expect(inclusionItems(undefined)).toEqual([]);
+    expect(inclusionItems(" , , ")).toEqual([]);
+  });
+});
+
+describe("sentenceCase — supplier keys are not labels", () => {
+  it("unpicks TBO's snake_case supplement types", () => {
+    expect(sentenceCase("mandatory_tax")).toBe("Mandatory tax");
+  });
+
+  it("leaves an already-cased description alone", () => {
+    expect(sentenceCase("Tourism Dirham Fee")).toBe("Tourism Dirham Fee");
+  });
+
+  it("returns nothing for nothing", () => {
+    expect(sentenceCase(undefined)).toBe("");
+    expect(sentenceCase("   ")).toBe("");
+  });
+});
+
+describe("supplementCurrencyNote — name the currency, or say nothing", () => {
+  it("names a currency that is not the one we quoted", () => {
+    expect(supplementCurrencyNote("AED", "INR")).toBe(" (charged in AED)");
+    // TBO quotes a Dubai hotel's fee in USD often enough that the old
+    // "hotel's local currency" wording was simply untrue.
+    expect(supplementCurrencyNote("USD", "INR")).toBe(" (charged in USD)");
+  });
+
+  it("stays silent when the supplement is in our own currency", () => {
+    expect(supplementCurrencyNote("INR", "INR")).toBe("");
+    expect(supplementCurrencyNote(undefined, "INR")).toBe("");
+    expect(supplementCurrencyNote("inr", undefined)).toBe("");
+  });
+});
+
+describe("clockLabel — one clock for every supplier", () => {
+  it("normalises the shapes TBO actually sends", () => {
+    expect(clockLabel("14:00:00")).toBe("2:00 PM");
+    expect(clockLabel("14:00")).toBe("2:00 PM");
+    expect(clockLabel("2:00 PM")).toBe("2:00 PM");
+    expect(clockLabel("12:00:00")).toBe("12:00 PM");
+    expect(clockLabel("00:00")).toBe("12:00 AM");
+    expect(clockLabel("12:00 AM")).toBe("12:00 AM");
+  });
+
+  it("keeps prose a supplier wrote instead of a time", () => {
+    expect(clockLabel("Flexible")).toBe("Flexible");
+    expect(clockLabel("After 2pm, call ahead")).toBe("After 2pm, call ahead");
+  });
+
+  it("returns nothing for an empty field", () => {
+    expect(clockLabel(undefined)).toBe("");
   });
 });

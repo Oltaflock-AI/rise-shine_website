@@ -123,3 +123,128 @@ export function mealLabel(raw: string | undefined, keepRoomOnly = false): string
   if (!keepRoomOnly && (lower === "room only" || lower === "roomonly")) return "";
   return lower.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 }
+
+/**
+ * A room name a human wrote, from the one TBO sends.
+ *
+ * The live feed omits the space after a comma on nearly every rate —
+ * "Deluxe Room,1 King Bed", "Premier Room,1 King Bed" — so every room card on
+ * every hotel read as a typo. Three components each printed the raw string, so
+ * fixing it at one call site fixed one page; this is the shared version.
+ */
+export function roomTitle(raw: string | undefined): string {
+  const text = (raw ?? "")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s+/g, " ")
+    .replace(/[\s,;·|-]+$/, "")
+    .trim();
+  return text || "Room";
+}
+
+/**
+ * TBO's `RoomSize` as a unit a guest can read.
+ *
+ * The catalogue writes square feet as a bare "ft" — "355 ft" — which reads as a
+ * length, not an area, and is how the room list came to advertise rooms 355
+ * feet long. A size with no recognisable unit is assumed to be square feet,
+ * which is what TBO uses throughout; anything that is not a number at all is
+ * dropped rather than guessed at.
+ */
+export function roomSizeLabel(raw: string | undefined): string {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
+  const m = text.match(/^([\d.,]+)\s*(.*)$/);
+  if (!m) return "";
+  const value = m[1].replace(/,/g, "");
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const unit = m[2].toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (unit === "sqm" || unit === "m2" || unit === "sqmt" || unit === "sqmtr")
+    return `${value} sq m`;
+  // "", "ft", "sqft", "sqfeet", "squarefeet" — all square feet in TBO's feed.
+  if (unit && !/^(ft|feet|sqft|sqfeet|squarefeet|squareft)$/.test(unit))
+    return "";
+  return `${value} sq ft`;
+}
+
+/**
+ * TBO's `Inclusion` — a comma-separated dump — as one readable line.
+ *
+ * It arrives in whatever case the supplier typed ("breakfast buffet, FREE
+ * VALET PARKING") and repeats itself across rates. Sentence case per item, de-
+ * duplicated, and capped: past four entries it is a paragraph pretending to be
+ * a chip row, and the same facts are in the room's own amenity list.
+ */
+export function inclusionItems(raw: string | undefined, max = 4): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of (raw ?? "").split(/[,;·]/)) {
+    const text = part.replace(/\s+/g, " ").trim();
+    if (!text || text.length > 40) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key[0].toUpperCase() + key.slice(1));
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/**
+ * A supplier's machine key or shouted label as a sentence.
+ *
+ * TBO writes supplement types as snake_case ("mandatory_tax") and suppliers
+ * write descriptions in whatever case they please, so the same fee appeared as
+ * "mandatory tax" on the room list and "Mandatory tax" in the rate panel.
+ */
+export function sentenceCase(raw: string | undefined): string {
+  const text = (raw ?? "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text[0].toUpperCase() + text.slice(1) : "";
+}
+
+/**
+ * The note beside a supplement priced in someone else's money.
+ *
+ * "(hotel's local currency)" named no currency, and TBO routinely quotes a
+ * Dubai hotel's fee in USD — so the note was both vague and, for a rate the
+ * hotel does not actually charge in dirhams, wrong. Say the code.
+ */
+export function supplementCurrencyNote(
+  supplementCurrency: string | undefined,
+  quoteCurrency: string | undefined,
+): string {
+  const sup = (supplementCurrency ?? "").trim().toUpperCase();
+  const ours = (quoteCurrency ?? "INR").trim().toUpperCase();
+  return sup && sup !== ours ? ` (charged in ${sup})` : "";
+}
+
+/**
+ * A hotel's check-in / check-out time in ONE format.
+ *
+ * `CheckInTime` is free text on TBO's side and every supplier writes it their
+ * own way — "14:00:00", "2:00 PM", "1400", "14:00" — so two hotels in the same
+ * results set showed the same fact two different ways. Normalised to the
+ * 12-hour clock the rest of the site speaks.
+ *
+ * Anything that is not a time comes back verbatim: some suppliers write real
+ * sentences here ("Flexible"), and blanking that would lose the answer.
+ */
+export function clockLabel(raw: string | undefined): string {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
+  const m = text.match(/^(\d{1,2})[:.]?(\d{2})?(?::\d{2})?\s*([ap]\.?m\.?)?$/i);
+  if (!m) return text;
+
+  let hour = parseInt(m[1], 10);
+  const minute = m[2] ? parseInt(m[2], 10) : 0;
+  if (!Number.isFinite(hour) || hour > 24 || minute > 59) return text;
+
+  const suffix = (m[3] ?? "").toLowerCase().replace(/\./g, "");
+  if (suffix === "pm" && hour < 12) hour += 12;
+  if (suffix === "am" && hour === 12) hour = 0;
+  hour %= 24;
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const twelve = hour % 12 === 0 ? 12 : hour % 12;
+  return `${twelve}:${String(minute).padStart(2, "0")} ${period}`;
+}

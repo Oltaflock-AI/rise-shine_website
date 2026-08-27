@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseHotelDescription, toPlainText } from "../src/lib/hotel-description";
+import {
+  parseHotelDescription,
+  parseRoomDescription,
+  toPlainText,
+} from "../src/lib/hotel-description";
 
 /** Verbatim opening of TBO's description for Mövenpick Bur Dubai. */
 const REAL =
@@ -61,5 +65,52 @@ describe("parseHotelDescription", () => {
     const s = parseHotelDescription("<p>The hotel has one rule: no smoking indoors.</p>");
     expect(s[0].heading).toBe("");
     expect(s[0].paragraphs[0]).toContain("no smoking indoors");
+  });
+});
+
+describe("parseRoomDescription — one welded line, six sections", () => {
+  const raw =
+    "1 King Bed 355 sq feet Layout - Separate sitting area Internet - Free " +
+    "WiFi and wired internet access Food & Drink - Espresso maker, electric " +
+    "kettle, and 24-hour room service Bathroom - Deep soaking bathtub";
+
+  it("recovers the supplier's own labels", () => {
+    expect(parseRoomDescription(raw).map((p) => p.label)).toEqual([
+      "",
+      "Layout",
+      "Internet",
+      "Food & Drink",
+      "Bathroom",
+    ]);
+  });
+
+  it("keeps the text before the first label as an unlabelled lead", () => {
+    expect(parseRoomDescription(raw)[0].text).toBe("1 King Bed 355 sq feet");
+  });
+
+  it("does not split an unspaced hyphen — '24-hour' is not a label", () => {
+    const food = parseRoomDescription(raw).find(
+      (p) => p.label === "Food & Drink",
+    );
+    expect(food?.text).toBe(
+      "Espresso maker, electric kettle, and 24-hour room service",
+    );
+  });
+
+  it("leaves ordinary prose as a single unlabelled part", () => {
+    expect(parseRoomDescription("A quiet room with a 24-hour desk.")).toEqual([
+      { label: "", text: "A quiet room with a 24-hour desk." },
+    ]);
+  });
+
+  it("tidies the space suppliers leave before punctuation", () => {
+    expect(parseRoomDescription("Minibar , fees may apply")[0].text).toBe(
+      "Minibar, fees may apply",
+    );
+  });
+
+  it("returns nothing for an empty description", () => {
+    expect(parseRoomDescription(undefined)).toEqual([]);
+    expect(parseRoomDescription("   ")).toEqual([]);
   });
 });

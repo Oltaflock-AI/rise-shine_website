@@ -38,6 +38,15 @@ import { site } from "@/data/site";
 import { whatsappEnabled } from "@/lib/whatsapp";
 import { formatDate } from "@/lib/format-date";
 import { cancellationWindows } from "@/lib/hotel-cancellation";
+import { curateAmenities } from "@/lib/hotel-amenities";
+import {
+  clockLabel,
+  inclusionItems,
+  mealLabel,
+  roomTitle,
+  sentenceCase,
+  supplementCurrencyNote,
+} from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -239,7 +248,8 @@ export default async function HotelDetailPage({
                   </h3>
                   <p className="flex items-center gap-2 text-[0.88rem] text-muted">
                     <Clock size={14} className="text-red" aria-hidden />
-                    {info.checkInTime ?? "—"} / {info.checkOutTime ?? "—"}
+                    {clockLabel(info.checkInTime) || "—"} /{" "}
+                    {clockLabel(info.checkOutTime) || "—"}
                   </p>
                 </div>
               )}
@@ -361,6 +371,9 @@ async function RoomOptions({
         <div className="space-y-4">
           {roomOptions.map((room, i) => {
             const freeUntil = freeCancelUntil(room);
+            const content = matchRoomContent(room.name, roomContent);
+            const inclusions = inclusionItems(room.inclusion);
+            const roomAmenities = curateAmenities(room.amenities, 6);
             const query: Record<string, string> = {
               bookingCode: room.bookingCode,
               hotel: name,
@@ -391,12 +404,12 @@ async function RoomOptions({
               >
                 <div className="min-w-0">
                   <h3 className="text-[0.98rem] font-bold text-ink">
-                    {room.name || "Room"}
+                    {roomTitle(room.name)}
                   </h3>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.82rem]">
                     <span className="inline-flex items-center gap-1 text-muted">
                       <Utensils size={13} className="text-red" aria-hidden />
-                      {(room.mealType || "Room Only").replace(/_/g, " ")}
+                      {mealLabel(room.mealType, true) || "Room Only"}
                     </span>
                     <span
                       className={cn(
@@ -431,12 +444,13 @@ async function RoomOptions({
                       )}
                     </div>
                   )}
-                  <RoomContentNote
-                    content={matchRoomContent(room.name, roomContent)}
-                  />
-                  {room.inclusion && (
+                  <RoomContentNote content={content} />
+                  {/* Sentence case and de-duplicated: TBO hands this over in
+                      whatever case the supplier typed, and a lower-cased dump
+                      was the one line on the page that looked unedited. */}
+                  {inclusions.length > 0 && (
                     <p className="mt-1 text-meta text-muted/90">
-                      {room.inclusion.toLowerCase().replace(/,/g, " · ")}
+                      {inclusions.join(" · ")}
                     </p>
                   )}
                   {/* Detailed Search RS extras — TBO portal checkpoints 18, 24. */}
@@ -457,14 +471,17 @@ async function RoomOptions({
                       ))}
                     </ul>
                   )}
-                  {(room.amenities?.length ?? 0) > 0 && (
+                  {/* Curated, like every other amenity list on the site —
+                      the raw field repeats itself and runs to dozens of
+                      entries. The full set is one tap away in the rate panel. */}
+                  {roomAmenities.length > 0 && (
                     <p className="mt-1.5 flex items-start gap-1.5 text-meta text-muted">
                       <Check
                         size={13}
                         className="mt-0.5 flex-none text-red"
                         aria-hidden
                       />
-                      <span>{room.amenities!.slice(0, 8).join(" · ")}</span>
+                      <span>{roomAmenities.map((a) => a.label).join(" · ")}</span>
                     </p>
                   )}
                   {/* Mandatory charges collected BY THE HOTEL, usually in
@@ -478,11 +495,11 @@ async function RoomOptions({
                       <ul className="mt-0.5 list-disc pl-4">
                         {room.supplements!.map((sup, k) => (
                           <li key={k}>
-                            {(
+                            {sentenceCase(
                               sup.description ||
-                              sup.type ||
-                              "Mandatory supplement"
-                            ).replace(/_/g, " ")}
+                                sup.type ||
+                                "Mandatory supplement",
+                            )}
                             {sup.price != null
                               ? ` — ${new Intl.NumberFormat("en-IN", {
                                   style: "currency",
@@ -490,12 +507,10 @@ async function RoomOptions({
                                     sup.currency || offer?.currency || "INR",
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
-                                }).format(sup.price)}${
-                                  sup.currency &&
-                                  sup.currency !== (offer?.currency || "INR")
-                                    ? " (hotel's local currency)"
-                                    : ""
-                                }`
+                                }).format(sup.price)}${supplementCurrencyNote(
+                                  sup.currency,
+                                  offer?.currency,
+                                )}`
                               : ""}
                           </li>
                         ))}
@@ -510,6 +525,7 @@ async function RoomOptions({
                   <RoomRateDetails
                     bookingCode={room.bookingCode}
                     destinationCountry={countryCode}
+                    roomDescription={content?.description}
                   />
                 </div>
                 <div className="flex flex-none items-end justify-between gap-4 sm:flex-col sm:items-end">

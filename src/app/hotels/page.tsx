@@ -514,7 +514,7 @@ async function HotelResults({
               infoMap.get(o.hotelCode)?.images?.[0],
             // Three facts, not thirty: enough for the guest to rule a hotel in
             // or out from the list instead of opening every one of them.
-            amenities: curateAmenities(infoMap.get(o.hotelCode)?.facilities, 3),
+            amenities: curateAmenities(infoMap.get(o.hotelCode)?.facilities, 4),
             // Nearest landmark, not the postal address: "Near Juhu Beach" is
             // what places a hotel on a results list; "Nehru Road, Vile Parle
             // East, Mumbai 400099" is two lines answering a question nobody

@@ -17,7 +17,15 @@ import {
   cancellationWindows,
   tboDateToISO,
 } from "@/lib/hotel-cancellation";
-import { formatDeadline, mealLabel, perNightFare } from "@/lib/hotel-display";
+import {
+  formatDeadline,
+  inclusionItems,
+  mealLabel,
+  perNightFare,
+  sentenceCase,
+  supplementCurrencyNote,
+} from "@/lib/hotel-display";
+import { curateAmenities } from "@/lib/hotel-amenities";
 import { cn } from "@/lib/cn";
 import { controlClass, DateField, Select } from "@/components/ui/form-controls";
 import {
@@ -806,7 +814,8 @@ function RateTerms({ quote }: { quote: Quote }) {
   const promos = quote.roomPromotions ?? [];
   const supplements = quote.supplements ?? [];
   const windows = cancellationWindows(quote.cancelPolicies);
-  const amenities = quote.amenities ?? [];
+  const amenities = curateAmenities(quote.amenities, 12);
+  const inclusions = inclusionItems(quote.inclusion, 24);
   // TBO hands this over as its own "DD-MM-YYYY hh:mm:ss" string. Printed
   // verbatim it broke the site-wide date format and, like the raw policy rows,
   // could name a deadline that had already passed.
@@ -831,9 +840,13 @@ function RateTerms({ quote }: { quote: Quote }) {
             {mealLabel(quote.mealType, true)}
           </p>
         )}
-        {quote.inclusion && (
+        {/* Sentence-cased, de-duplicated — but NOT trimmed: this is a rate
+            term on the book page, so the cap is high enough that no real
+            inclusion is ever dropped from it. */}
+        {inclusions.length > 0 && (
           <p>
-            <span className="font-semibold">Includes:</span> {quote.inclusion}
+            <span className="font-semibold">Includes:</span>{" "}
+            {inclusions.join(" · ")}
           </p>
         )}
         {promos.length > 0 && (
@@ -850,7 +863,7 @@ function RateTerms({ quote }: { quote: Quote }) {
             <ul className="mt-1 list-disc pl-5">
               {supplements.map((s, i) => (
                 <li key={i}>
-                  {s.description || s.type || "Mandatory supplement"}
+                  {sentenceCase(s.description || s.type || "Mandatory supplement")}
                   {s.price != null && s.price > 0 && (
                     <>
                       {" — "}
@@ -859,9 +872,7 @@ function RateTerms({ quote }: { quote: Quote }) {
                         currency: s.currency || currency,
                         maximumFractionDigits: 2,
                       }).format(s.price)}
-                      {s.currency &&
-                        s.currency !== "INR" &&
-                        " (hotel's local currency)"}
+                      {supplementCurrencyNote(s.currency, currency)}
                     </>
                   )}
                 </li>
@@ -889,10 +900,16 @@ function RateTerms({ quote }: { quote: Quote }) {
             </ul>
           </div>
         )}
+        {/* Curated for the same reason as everywhere else on the site: the
+            raw per-rate list runs to 70-odd supplier phrases that say
+            "television" four ways. Amenities are content, not a rate term —
+            the terms above are rendered in full. */}
         {amenities.length > 0 && (
           <div>
             <p className="font-semibold">Room amenities:</p>
-            <p className="mt-1 text-muted">{amenities.join(" · ")}</p>
+            <p className="mt-1 text-muted">
+              {amenities.map((a) => a.label).join(" · ")}
+            </p>
           </div>
         )}
         {lastDeadlineISO && (

@@ -150,22 +150,38 @@ export function HotelLocation({
 function MapPanel({ osm, name }: { osm: string; name: string }) {
   const [live, setLive] = useState(false);
   return (
-    <div className="relative">
+    <div className="relative border-y border-line">
+      {/* Taller than the strip we mask, so the map itself keeps its 16rem. */}
       <iframe
         src={osm}
         title={`Map showing ${name}`}
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
         className={cn(
-          "block h-64 w-full border-0 border-y border-line",
+          "block h-[17.5rem] w-full border-0",
           !live && "pointer-events-none",
         )}
       />
+      {/* OSM's own footer wraps to two lines in a sidebar-width frame, and the
+          frame clips the second — every hotel page carried a half-sentence of
+          someone else's chrome. It is cross-origin, so it cannot be styled;
+          cover it and carry the attribution ourselves, which is what the ODbL
+          asks for anyway. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-center justify-end border-t border-line bg-white px-3 text-meta text-muted">
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pointer-events-auto hover:text-red"
+        >
+          © OpenStreetMap contributors
+        </a>
+      </div>
       {!live && (
         <button
           type="button"
           onClick={() => setLive(true)}
-          className="absolute inset-0 grid place-items-center bg-navy/0 transition-colors hover:bg-navy/10"
+          className="absolute inset-x-0 bottom-6 top-0 grid place-items-center bg-navy/0 transition-colors hover:bg-navy/10"
         >
           <span className="rounded-full bg-white/95 px-4 py-2 text-meta font-semibold text-ink shadow-brand-sm">
             Use the map

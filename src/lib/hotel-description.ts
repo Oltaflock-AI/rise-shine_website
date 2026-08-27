@@ -115,3 +115,56 @@ export function parseHotelDescription(
   // A heading with nothing under it is a rule with no content — drop it.
   return out.filter((s) => s.paragraphs.length > 0);
 }
+
+/** One "Layout - Separate sitting area" run out of a room description. */
+export type RoomDescriptionPart = {
+  /** "Layout", "Food & Drink" … or "" for the text before the first label. */
+  label: string;
+  text: string;
+};
+
+/**
+ * A room's `RoomDescription` is labelled prose that arrives as ONE line.
+ *
+ * TBO sends it exactly like this, spaces and all:
+ *
+ *   "1 King Bed 355 sq feet Layout - Separate sitting area Internet - Free
+ *    WiFi and wired internet access Entertainment - LED television …"
+ *
+ * Printed verbatim it is a 60-word run-on where six sections have been welded
+ * together, which is how the room panel came to look like a data dump. The
+ * labels are the supplier's own — "Layout -", "Internet -", "Food & Drink -",
+ * "Bathroom -" — so they can be recovered and rendered as labels.
+ *
+ * A hyphen only splits when it is spaced AND follows a short capitalised
+ * label: "24-hour room service" and "blackout drapes/curtains" have to survive
+ * intact, and they are exactly what a greedy split destroys.
+ *
+ * Falls back to a single unlabelled part, so a supplier who writes ordinary
+ * prose still renders. Pure: `tests/hotel-description.test.ts` covers it.
+ */
+const ROOM_LABEL = /(^|[\s.,;])([A-Z][A-Za-z&/]*(?:[ ][A-Z&][A-Za-z&/]*){0,2})\s-\s/g;
+
+export function parseRoomDescription(
+  raw: string | undefined,
+): RoomDescriptionPart[] {
+  // Suppliers leave a space before punctuation ("minibar fees may apply ,").
+  const text = toPlainText(raw ?? "").replace(/\s+([,;.])/g, "$1");
+  if (!text) return [];
+
+  const parts: RoomDescriptionPart[] = [];
+  let label = "";
+  let cursor = 0;
+  ROOM_LABEL.lastIndex = 0;
+  for (let m = ROOM_LABEL.exec(text); m; m = ROOM_LABEL.exec(text)) {
+    const startOfLabel = m.index + m[1].length;
+    const chunk = text.slice(cursor, startOfLabel).trim();
+    if (chunk) parts.push({ label, text: chunk });
+    label = m[2].trim();
+    cursor = ROOM_LABEL.lastIndex;
+  }
+  const tail = text.slice(cursor).trim();
+  if (tail) parts.push({ label, text: tail });
+
+  return parts.filter((p) => p.text);
+}

@@ -10,6 +10,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { HotelBookingForm } from "./HotelBookingForm";
 import { formatDate } from "@/lib/format-date";
+import { roomTitle } from "@/lib/hotel-display";
 
 const fmtDate = formatDate;
 
@@ -91,7 +92,7 @@ export function HotelCheckoutView() {
                     {Number(b.adults || 2) + Number(b.children || 0)} guest
                     {Number(b.adults || 2) + Number(b.children || 0) > 1 ? "s" : ""}/room
                   </span>
-                  {b.room && <span>{b.room}</span>}
+                  {b.room && <span>{roomTitle(b.room)}</span>}
                 </div>
               </div>
               <div className="text-right">
