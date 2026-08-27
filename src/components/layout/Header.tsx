@@ -83,9 +83,8 @@ export function Header() {
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   // A parent is also active when the open page is one of its children. Packages'
-  // children live under /packages so the prefix match already covers them, but
-  // Contact's callback page shares none of its path and would leave the nav with
-  // nothing highlighted.
+  // children live under /packages so the prefix match already covers them; the
+  // check stays for any future child whose path sits outside its parent's.
   const itemActive = (item: NavItem) =>
     isActive(item.href) || (item.children?.some((child) => isActive(child.href)) ?? false);
 
