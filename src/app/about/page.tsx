@@ -11,10 +11,21 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { aboutStats, values } from "@/data/content";
 
+const founders = [
+  {
+    src: "/brand/founder-hardik-patel.webp",
+    alt: "Hardik Patel, co-founder of Rise & Shine Travel",
+  },
+  {
+    src: "/brand/founder-alpesh-patel.webp",
+    alt: "Alpesh Patel, co-founder of Rise & Shine Travel",
+  },
+];
+
 export const metadata: Metadata = {
   title: "About Us",
   description:
-    "Founded in 2011 by Hardik Patel and Alpesh, Rise & Shine Travel is an Ahmedabad travel house that has planned journeys across 30+ countries for travellers of 55 nationalities.",
+    "Founded in 2011 by Hardik Patel and Alpesh Patel, Rise & Shine Travel is an Ahmedabad travel house that has planned journeys across 30+ countries for travellers of 55 nationalities.",
   alternates: { canonical: "/about" },
 };
 
@@ -42,17 +53,24 @@ export default function AboutPage() {
                 className="grad-red absolute -left-5 -top-5 -z-10 hidden aspect-square w-3/5 animate-morph opacity-90 lg:block"
                 aria-hidden
               />
-              <div className="relative overflow-hidden rounded-brand-lg shadow-brand-lg">
-                <Image
-                  src="/brand/founders.webp"
-                  alt="Rise & Shine Travel founders Hardik Patel and Alpesh"
-                  width={820}
-                  height={1459}
-                  sizes="(min-width: 1024px) 40vw, 90vw"
-                  className="h-auto w-full object-cover"
-                />
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {founders.map((f) => (
+                  <div
+                    key={f.src}
+                    className="overflow-hidden rounded-brand-lg shadow-brand-lg"
+                  >
+                    <Image
+                      src={f.src}
+                      alt={f.alt}
+                      width={760}
+                      height={1351}
+                      sizes="(min-width: 1024px) 20vw, 45vw"
+                      className="h-auto w-full object-cover"
+                    />
+                  </div>
+                ))}
               </div>
-              <div className="absolute -bottom-4 right-3 flex items-center gap-3.5 rounded-2xl bg-white p-4 pr-6 shadow-brand sm:-bottom-6 sm:-right-6">
+              <div className="mt-6 flex w-fit items-center gap-3.5 rounded-2xl bg-white p-4 pr-6 shadow-brand">
                 <span className="grad-red grid h-12 w-12 place-items-center rounded-xl text-lg font-extrabold text-white">
                   15+
                 </span>
@@ -82,7 +100,7 @@ export default function AboutPage() {
               />
               <p className="mt-4 text-ink-soft">
                 Rise &amp; Shine Travel began in 2011, when Hardik Patel and
-                Alpesh left a settled government construction business to build
+                Alpesh Patel left a settled government construction business to build
                 something around what they loved most: travel. What started as
                 two friends planning trips has grown into one of
                 Ahmedabad&apos;s most trusted travel houses.
