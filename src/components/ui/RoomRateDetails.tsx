@@ -20,6 +20,7 @@ import {
   formatDeadline,
   inclusionItems,
   mealLabel,
+  promotionLabel,
   sentenceCase,
   supplementCurrencyNote,
 } from "@/lib/hotel-display";
@@ -268,7 +269,7 @@ export function RoomRateDetails({
                     title="Promotion"
                     tone="good"
                   >
-                    <List items={quote.roomPromotions!} />
+                    <List items={quote.roomPromotions!.map(promotionLabel)} />
                   </Row>
                 )}
 

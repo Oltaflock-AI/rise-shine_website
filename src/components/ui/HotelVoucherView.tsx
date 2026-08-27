@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mealLabel, roomTitle } from "@/lib/hotel-display";
+import { formatAddress, mealLabel, roomTitle } from "@/lib/hotel-display";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -170,7 +170,9 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
                   className="mt-0.5 flex-none text-red"
                   aria-hidden
                 />
-                {[detail.address, detail.city].filter(Boolean).join(", ")}
+                {[formatAddress(detail.address), detail.city]
+                  .filter(Boolean)
+                  .join(", ")}
               </p>
             )}
           </div>

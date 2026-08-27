@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   clockLabel,
+  feeBasisLabel,
+  formatAddress,
   inclusionItems,
   mealLabel,
+  promotionLabel,
   sentenceCase,
   supplementCurrencyNote,
   pageCount,
@@ -236,5 +239,71 @@ describe("clockLabel — one clock for every supplier", () => {
 
   it("returns nothing for an empty field", () => {
     expect(clockLabel(undefined)).toBe("");
+  });
+});
+
+describe("formatAddress — TBO concatenates its address fields", () => {
+  it("recovers the joins in a live Mumbai address", () => {
+    expect(
+      formatAddress(
+        "First Road near Milan Subway Santacruz West, Milan subwaySantacruz (West)Mumbai-400054",
+      ),
+    ).toBe(
+      "First Road near Milan Subway Santacruz West, Milan subway, Santacruz (West), Mumbai-400054",
+    );
+  });
+
+  it("does not split a name that legitimately carries an inner capital", () => {
+    expect(formatAddress("12 MacArthur Road,Colombo")).toBe(
+      "12 MacArthur Road, Colombo",
+    );
+    expect(formatAddress("McDonald Avenue, Dubai")).toBe(
+      "McDonald Avenue, Dubai",
+    );
+  });
+
+  it("trims the trailing comma TBO leaves on most addresses", () => {
+    expect(formatAddress("Khalid Bin Al Waleed Rd - Al Raffa,")).toBe(
+      "Khalid Bin Al Waleed Rd - Al Raffa",
+    );
+  });
+
+  it("leaves an already-clean address untouched", () => {
+    expect(formatAddress("Dr Zakir Hussain Marg, New Delhi, Delhi 110003")).toBe(
+      "Dr Zakir Hussain Marg, New Delhi, Delhi 110003",
+    );
+    expect(formatAddress(undefined)).toBe("");
+  });
+});
+
+describe("feeBasisLabel — the fee basis is supplier prose", () => {
+  it("sentence-cases and upper-cases the currency code", () => {
+    expect(
+      feeBasisLabel("approximately inr 210 for adults and inr 210 for children"),
+    ).toBe("Approximately INR 210 for adults and INR 210 for children");
+  });
+
+  it("does not upper-case an ordinary word that precedes a number", () => {
+    expect(feeBasisLabel("valid for 210 guests")).toBe(
+      "Valid for 210 guests",
+    );
+  });
+});
+
+describe("promotionLabel — supplier tags are not sentences", () => {
+  it("spaces a compressed colon", () => {
+    expect(promotionLabel("Save:10%")).toBe("Save: 10%");
+  });
+
+  it("stops a shouted tag shouting", () => {
+    expect(promotionLabel("STAY 1 NIGHTS AND SAVE")).toBe(
+      "Stay 1 nights and save",
+    );
+  });
+
+  it("leaves prose a supplier already wrote for a reader", () => {
+    expect(
+      promotionLabel("Limited Time Offer. Price includes 25% discount!"),
+    ).toBe("Limited Time Offer. Price includes 25% discount!");
   });
 });

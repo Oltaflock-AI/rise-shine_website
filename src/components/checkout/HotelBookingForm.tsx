@@ -22,6 +22,7 @@ import {
   inclusionItems,
   mealLabel,
   perNightFare,
+  promotionLabel,
   sentenceCase,
   supplementCurrencyNote,
 } from "@/lib/hotel-display";
@@ -811,7 +812,7 @@ function cancelCharge(
 function RateTerms({ quote }: { quote: Quote }) {
   const currency = quote.currency || "INR";
   const conditions = quote.rateConditions ?? [];
-  const promos = quote.roomPromotions ?? [];
+  const promos = (quote.roomPromotions ?? []).map(promotionLabel);
   const supplements = quote.supplements ?? [];
   const windows = cancellationWindows(quote.cancelPolicies);
   const amenities = curateAmenities(quote.amenities, 12);
@@ -870,6 +871,7 @@ function RateTerms({ quote }: { quote: Quote }) {
                       {new Intl.NumberFormat("en-IN", {
                         style: "currency",
                         currency: s.currency || currency,
+                        minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       }).format(s.price)}
                       {supplementCurrencyNote(s.currency, currency)}

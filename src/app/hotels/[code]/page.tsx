@@ -41,8 +41,10 @@ import { cancellationWindows } from "@/lib/hotel-cancellation";
 import { curateAmenities } from "@/lib/hotel-amenities";
 import {
   clockLabel,
+  formatAddress,
   inclusionItems,
   mealLabel,
+  promotionLabel,
   roomTitle,
   sentenceCase,
   supplementCurrencyNote,
@@ -162,7 +164,7 @@ export default async function HotelDetailPage({
           {info?.address && (
             <p className="mt-2 flex items-start gap-1.5 text-[0.9rem] text-white/80">
               <MapPin size={14} className="mt-1 flex-none" aria-hidden />{" "}
-              {info.address}
+              {formatAddress(info.address)}
             </p>
           )}
           {hasStay && (
@@ -260,7 +262,7 @@ export default async function HotelDetailPage({
 
               <HotelLocation
                 name={name}
-                address={info?.address}
+                address={formatAddress(info?.address)}
                 lat={info?.lat}
                 lng={info?.lng}
                 attractions={info?.attractions}
@@ -372,7 +374,12 @@ async function RoomOptions({
           {roomOptions.map((room, i) => {
             const freeUntil = freeCancelUntil(room);
             const content = matchRoomContent(room.name, roomContent);
-            const inclusions = inclusionItems(room.inclusion);
+            const meal = mealLabel(room.mealType, true) || "Room Only";
+            // "Half Board" on the meta line and "Half board" underneath it is
+            // one fact printed twice, a line apart, in two casings.
+            const inclusions = inclusionItems(room.inclusion).filter(
+              (i) => i.toLowerCase() !== meal.toLowerCase(),
+            );
             const roomAmenities = curateAmenities(room.amenities, 6);
             const query: Record<string, string> = {
               bookingCode: room.bookingCode,
@@ -409,7 +416,7 @@ async function RoomOptions({
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.82rem]">
                     <span className="inline-flex items-center gap-1 text-muted">
                       <Utensils size={13} className="text-red" aria-hidden />
-                      {mealLabel(room.mealType, true) || "Room Only"}
+                      {meal}
                     </span>
                     <span
                       className={cn(
@@ -466,7 +473,7 @@ async function RoomOptions({
                             className="mt-0.5 flex-none"
                             aria-hidden
                           />{" "}
-                          {p}
+                          {promotionLabel(p)}
                         </li>
                       ))}
                     </ul>

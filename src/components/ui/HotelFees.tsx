@@ -1,13 +1,20 @@
 import { Wallet, Info } from "lucide-react";
 import type { HotelFee } from "@/lib/tbo-hotel-static";
+import { feeBasisLabel } from "@/lib/hotel-display";
 
+/**
+ * Two decimals, like every other amount on a hotel page.
+ *
+ * This one formatter rounded, so the SAME fee read "AED 33" in this panel and
+ * "AED 33.00" in the pay-at-hotel row on the room card a scroll above it.
+ */
 const money = (f: HotelFee) =>
   f.amount == null
     ? ""
     : new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: f.currency || "INR",
-        minimumFractionDigits: 0,
+        minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(f.amount);
 
@@ -71,7 +78,9 @@ function FeeRow({ fee }: { fee: HotelFee }) {
     <li className="flex flex-wrap items-baseline justify-between gap-x-3 text-[0.88rem] text-ink">
       <span>
         {fee.label}
-        {fee.basis && <span className="text-muted"> · {fee.basis}</span>}
+        {fee.basis && (
+          <span className="text-muted"> · {feeBasisLabel(fee.basis)}</span>
+        )}
       </span>
       {fee.amount != null && (
         <span className="font-semibold tabular-nums">{money(fee)}</span>

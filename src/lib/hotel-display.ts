@@ -248,3 +248,95 @@ export function clockLabel(raw: string | undefined): string {
   const twelve = hour % 12 === 0 ? 12 : hour % 12;
   return `${twelve}:${String(minute).padStart(2, "0")} ${period}`;
 }
+
+/**
+ * Currency codes TBO writes in lower case inside free-text fee descriptions.
+ * A closed list, because the alternative — upper-casing any three letters
+ * before a number — turns "for 210" into "FOR 210".
+ */
+const CURRENCY_CODES =
+  /\b(inr|usd|aed|eur|gbp|thb|sgd|myr|idr|npr|lkr|mvr|jpy|aud|cad|chf|cny|hkd|krw|nzd|omr|qar|sar|zar|try|vnd|php|bdt|pkr)\b/gi;
+
+/**
+ * A `HotelFees` basis line as a sentence.
+ *
+ * TBO passes the supplier's own text straight through, so the breakfast fee on
+ * a live Mumbai hotel reads "approximately inr 210 for adults and inr 210 for
+ * children" — sitting directly beside a formatted "₹210.00".
+ */
+export function feeBasisLabel(raw: string | undefined): string {
+  const text = sentenceCase(raw);
+  return text.replace(CURRENCY_CODES, (c) => c.toUpperCase());
+}
+
+/**
+ * A room promotion the way a person would write it.
+ *
+ * Suppliers send these as compressed tags — "Save:10%", "STAY 1 NIGHTS AND
+ * SAVE" — and they render beside prose, so an unspaced colon reads as a bug.
+ */
+export function promotionLabel(raw: string | undefined): string {
+  const text = (raw ?? "")
+    .replace(/\s*:\s*/g, ": ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  // ALL-CAPS supplier tags are shouting; anything with lower case is already
+  // written for a reader and is left exactly as it came.
+  const shouted = text === text.toUpperCase() && /[A-Z]{4,}/.test(text);
+  return shouted ? sentenceCase(text.toLowerCase()) : sentenceCase(text);
+}
+
+/**
+ * TBO's `Address` is several fields concatenated with nothing between them.
+ *
+ * A live Mumbai hotel returns, verbatim:
+ *
+ *   "First Road near Milan Subway Santacruz West, Milan subwaySantacruz
+ *    (West)Mumbai-400054"
+ *
+ * — which renders as a typo on the hero of every page that shows it. The joins
+ * are recoverable: a bracket closing straight into a word, a comma with no
+ * space, and a word running into a Capitalised one.
+ *
+ * That last rule is the risky one, so it does NOT fire after the name prefixes
+ * that legitimately carry an inner capital — "MacArthur", "McDonald", "O'Brien"
+ * are addresses too, and splitting them would be a new bug replacing an old one.
+ */
+const NAME_PREFIXES = new Set([
+  "mc",
+  "mac",
+  "o",
+  "de",
+  "di",
+  "da",
+  "del",
+  "van",
+  "von",
+  "le",
+  "la",
+  "du",
+]);
+
+export function formatAddress(raw: string | undefined): string {
+  let text = (raw ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  text = text
+    // "(West)Mumbai" → "(West), Mumbai"
+    .replace(/\)\s*(?=[A-Za-z0-9])/g, "), ")
+    // "West,Milan" → "West, Milan"
+    .replace(/,\s*/g, ", ")
+    // "subwaySantacruz" → "subway, Santacruz"
+    .replace(/([a-z0-9])([A-Z])/g, (match, left: string, right: string, offset: number) => {
+      const word = text.slice(0, offset + 1).match(/[A-Za-z']+$/)?.[0] ?? "";
+      if (NAME_PREFIXES.has(word.toLowerCase().replace(/'/g, ""))) return match;
+      return `${left}, ${right}`;
+    });
+
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/(,\s*)+/g, ", ")
+    .replace(/[\s,]+$/, "")
+    .trim();
+}
