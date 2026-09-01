@@ -7,14 +7,15 @@
  * the `callback_queue` table; `/api/cron/callback-queue` places the actual
  * ElevenLabs call once `due_at` passes. See lib/callback-queue.ts for why.
  *
- * The lead is also mirrored to the agency's existing Google Form pipeline on a
- * best-effort basis, so a lead is never invisible to staff just because the
- * robot call failed — but a Google outage must never cost us the callback, so
- * that leg is fire-and-forget and its failure is only logged.
+ * The lead is also mirrored to the agency's existing lead pipeline (Google Form,
+ * falling back to email — see lib/lead-delivery.ts) on a best-effort basis, so a
+ * lead is never invisible to staff just because the robot call failed — but a
+ * delivery outage must never cost us the callback, so that leg is
+ * fire-and-forget and its failure is only logged.
  */
 import { headers } from "next/headers";
 import type { FormState } from "@/lib/actions";
-import { GOOGLE_FORM, buildFormBody } from "@/lib/googleForm";
+import { deliverLead } from "@/lib/lead-delivery";
 import { rateLimit } from "@/lib/rate-limit";
 import { callbackDelayPhrase } from "@/lib/callback-delay";
 import { enqueueCallback } from "@/lib/callback-queue";
@@ -30,21 +31,19 @@ async function callerIp(): Promise<string> {
   return h.get("x-real-ip") ?? "unknown";
 }
 
-/** Mirror the lead into the agency's Google Sheet. Never throws. */
-async function mirrorToGoogleForm(name: string, phone: string): Promise<void> {
+/** Mirror the lead into the agency's Google Sheet (or inbox). Never throws. */
+async function mirrorLead(name: string, phone: string): Promise<void> {
   try {
-    await fetch(GOOGLE_FORM.responseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: buildFormBody({
+    await deliverLead(
+      {
         name,
         phone,
         message: "Requested an automated callback from the website (/request-a-call).",
-      }).toString(),
-      cache: "no-store",
-    }).catch(() => {});
+      },
+      "request-a-call",
+    );
   } catch (e) {
-    console.error("[request-a-call] Google Form mirror failed:", e);
+    console.error("[request-a-call] lead mirror failed:", e);
   }
 }
 
@@ -98,7 +97,7 @@ export async function requestCallback(
     }
   }
 
-  await mirrorToGoogleForm(name, phone);
+  await mirrorLead(name, phone);
 
   return {
     status: "success",

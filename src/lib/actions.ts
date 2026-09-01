@@ -3,19 +3,16 @@
 /**
  * Enquiry form handler.
  *
- * Validates the submission and delivers it to the agency's own Google Form
- * ("Rise & Shine Travel Inquiry Form") via a server-side POST — no CORS, no
- * client fragility — so leads land in their Google Sheet while the site keeps
- * its on-brand form UI. If a package key is present (from a detail-page CTA),
- * the lead is enriched with that package's name, route and duration.
+ * Validates the submission and hands it to `deliverLead`, which posts it to the
+ * agency's own Google Form ("Rise & Shine Travel Inquiry Form") and falls back
+ * to emailing the agency inbox when that form is unreachable — see
+ * lib/lead-delivery.ts for why that second leg exists. If a package key is
+ * present (from a detail-page CTA), the lead is enriched with that package's
+ * name, route and duration.
  */
 import { CATALOG_PACKAGES, isCatalogPackage } from "@/data/catalog";
-import {
-  GOOGLE_FORM,
-  buildFormBody,
-  nightsToDayOption,
-  type Lead,
-} from "@/lib/googleForm";
+import { nightsToDayOption, type Lead } from "@/lib/googleForm";
+import { deliverLead } from "@/lib/lead-delivery";
 
 export type FormState = {
   status: "idle" | "success" | "error";
@@ -90,20 +87,10 @@ export async function submitEnquiry(
     days: pkg ? nightsToDayOption(pkg.durationNights) : undefined,
   };
 
-  try {
-    const res = await fetch(GOOGLE_FORM.responseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: buildFormBody(lead).toString(),
-      // Google responds with an HTML confirmation page; we don't need to read it.
-      cache: "no-store",
-    });
-    // Google returns 200 on success (and sometimes an opaque redirect). Treat a
-    // non-network response as delivered.
-    if (!res.ok && res.status !== 0) {
-      throw new Error(`Google Form responded ${res.status}`);
-    }
-  } catch {
+  const packageLabel = pkg ? `package ${pkg.tourName}` : journeyType || "general";
+  const { ok } = await deliverLead(lead, `website enquiry form (${packageLabel})`);
+
+  if (!ok) {
     return {
       status: "error",
       message:
