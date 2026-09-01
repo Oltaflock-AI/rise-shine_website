@@ -16,6 +16,8 @@ import { AmenityIcon } from "@/components/ui/AmenityIcon";
 import { cn } from "@/lib/cn";
 import { curateAmenities } from "@/lib/hotel-amenities";
 import { parseRoomDescription } from "@/lib/hotel-description";
+import { parseRateConditions } from "@/lib/hotel-rate-conditions";
+import { RateConditionList } from "@/components/ui/RateConditionList";
 import {
   formatDeadline,
   inclusionItems,
@@ -149,6 +151,7 @@ export function RoomRateDetails({
   const inclusions = inclusionItems(quote?.inclusion, 8);
   const roomAmenities = curateAmenities(quote?.amenities, 10);
   const windows = cancellationWindows(quote?.cancelPolicies);
+  const rateConditions = parseRateConditions(quote?.rateConditions);
   const deadlineISO = tboDateToISO(quote?.lastCancellationDeadline ?? "");
   const headline = cancellationHeadline(windows, formatDeadline);
 
@@ -387,14 +390,26 @@ export function RoomRateDetails({
                   </Row>
                 )}
 
-                {(quote.rateConditions ?? []).length > 0 && (
-                  <Row
-                    icon={<FileText size={15} aria-hidden />}
-                    title="Rate conditions"
-                  >
-                    <List items={quote.rateConditions!} />
-                  </Row>
-                )}
+                {/* Always rendered, even when the supplier sends none — TBO's
+                    verifier must find the rate's conditions on the room page for
+                    every rate, and a section that appears only sometimes reads to
+                    them as one that is missing. */}
+                <Row
+                  icon={<FileText size={15} aria-hidden />}
+                  title="Rate conditions"
+                >
+                  {rateConditions.length > 0 ? (
+                    <RateConditionList
+                      groups={rateConditions}
+                      className="space-y-1.5"
+                    />
+                  ) : (
+                    <p>
+                      The hotel returns no additional rate conditions for this
+                      rate.
+                    </p>
+                  )}
+                </Row>
               </div>
             </>
           )}

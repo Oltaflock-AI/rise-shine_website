@@ -27,6 +27,11 @@ import {
   supplementCurrencyNote,
 } from "@/lib/hotel-display";
 import { curateAmenities } from "@/lib/hotel-amenities";
+import {
+  parseRateConditions,
+  rateConditionCount,
+} from "@/lib/hotel-rate-conditions";
+import { RateConditionList } from "@/components/ui/RateConditionList";
 import { cn } from "@/lib/cn";
 import { controlClass, DateField, Select } from "@/components/ui/form-controls";
 import {
@@ -811,7 +816,9 @@ function cancelCharge(
  */
 function RateTerms({ quote }: { quote: Quote }) {
   const currency = quote.currency || "INR";
-  const conditions = quote.rateConditions ?? [];
+  // Supplier HTML, entity-escaped. Parsed to text — never dangerouslySetInnerHTML.
+  const conditions = parseRateConditions(quote.rateConditions);
+  const conditionCount = rateConditionCount(conditions);
   const promos = (quote.roomPromotions ?? []).map(promotionLabel);
   const supplements = quote.supplements ?? [];
   const windows = cancellationWindows(quote.cancelPolicies);
@@ -828,6 +835,7 @@ function RateTerms({ quote }: { quote: Quote }) {
   // Never returns null: TBO's verifier must be able to find the rate's terms on the
   // book page for EVERY rate, including one whose supplier sends no conditions.
   const shown = showAll ? conditions : conditions.slice(0, 3);
+  const hidden = conditionCount - rateConditionCount(conditions.slice(0, 3));
 
   return (
     <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
@@ -924,18 +932,17 @@ function RateTerms({ quote }: { quote: Quote }) {
         )}
         <div>
           <p className="font-semibold">Rate conditions:</p>
-          {conditions.length === 0 ? (
+          {conditionCount === 0 ? (
             <p className="mt-1 text-muted">
               The hotel returns no additional rate conditions for this rate.
             </p>
           ) : (
-            <ul className="mt-1 list-disc pl-5 text-muted">
-              {shown.map((c, i) => (
-                <li key={i}>{c}</li>
-              ))}
-            </ul>
+            <RateConditionList
+              groups={shown}
+              className="mt-1 list-disc space-y-1 pl-5 text-muted"
+            />
           )}
-          {conditions.length > 3 && (
+          {hidden > 0 && (
             <button
               type="button"
               onClick={() => setShowAll((s) => !s)}
@@ -943,7 +950,7 @@ function RateTerms({ quote }: { quote: Quote }) {
             >
               {showAll
                 ? "Show fewer conditions"
-                : `Show all ${conditions.length} conditions`}
+                : `Show all ${conditionCount} conditions`}
             </button>
           )}
         </div>

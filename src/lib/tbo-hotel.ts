@@ -506,6 +506,11 @@ export type HotelValidationInfo = {
   paxNameMinLength?: number;
   paxNameMaxLength?: number;
   panCountRequired?: number;
+  /** TBO's own answer to portal checkpoint 29. */
+  samePaxNameAllowed?: boolean;
+  specialCharAllowed?: boolean;
+  spaceAllowed?: boolean;
+  corporateBookingAllowed?: boolean;
 };
 
 export type PreBookResult = {
@@ -557,6 +562,10 @@ export async function preBookHotel(args: {
     PaxNameMinLength?: number;
     PaxNameMaxLength?: number;
     PanCountRequired?: number;
+    SamePaxNameAllowed?: boolean;
+    SpecialCharAllowed?: boolean;
+    SpaceAllowed?: boolean;
+    CorporateBookingAllowed?: boolean;
   };
   type RawSupplement = {
     Type?: string;
@@ -566,19 +575,37 @@ export async function preBookHotel(args: {
   };
   type RawRoomPB = RawRoom & {
     NetAmount?: number;
-    RateConditions?: string[];
     RoomPromotion?: string[];
     LastCancellationDeadline?: string;
     // TBO nests supplements per room as an array of arrays.
     Supplements?: RawSupplement[][];
+    /** Not sent here today; read as a fallback in case TBO moves it back. */
+    RateConditions?: string[];
     ValidationInfo?: RawVI;
   };
+  /**
+   * Two nodes sit a level up from where they read like they should, and both
+   * were being read off `Rooms[0]`, where they are simply absent — so they were
+   * silently empty on every single PreBook (verified live 2026-09-01, hotel
+   * 1012683):
+   *
+   *   RateConditions → HotelResult[0]   (the page told the guest "no additional
+   *                                      rate conditions" while TBO's own log
+   *                                      showed ten of them — portal ch. 23)
+   *   ValidationInfo → the RESPONSE ROOT (so PanMandatory/PassportMandatory/
+   *                                      PaxNameMin|MaxLength all defaulted —
+   *                                      portal ch. 33, logs observation 4)
+   *
+   * Room-level reads are kept as fallbacks; whichever arrives is used.
+   */
   type Resp = {
     Status?: TboStatus;
+    ValidationInfo?: RawVI;
     HotelResult?: Array<{
       Currency?: string;
       IsPriceChanged?: boolean;
       IsCancellationPolicyChanged?: boolean;
+      RateConditions?: string[];
       Rooms?: RawRoomPB[];
     }>;
   };
@@ -601,7 +628,7 @@ export async function preBookHotel(args: {
   const room = hr?.Rooms?.[0];
   if (!room)
     return fail("PreBook returned no room — the rate is no longer available.");
-  const vi = room.ValidationInfo ?? {};
+  const vi = j.ValidationInfo ?? room.ValidationInfo ?? {};
 
   // TBO portal checkpoint 30: the portal must show TotalFare throughout the
   // booking — NetAmount is TBO's charge to the agency and rides ONLY in the
@@ -624,7 +651,7 @@ export async function preBookHotel(args: {
     })),
     mealType: room.MealType,
     inclusion: room.Inclusion,
-    rateConditions: (room.RateConditions ?? []).filter(Boolean),
+    rateConditions: (hr?.RateConditions ?? room.RateConditions ?? []).filter(Boolean),
     roomPromotions: strList(room.RoomPromotion),
     // Verified live: PreBook returns a room-level Amenities list (Search does not),
     // which is what TBO's portal checkpoint 24 looks for on the room/book pages.
@@ -645,6 +672,10 @@ export async function preBookHotel(args: {
       paxNameMinLength: vi.PaxNameMinLength,
       paxNameMaxLength: vi.PaxNameMaxLength,
       panCountRequired: vi.PanCountRequired,
+      samePaxNameAllowed: vi.SamePaxNameAllowed,
+      specialCharAllowed: vi.SpecialCharAllowed,
+      spaceAllowed: vi.SpaceAllowed,
+      corporateBookingAllowed: vi.CorporateBookingAllowed,
     },
   };
 }

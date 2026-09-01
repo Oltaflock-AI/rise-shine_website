@@ -104,8 +104,12 @@ export function validateHotelPax(req: HotelBookRequest): string | null {
       // rate's ValidationInfo says otherwise.
       if (!NAME_RE.test(p.firstName.trim()) || !NAME_RE.test(p.lastName.trim()))
         return `Guest names can only contain letters and spaces.`;
-      const min = v?.paxNameMinLength ?? 2;
-      const max = v?.paxNameMaxLength ?? 25;
+      // The rate's own ValidationInfo may NARROW the range but never widen it:
+      // TBO's API rule is 2–25 for every field (General Queries, Book API #2),
+      // while a rate can answer 1–50. Take the tighter of the two, so a Book we
+      // accept is never one TBO rejects.
+      const min = Math.max(2, v?.paxNameMinLength ?? 2);
+      const max = Math.min(25, v?.paxNameMaxLength ?? 25);
       if (p.firstName.trim().length < min || p.firstName.trim().length > max || p.lastName.trim().length < min || p.lastName.trim().length > max)
         return `Guest names must be ${min}–${max} characters.`;
     }
@@ -227,7 +231,11 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
       ...(p.email ? { Email: p.email.trim() } : {}),
       ...(p.phone ? { Phoneno: p.phone.trim() } : {}),
       ...(p.pan ? { PAN: p.pan.trim().toUpperCase() } : {}),
-      ...(p.passportNo
+      // Passport rides ONLY when the rate asks for it. TBO's log review flagged
+      // us for sending it on international bookings whose ValidationInfo said
+      // PassportMandatory=false — "if Passportmandatory is false then no need to
+      // pass the details of passport" (logs observation 4).
+      ...(req.validation?.passportMandatory && p.passportNo
         ? { PassportNo: p.passportNo.trim(), PassportIssueDate: p.passportIssueDate, PassportExpDate: p.passportExpDate }
         : {}),
     })),
