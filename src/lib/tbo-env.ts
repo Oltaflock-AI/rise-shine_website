@@ -70,11 +70,19 @@ export function hotelBookingBlockedForMissingPayments(livePaymentsConfigured: bo
 /**
  * May a hotel booking be completed WITHOUT taking payment?
  *
- * Only on TBO's certification hosts, and only while no payment gateway is configured —
- * which is exactly the state certification runs in. The moment either changes (live
- * hotel hosts, or Cashfree keys present) this returns false and the paid path is the
- * only path.
+ * Only on TBO's certification hosts — that half is absolute, and is what stops this
+ * ever giving away a real room.
+ *
+ * On those hosts there are two ways in. Either no payment gateway is configured at
+ * all (the state certification is meant to run in), or the request carries a valid
+ * TBO verification session. The second exists because Cashfree went live for
+ * FLIGHTS while the hotel stack stayed on certification: one global "keys present"
+ * flag then demanded a real payment from TBO's own verifier and stalled the
+ * remaining Book-side checkpoints. See `lib/tbo-verification.ts`.
  */
-export function hotelUnpaidBookingAllowed(paymentsConfigured: boolean): boolean {
-  return !paymentsConfigured && !tboHotelIsLive();
+export function hotelUnpaidBookingAllowed(
+  paymentsConfigured: boolean,
+  verificationSession = false,
+): boolean {
+  return (!paymentsConfigured || verificationSession) && !tboHotelIsLive();
 }

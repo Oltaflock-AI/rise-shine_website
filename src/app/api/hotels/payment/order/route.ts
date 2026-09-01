@@ -9,6 +9,7 @@ import {
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
 import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
+import { hotelVerificationSession } from "@/lib/tbo-verification";
 
 // Live re-price + order creation — never cached. Runs PreBook.
 export const dynamic = "force-dynamic";
@@ -27,6 +28,18 @@ export const maxDuration = 120;
  * Body: same as /api/hotels/book minus payment: { bookingCode, nationality?, rooms }.
  */
 export async function POST(req: Request) {
+  // TBO's portal verifier, on the certification host: no order, no charge — the
+  // client falls through to the direct-book path below. Answered with the same
+  // shape as "no gateway", because to the browser it is the same situation.
+  const verifying = await hotelVerificationSession();
+  if (verifying) {
+    console.info("[api/hotels/payment/order] TBO verification session — skipping payment.");
+    return Response.json(
+      { ok: false, unpaidBookingAllowed: true, error: "TBO verification session — payment skipped." },
+      { status: 503 },
+    );
+  }
+
   if (!cashfreeConfigured) {
     // No keys. Whether the client may still book depends on WHICH TBO stack we are
     // pointed at, so the answer is decided here (server-side) and not by the browser:

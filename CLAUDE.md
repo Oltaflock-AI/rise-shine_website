@@ -108,6 +108,50 @@ had already closed, i.e. a refund promise the site could not keep. Always go
 through `cancellationWindows()`, which pairs each row with its end, drops the
 lapsed ones and marks the one containing now.
 
+**The HotelBE post-booking family needs the HOTEL agency's token, not the flight one.**
+`GetBookingDetail` / `GenerateVoucher` / `SendChangeRequest` used to borrow
+`getAuthToken()` from `lib/tbo.ts`. That was right until 11-Aug-2026, when the flight
+credentials moved to production: from then on we minted a LIVE token (agency 63641) and
+presented it to the CERTIFICATION HotelBE, which owns our hotel bookings (agency 58394).
+It answers `ErrorCode 6 · "Invalid Token"` — and the retry-on-6 re-authenticates with the
+same live credentials, so it fails twice and gives up. The whole post-booking family was
+dead for three weeks, which is why TBO could not verify the voucher, the 120-second
+BookingDetail re-read, or cancellation. `tbo-hotel-post.ts` now authenticates with
+`TBO_HOTEL_BE_*` (certification: `Sharedapi.tektravels.com`, ClientId `ApiIntegrationNew`,
+the `TBO_HOTEL_*` login), falling back to the flight token when unset. **Whenever the two
+stacks are on different agencies, they need different tokens** — the shared helper's name
+makes that easy to miss.
+
+**SendChangeRequest is not slow.** The 180-second 504s logged in August were that auth
+fault wearing a timeout's clothes. With the right token it answers in **under a second**
+with a `ChangeRequestId`. `ChangeRequestStatus` then sits at `2` (InProgress) for a while —
+TBO completes cancellations in their back office, so the booking flips to `Cancelled` later.
+Don't read InProgress as a failure. `scripts/cancel-cert-run.mts` runs the whole flow and
+writes a masked log; `scripts/cancel-status-check.mts` re-reads one.
+
+**Two PreBook nodes do not sit where they read like they should.** `RateConditions`
+is on `HotelResult[0]` and `ValidationInfo` is on the RESPONSE ROOT — neither is on
+`Rooms[0]`, where both were being read. Because the reads were optional-chained they
+returned empty rather than throwing, so for weeks the room and book pages told the
+guest "no additional rate conditions for this rate" while TBO's own log showed ten,
+and `panMandatory` / `passportMandatory` / `paxName*Length` all silently fell back to
+defaults. Verified live on hotel 1012683 (2026-09-01); `scripts/rate-conditions-probe.mts`
+re-checks both levels. Room-level reads are kept as fallbacks.
+
+**`RateConditions` rows are entity-escaped supplier HTML.** A row arrives as
+`CheckIn Instructions: &lt;ul&gt;&lt;li&gt;…` — printed as text the guest reads the
+escapes. `hotel-rate-conditions.ts` unescapes, splits on the list/paragraph tags and
+strips the rest to plain text (never `dangerouslySetInnerHTML`), grouping each row
+under its own heading. It deliberately does NOT re-cut a comma-joined run: splitting
+on commas turned "a credit card, debit card, or cash deposit may be required" into
+three separate promises, and a rate condition is a contract term.
+
+**A rate's `ValidationInfo` may NARROW the name-length range but never widen it.**
+TBO's API rule is 2–25 per field; a rate answers 1–50. `validateHotelPax` takes the
+tighter of the two, so nothing we accept is something Book rejects. Passport details
+ride ONLY when `PassportMandatory` is true — TBO's log review flagged us for sending
+them otherwise.
+
 **TBO returns no per-room photographs.** `RoomDetails[].imageURL` is in the
 schema and empty on every room of every hotel on our account (6,879 rooms across
 23 hotels, three cities, checked 2026-08-22). The room list shows `RoomSize` and
@@ -294,6 +338,14 @@ is no separate webhook secret. Read `req.text()`; re-serializing rewrites `170.0
 With no keys, `/api/payment/order` returns `503` and flights refuse to book (there is
 no unpaid flight path). Hotels still fall back to an unpaid Book, but **only** on TBO's
 certification hosts — `src/lib/tbo-env.ts` fails closed against live hosts.
+
+`cashfreeConfigured` is one GLOBAL flag, and that bit TBO's portal verifier: the live
+FLIGHT keys (18-Aug-2026) put a real payment page in front of hotel bookings that are
+still on the certification host, stalling every Book-side checkpoint behind it.
+`src/lib/tbo-verification.ts` + `/api/hotels/verification?token=…` opens a cookie-scoped
+no-payment session for them. It is inert unless `TBO_VERIFICATION_TOKEN` is set AND
+`tboHotelIsLive()` is false, so it can never give away a live room, and flights never
+consult it. **Delete the env var once hotel certification is signed off.**
 
 **`cashfreeConfigured` vs `cashfreePaymentsLive` — do not swap these.** The first means
 "keys present, so run the payment gate"; the second means "the money is real"

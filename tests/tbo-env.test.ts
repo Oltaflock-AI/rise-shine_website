@@ -139,6 +139,26 @@ describe("hotel payment guards", () => {
     const { hotelBookingBlockedForMissingPayments } = await load({ ...CLEARED, TBO_HOTEL_URL: LIVE_HOTEL });
     expect(hotelBookingBlockedForMissingPayments(true)).toBe(false);
   });
+
+  // TBO's portal verifier needs to complete a Book on the certification host even
+  // though Cashfree is configured for the live FLIGHT stack. That is the ONLY thing
+  // the verification session buys, and only there.
+  it("lets a verification session book unpaid on certification hosts", async () => {
+    const { hotelUnpaidBookingAllowed } = await load(CLEARED);
+    expect(hotelUnpaidBookingAllowed(true, true)).toBe(true);
+  });
+
+  it("ignores a verification session once the hotel stack is live", async () => {
+    const { hotelUnpaidBookingAllowed } = await load({ ...CLEARED, TBO_HOTEL_URL: LIVE_HOTEL });
+    expect(hotelUnpaidBookingAllowed(true, true)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(false, true)).toBe(false);
+  });
+
+  it("defaults to no session, so nothing changes for a normal customer", async () => {
+    const { hotelUnpaidBookingAllowed } = await load(CLEARED);
+    expect(hotelUnpaidBookingAllowed(true)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(true, false)).toBe(false);
+  });
 });
 
 /**
