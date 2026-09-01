@@ -24,6 +24,63 @@ import { tboFetch } from "./tbo-fetch";
 const BASE = (process.env.TBO_HOTEL_BE_URL || "https://HotelBE.tektravels.com/hotelservice.svc/rest").replace(/\/+$/, "");
 const TOKEN_INVALID = 6;
 
+/**
+ * HotelBE needs a TokenId from the agency that OWNS the hotel bookings — which
+ * is not necessarily the agency the flight stack logs in as.
+ *
+ * This family used to share `getAuthToken()` with flights. That was correct
+ * until 11-Aug-2026, when the flight credentials moved to production: from then
+ * on we were minting a LIVE token (agency 63641) and presenting it to the
+ * CERTIFICATION HotelBE, which owns our hotel bookings (agency 58394). It
+ * answered `ErrorCode 6 · "Invalid Token"` to every call, and because our
+ * retry-on-6 just re-authenticates with the same live credentials it failed
+ * twice and gave up. GetBookingDetail, GenerateVoucher and SendChangeRequest
+ * were ALL dead from that day — which is why TBO could not verify the voucher,
+ * the 120-second BookingDetail re-read, or cancellation.
+ *
+ * So the post-booking family gets its own credentials. Unset = fall back to the
+ * flight token, which is the historical behaviour and is right again the day
+ * both stacks live on the same agency.
+ */
+const BE_AUTH_URL = (process.env.TBO_HOTEL_BE_AUTH_URL || "http://Sharedapi.tektravels.com/SharedData.svc/rest").replace(/\/+$/, "");
+const BE_CLIENT_ID = process.env.TBO_HOTEL_BE_CLIENT_ID?.trim() || "";
+const BE_USERNAME = process.env.TBO_HOTEL_BE_USERNAME?.trim() || process.env.TBO_HOTEL_USERNAME?.trim() || "";
+const BE_PASSWORD = process.env.TBO_HOTEL_BE_PASSWORD || process.env.TBO_HOTEL_PASSWORD || "";
+
+/** Dedicated credentials present? Only then do we stop borrowing the flight token. */
+const beAuthConfigured = Boolean(BE_CLIENT_ID && BE_USERNAME && BE_PASSWORD);
+
+let beTokenCache: { token: string; exp: number } | null = null;
+
+/** The TokenId for the HotelBE family. Mirrors the flight cache's 20-minute window. */
+async function beAuthToken(force = false): Promise<string | null> {
+  if (!beAuthConfigured) return getAuthToken(force);
+  if (!force && beTokenCache && beTokenCache.exp > Date.now()) return beTokenCache.token;
+  try {
+    const r = await tboFetch(`${BE_AUTH_URL}/Authenticate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ClientId: BE_CLIENT_ID,
+        UserName: BE_USERNAME,
+        Password: BE_PASSWORD,
+        EndUserIp: ip(),
+      }),
+      cache: "no-store",
+    });
+    const j = (await r.json()) as { Status?: number; TokenId?: string; Error?: { ErrorMessage?: string } };
+    if (j?.Status !== 1 || !j?.TokenId) {
+      console.error("[tbo-hotel-post] HotelBE Authenticate failed:", j?.Error?.ErrorMessage ?? `Status ${j?.Status}`);
+      return null;
+    }
+    beTokenCache = { token: j.TokenId, exp: Date.now() + 20 * 60 * 1000 };
+    return j.TokenId;
+  } catch (e) {
+    console.error("[tbo-hotel-post] HotelBE Authenticate error:", e);
+    return null;
+  }
+}
+
 function ip(): string {
   return process.env.TBO_END_USER_IP || "115.112.175.13";
 }
@@ -51,13 +108,13 @@ async function post(method: string, body: Json, timeoutMs = 30_000): Promise<Jso
 
 /** Call a TokenId-family method, refreshing the token once on ErrorCode 6. */
 async function call(method: string, fields: Json): Promise<Json> {
-  let token = await getAuthToken();
+  let token = await beAuthToken();
   if (!token) throw new TboHotelError("TBO credentials are not configured.", -1);
 
   let j = await post(method, { EndUserIp: ip(), TokenId: token, ...fields });
   const err = (j as { Error?: { ErrorCode?: number } }).Error;
   if (err?.ErrorCode === TOKEN_INVALID) {
-    token = await getAuthToken(true);
+    token = await beAuthToken(true);
     if (token) j = await post(method, { EndUserIp: ip(), TokenId: token, ...fields });
   }
   return j;
