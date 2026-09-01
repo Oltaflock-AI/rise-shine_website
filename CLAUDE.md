@@ -415,9 +415,19 @@ wrong auto-filled name is a wasted ticket, a wrong address is a corrected field.
 - **`FareRuleDetail` is third-party HTML.** It reaches the browser only through
   `sanitizeFareRuleHtml` (`lib/fare-rules.ts`, allowlist — tags in, all attributes out
   bar table spans). Never render it raw, never swap in a blocklist.
-- **Enquiry forms** post server-side to the agency's Google Form (`lib/actions.ts`
-  + `lib/googleForm.ts`) — that's the lead pipeline. Transactional booking/refund
-  email is separate and uses Resend via `lib/email.ts`.
+- **Enquiry forms** deliver through `lib/lead-delivery.ts`, never by calling the
+  Google Form directly. It posts server-side to the agency's Google Form
+  (`lib/googleForm.ts`) — the lead pipeline — and falls back to emailing
+  `ALERT_EMAIL` when that fails. The fallback is not defensive padding: the form
+  is the agency's, not ours, and on 01-Sep-2026 its "Collect email addresses"
+  setting was switched to **Verified**, which makes `formResponse` demand a
+  signed-in Google session. Every server POST answered `401` and `GET`
+  redirected to `accounts.google.com/ServiceLogin`, so /contact and
+  /plan-my-trip refused every enquiry and the /request-a-call mirror went
+  silently missing. A same-host `3xx` from Google is a success; a redirect to
+  `accounts.google.com` is the sign-in wall and must count as a failure.
+  Transactional booking/refund email is separate and uses Resend via
+  `lib/email.ts`.
 
 ## Conventions
 
