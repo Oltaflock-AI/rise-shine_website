@@ -1,0 +1,89 @@
+# Drains the voice-callback queue.
+#
+# Why this exists at all: /contact and /request-a-call park a row and promise the
+# customer a call in about two minutes. Something has to come along and dial it,
+# and that something cannot live on Vercel — the project is on the Hobby plan,
+# whose Cron will not run more often than daily. The schedule was therefore
+# always external, and the external pinger silently died on 25 Aug 2026: rows
+# queued, due_at passed, nobody was ever called, and nothing logged an error.
+#
+# GitHub's minimum schedule granularity is five minutes, which is far too coarse
+# for a two-minute promise, so each run POLLS for five minutes at PING_INTERVAL.
+# That is affordable because this repository is public, where Actions minutes are
+# free; do NOT copy this pattern into a private repo without checking the bill.
+#
+# Overlapping runs are safe by design and deliberately not serialised with a
+# concurrency group: claimDueCallbacks() takes each row compare-and-swap style,
+# so two drains racing can never both dial the same lead — and overlap is what
+# covers GitHub's habit of starting scheduled jobs late.
+#
+# This is a STOPGAP. Scheduled workflows here are best-effort (runs can be
+# delayed under load) and GitHub disables them after 60 days without repository
+# activity. The durable fixes are a delay service that fires exactly at due_at
+# (Upstash QStash), or Vercel Pro, whose Cron does support per-minute schedules.
+name: callback-queue pinger
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # manual run, for verifying the wiring
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ENDPOINT: https://www.riseandshinetravel.in/api/cron/callback-queue
+      PING_INTERVAL: 20
+      RUN_SECONDS: 290 # just under the 5-minute schedule, so runs overlap slightly
+    steps:
+      - name: Drain the queue every ${PING_INTERVAL}s
+        run: |
+          set -uo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET is not set on this repository — the endpoint will answer 401."
+            exit 1
+          fi
+
+          deadline=$(( $(date +%s) + RUN_SECONDS ))
+          placed_total=0
+          failed_total=0
+          errors=0
+
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            body=$(curl -sS --max-time 30 -w '\n%{http_code}' \
+                     -H "Authorization: Bearer ${CRON_SECRET}" "$ENDPOINT") || body=$'\n000'
+            code=$(printf '%s' "$body" | tail -n1)
+            json=$(printf '%s' "$body" | sed '$d')
+
+            if [ "$code" = "200" ]; then
+              placed=$(printf '%s' "$json" | jq -r '.placed // 0')
+              failed=$(printf '%s' "$json" | jq -r '.failed // 0')
+              placed_total=$(( placed_total + placed ))
+              failed_total=$(( failed_total + failed ))
+              # Only log the interesting ticks; an empty queue is the normal case.
+              if [ "$placed" != "0" ] || [ "$failed" != "0" ]; then
+                echo "$(date -u +%H:%M:%S) placed=$placed failed=$failed"
+              fi
+            else
+              errors=$(( errors + 1 ))
+              echo "::warning::$(date -u +%H:%M:%S) HTTP $code — $json"
+            fi
+
+            sleep "$PING_INTERVAL"
+          done
+
+          echo "### Callback drain" >> "$GITHUB_STEP_SUMMARY"
+          echo "- calls placed: **$placed_total**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- dials failed: **$failed_total**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- request errors: **$errors**" >> "$GITHUB_STEP_SUMMARY"
+
+          # A run where EVERY request failed means the pinger is down — fail loudly
+          # so it shows up as a red run rather than dying silently the way the last
+          # one did. A few blips are tolerated.
+          if [ "$errors" -ge 10 ]; then
+            echo "::error::$errors failed requests — the endpoint or the secret is wrong."
+            exit 1
+          fi
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
