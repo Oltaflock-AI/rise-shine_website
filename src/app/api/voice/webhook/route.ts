@@ -11,6 +11,7 @@ import {
   recordCallInitiationFailure,
   recordCallTranscription,
 } from "@/lib/voice-calls";
+import { callWasAnswered, retryUnansweredCallback } from "@/lib/callback-retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,17 +69,36 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: "no-conversation-id" });
   }
 
+  // Recording the call is the job that must succeed; queueing another attempt is
+  // a courtesy on top. So the retry runs AFTER the write and can never turn a
+  // recorded call into a 500 — which would make ElevenLabs redeliver the whole
+  // event. (Redelivery is harmless anyway: the queue's active-phone index refuses
+  // a second outstanding row for the same number.)
+  let retry: string | undefined;
+
   try {
     switch (event.type) {
-      case "post_call_transcription":
-        await recordCallTranscription(event as PostCallTranscription);
+      case "post_call_transcription": {
+        const call = event as PostCallTranscription;
+        await recordCallTranscription(call);
+        // Rang out or went to voicemail: the customer was promised a call, so
+        // give them one more before the lead goes cold.
+        if (!callWasAnswered(call.data.transcript)) {
+          retry = await retryUnansweredCallback(call.data.conversation_id);
+        }
         break;
+      }
       case "post_call_audio":
         await recordCallAudio(event as unknown as PostCallAudio);
         break;
-      case "call_initiation_failure":
-        await recordCallInitiationFailure(event as unknown as CallInitiationFailure);
+      case "call_initiation_failure": {
+        const failure = event as unknown as CallInitiationFailure;
+        await recordCallInitiationFailure(failure);
+        // Busy, no-answer, or never connected at all — nobody heard anything,
+        // so this one always deserves a second attempt.
+        retry = await retryUnansweredCallback(failure.data.conversation_id);
         break;
+      }
       default:
         // Unknown/unsubscribed event — acknowledge so it isn't retried forever.
         return Response.json({ ok: true, ignored: event.type ?? "unknown" });
@@ -88,7 +108,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false }, { status: 500 }); // 5xx → ElevenLabs retries
   }
 
-  return Response.json({ ok: true });
+  if (retry && retry !== "not-from-queue") {
+    console.log(`[api/voice/webhook] unanswered call → retry ${retry}`);
+  }
+
+  return Response.json({ ok: true, ...(retry ? { retry } : {}) });
 }
 
 /** Health check — lets you confirm the URL is live before pasting it into ElevenLabs. */

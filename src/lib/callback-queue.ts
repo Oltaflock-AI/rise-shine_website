@@ -45,6 +45,8 @@ export async function enqueueCallback(input: {
   name: string;
   phone: string;
   source?: string;
+  /** Override the wait before dialling. Used by the unanswered-call retry. */
+  delaySeconds?: number;
 }): Promise<EnqueueResult> {
   if (!callbackQueueConfigured) {
     return { ok: false, reason: "unconfigured", message: "Supabase admin is not configured." };
@@ -55,7 +57,11 @@ export async function enqueueCallback(input: {
     return { ok: false, reason: "invalid_phone", message: "Not a diallable number." };
   }
 
-  const dueAt = new Date(Date.now() + CALLBACK_DELAY_SECONDS * 1000).toISOString();
+  const delay =
+    Number.isFinite(input.delaySeconds) && (input.delaySeconds as number) >= 0
+      ? (input.delaySeconds as number)
+      : CALLBACK_DELAY_SECONDS;
+  const dueAt = new Date(Date.now() + delay * 1000).toISOString();
 
   const { data, error } = await createAdminClient()
     .from("callback_queue")
