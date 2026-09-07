@@ -12,8 +12,7 @@ import {
 } from "@/lib/email";
 import { alertOps } from "@/lib/alerts";
 import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, hotelBind } from "@/lib/cashfree";
-import { hotelBookingBlockedForMissingPayments } from "@/lib/tbo-env";
-import { hotelVerificationSession } from "@/lib/tbo-verification";
+import { hotelBookingBlockedForMissingPayments, hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 
 // Live TBO hotel booking — never cached; Book can run long.
 export const dynamic = "force-dynamic";
@@ -78,14 +77,14 @@ export async function POST(req: Request) {
   // What the customer actually paid (order is server-priced at the RSP-floored
   // selling fare; body.netAmount is TBO's net and no longer matches it).
   let paidInr: number | null = null;
-  // A TBO verification session skips the gate — but ONLY on the certification
-  // hosts, which `hotelVerificationSession` checks itself. It cannot unlock a
-  // live booking, and it is never consulted on the flight route.
-  const verifying = await hotelVerificationSession();
-  if (verifying) {
-    console.info("[api/hotels/book] TBO verification session — booking without payment (certification hosts).");
+  // On TBO's certification hosts there is no payment to confirm — that is how
+  // certification is meant to run. The check is on the HOTEL hosts, so it cannot
+  // unlock a live booking, and it is never consulted on the flight route.
+  const unpaidAllowed = hotelUnpaidBookingAllowed(cashfreeConfigured);
+  if (unpaidAllowed) {
+    console.info("[api/hotels/book] TBO certification hosts — booking without payment.");
   }
-  if (cashfreeConfigured && !verifying) {
+  if (cashfreeConfigured && !unpaidAllowed) {
     const orderId = body.payment?.orderId;
     if (!orderId) {
       return Response.json({ ok: false, unpaid: true, error: "Payment is required before booking." }, { status: 402 });

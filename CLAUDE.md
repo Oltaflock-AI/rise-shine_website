@@ -347,11 +347,22 @@ certification hosts — `src/lib/tbo-env.ts` fails closed against live hosts.
 
 `cashfreeConfigured` is one GLOBAL flag, and that bit TBO's portal verifier: the live
 FLIGHT keys (18-Aug-2026) put a real payment page in front of hotel bookings that are
-still on the certification host, stalling every Book-side checkpoint behind it.
-`src/lib/tbo-verification.ts` + `/api/hotels/verification?token=…` opens a cookie-scoped
-no-payment session for them. It is inert unless `TBO_VERIFICATION_TOKEN` is set AND
-`tboHotelIsLive()` is false, so it can never give away a live room, and flights never
-consult it. **Delete the env var once hotel certification is signed off.**
+still on the certification host, stalling five Book-side checkpoints (31, 32, 33, 38, 40)
+across three verification rounds. So **`hotelUnpaidBookingAllowed()` ignores whether a
+gateway is configured** — on TBO's certification hosts there is simply no payment page.
+`tboHotelIsLive()` is the only thing that matters, and it fails closed, so this can never
+give away a real room; flights never consult it.
+
+The first fix was a secret token opening a no-payment cookie (`TBO_VERIFICATION_TOKEN`,
+`/api/hotels/verification`). It worked and was still useless: per-browser and delivered
+by email, while TBO's verifier rotates between rounds and works from the checklist. They
+never used it and the same five points came back "unable to make payments" on 07-Sep-2026.
+Removed — **do not reintroduce a setup step the verifier has to perform.** Clear
+`TBO_VERIFICATION_TOKEN` from Vercel.
+
+`HOTEL_CERT_REQUIRE_PAYMENT=true` puts the payment page back on certification, for one
+purpose: rehearsing the real Cashfree hotel flow before hotels go live. It cannot make
+booking impossible — with no keys at all, unpaid stays the only way through.
 
 **`cashfreeConfigured` vs `cashfreePaymentsLive` — do not swap these.** The first means
 "keys present, so run the payment gate"; the second means "the money is real"

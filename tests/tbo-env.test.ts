@@ -23,6 +23,7 @@ const CLEARED = {
   TBO_BOOK_URL: undefined,
   TBO_HOTEL_URL: undefined,
   TBO_HOTEL_BE_URL: undefined,
+  HOTEL_CERT_REQUIRE_PAYMENT: undefined,
 };
 
 /** TBO's certification hotel hosts (the defaults) vs a live-looking one. */
@@ -130,9 +131,13 @@ describe("hotel payment guards", () => {
     expect(hotelBookingBlockedForMissingPayments(false)).toBe(true);
   });
 
-  it("requires payment as soon as a gateway exists, certification host or not", async () => {
+  // Certification must not ask for payment even though Cashfree is configured for
+  // the LIVE FLIGHT stack. One global "keys present" flag put a real payment page in
+  // front of TBO's own verifier and stalled five Book-side checkpoints for three
+  // rounds (31, 32, 33, 38, 40).
+  it("does not require payment on certification hosts even when a gateway exists", async () => {
     const { hotelUnpaidBookingAllowed } = await load(CLEARED);
-    expect(hotelUnpaidBookingAllowed(true)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(true)).toBe(true);
   });
 
   it("allows live hotels once Cashfree is configured", async () => {
@@ -140,24 +145,30 @@ describe("hotel payment guards", () => {
     expect(hotelBookingBlockedForMissingPayments(true)).toBe(false);
   });
 
-  // TBO's portal verifier needs to complete a Book on the certification host even
-  // though Cashfree is configured for the live FLIGHT stack. That is the ONLY thing
-  // the verification session buys, and only there.
-  it("lets a verification session book unpaid on certification hosts", async () => {
-    const { hotelUnpaidBookingAllowed } = await load(CLEARED);
-    expect(hotelUnpaidBookingAllowed(true, true)).toBe(true);
-  });
-
-  it("ignores a verification session once the hotel stack is live", async () => {
+  // The host half is absolute: nothing buys an unpaid booking on a live hotel host.
+  it("never allows an unpaid booking once the hotel stack is live", async () => {
     const { hotelUnpaidBookingAllowed } = await load({ ...CLEARED, TBO_HOTEL_URL: LIVE_HOTEL });
-    expect(hotelUnpaidBookingAllowed(true, true)).toBe(false);
-    expect(hotelUnpaidBookingAllowed(false, true)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(true)).toBe(false);
+    expect(hotelUnpaidBookingAllowed(false)).toBe(false);
   });
 
-  it("defaults to no session, so nothing changes for a normal customer", async () => {
-    const { hotelUnpaidBookingAllowed } = await load(CLEARED);
+  it("puts the payment page back on certification when HOTEL_CERT_REQUIRE_PAYMENT is true", async () => {
+    const { hotelUnpaidBookingAllowed } = await load({ ...CLEARED, HOTEL_CERT_REQUIRE_PAYMENT: "true" });
     expect(hotelUnpaidBookingAllowed(true)).toBe(false);
-    expect(hotelUnpaidBookingAllowed(true, false)).toBe(false);
+  });
+
+  it("still lets certification book unpaid when forced but no gateway exists", async () => {
+    const { hotelUnpaidBookingAllowed } = await load({ ...CLEARED, HOTEL_CERT_REQUIRE_PAYMENT: "true" });
+    expect(hotelUnpaidBookingAllowed(false)).toBe(true);
+  });
+
+  it("ignores HOTEL_CERT_REQUIRE_PAYMENT on live hotel hosts", async () => {
+    const { hotelUnpaidBookingAllowed } = await load({
+      ...CLEARED,
+      TBO_HOTEL_URL: LIVE_HOTEL,
+      HOTEL_CERT_REQUIRE_PAYMENT: "true",
+    });
+    expect(hotelUnpaidBookingAllowed(false)).toBe(false);
   });
 });
 

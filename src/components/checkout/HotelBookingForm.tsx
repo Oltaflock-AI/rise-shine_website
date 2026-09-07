@@ -47,6 +47,8 @@ type Validation = {
   paxNameMinLength?: number;
   paxNameMaxLength?: number;
   panCountRequired?: number;
+  /** TBO portal checkpoint 29 — when true, two guests may share a first name. */
+  samePaxNameAllowed?: boolean;
 };
 type Quote = {
   ok: boolean;
@@ -319,6 +321,10 @@ export function HotelBookingForm({
   /** Collect payment (Cashfree), then book. Money is taken BEFORE Book; the server refunds if Book fails. */
   async function submit() {
     // Light client check; the order route re-validates authoritatively before charging.
+    // The rate's own ValidationInfo decides whether two guests may share a first
+    // name (see validateHotelPax) — the same full name is never allowed.
+    const firstNamesMustDiffer = v?.samePaxNameAllowed !== true;
+    const fullNames = new Set<string>();
     const firstNames = new Set<string>();
     for (const g of guests) {
       if (!g.first.trim() || !g.last.trim())
@@ -333,15 +339,24 @@ export function HotelBookingForm({
           rule: true,
           error: "Each room's lead guest needs an email and phone.",
         });
-      // TBO accepts only one guest per first name on a booking, whatever the surname.
       const first = g.first.trim().toUpperCase();
-      if (firstNames.has(first))
+      const full = `${first} ${g.last.trim().toUpperCase()}`;
+      if (fullNames.has(full))
         return setBooked({
           ok: false,
           rule: true,
-          error: `Two guests can't share the first name "${g.first.trim()}" — please give each guest their own first name.`,
+          error: `Two guests can't have the same name "${g.first.trim()} ${g.last.trim()}" — please enter each guest once.`,
         });
-      firstNames.add(first);
+      fullNames.add(full);
+      if (firstNamesMustDiffer) {
+        if (firstNames.has(first))
+          return setBooked({
+            ok: false,
+            rule: true,
+            error: `Two guests can't share the first name "${g.first.trim()}" — please give each guest their own first name.`,
+          });
+        firstNames.add(first);
+      }
     }
 
     setBooking(true);

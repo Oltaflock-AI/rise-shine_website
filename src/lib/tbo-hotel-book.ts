@@ -122,17 +122,33 @@ export function validateHotelPax(req: HotelBookRequest): string | null {
     }
   }
 
-  // TBO portal checkpoint 29: no two guests on one booking may share a FIRST
-  // name — not merely a full name. Confirmed with TBO on 17-Aug-2026, so this is
-  // deliberately stricter than "same person twice": "Rahul Shah" and "Rahul
-  // Mehta" cannot ride on the same booking either.
+  // TBO portal checkpoint 29 — the RATE decides, not us.
+  //
+  // On 17-Aug-2026 TBO asked for identical FIRST names to be blocked outright,
+  // so we did. On 07-Sep-2026 they marked that same rule as a failure: PreBook
+  // returns `SamePaxNameAllowed: true` for these rates and a portal must follow
+  // the node rather than a blanket rule. So the node wins whenever it is sent.
+  //
+  // When it is absent we keep the strict rule — that was TBO's stated default and
+  // it can only ever reject a Book they would also reject. Two guests with the
+  // SAME FULL NAME are refused either way: that is one person entered twice, and
+  // no rate makes it meaningful.
+  const seenFullNames = new Set<string>();
   const seenFirstNames = new Set<string>();
+  const firstNamesMustDiffer = v?.samePaxNameAllowed !== true;
   for (const p of req.rooms.flatMap((r) => r.passengers)) {
     const first = (p.firstName ?? "").trim().toUpperCase();
-    if (!first) continue; // the empty-name check above already reports this
-    if (seenFirstNames.has(first))
-      return `Two guests can't share the first name "${(p.firstName ?? "").trim()}" — TBO needs a different first name for every guest on a booking.`;
-    seenFirstNames.add(first);
+    const last = (p.lastName ?? "").trim().toUpperCase();
+    if (!first || !last) continue; // the empty-name check above already reports this
+    const full = `${first} ${last}`;
+    if (seenFullNames.has(full))
+      return `Two guests can't have the same name "${(p.firstName ?? "").trim()} ${(p.lastName ?? "").trim()}" — please enter each guest once.`;
+    seenFullNames.add(full);
+    if (firstNamesMustDiffer) {
+      if (seenFirstNames.has(first))
+        return `Two guests can't share the first name "${(p.firstName ?? "").trim()}" — this rate needs a different first name for every guest on the booking.`;
+      seenFirstNames.add(first);
+    }
   }
 
   if (v?.panMandatory) {

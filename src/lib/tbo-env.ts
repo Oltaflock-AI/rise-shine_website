@@ -70,19 +70,34 @@ export function hotelBookingBlockedForMissingPayments(livePaymentsConfigured: bo
 /**
  * May a hotel booking be completed WITHOUT taking payment?
  *
- * Only on TBO's certification hosts — that half is absolute, and is what stops this
- * ever giving away a real room.
+ * Yes on TBO's certification hosts, no anywhere else. The host half is absolute and
+ * is what stops this ever giving away a real room: the day `TBO_HOTEL_URL` moves to
+ * a live host this returns false for everyone. Flights never consult it — there is
+ * no unpaid flight path.
  *
- * On those hosts there are two ways in. Either no payment gateway is configured at
- * all (the state certification is meant to run in), or the request carries a valid
- * TBO verification session. The second exists because Cashfree went live for
- * FLIGHTS while the hotel stack stayed on certification: one global "keys present"
- * flag then demanded a real payment from TBO's own verifier and stalled the
- * remaining Book-side checkpoints. See `lib/tbo-verification.ts`.
+ * Why it ignores whether a gateway is configured. Certification is meant to run
+ * without one, and it did until Cashfree went live for FLIGHTS on 18-Aug-2026 —
+ * `cashfreeConfigured` is one GLOBAL flag, so from that day the hotel checkout
+ * demanded a real payment from TBO's own verifier even though the hotel stack was
+ * still on certification. That stalled five Book-side checkpoints (31, 32, 33, 38,
+ * 40) across three verification rounds. The first attempt at a fix was a secret
+ * token that opened a no-payment cookie; it worked, but it was per-browser and
+ * out-of-band, and TBO's verifier — who rotates between rounds and works from the
+ * checklist, not our covering email — never used it. So the setup step is gone:
+ * on certification hosts there is simply no payment page.
+ *
+ * `HOTEL_CERT_REQUIRE_PAYMENT=true` puts it back, for one purpose — rehearsing the
+ * real Cashfree hotel flow end to end against certification TBO before hotels go
+ * live. It cannot make booking impossible: with no keys at all, unpaid is still the
+ * only way through.
  */
-export function hotelUnpaidBookingAllowed(
-  paymentsConfigured: boolean,
-  verificationSession = false,
-): boolean {
-  return (!paymentsConfigured || verificationSession) && !tboHotelIsLive();
+export function hotelUnpaidBookingAllowed(paymentsConfigured: boolean): boolean {
+  if (tboHotelIsLive()) return false;
+  if (!paymentsConfigured) return true;
+  return !hotelCertPaymentForced();
+}
+
+/** Opt back into the payment page on certification hosts (our own gateway rehearsal). */
+function hotelCertPaymentForced(): boolean {
+  return process.env.HOTEL_CERT_REQUIRE_PAYMENT?.trim().toLowerCase() === "true";
 }
