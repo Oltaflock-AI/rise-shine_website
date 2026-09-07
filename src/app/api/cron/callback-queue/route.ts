@@ -1,10 +1,6 @@
-import { elevenLabsConfigured, placeOutboundCall } from "@/lib/elevenlabs-outbound";
-import {
-  claimDueCallbacks,
-  markCallFailed,
-  markCallPlaced,
-  callbackQueueConfigured,
-} from "@/lib/callback-queue";
+import { elevenLabsConfigured } from "@/lib/elevenlabs-outbound";
+import { claimDueCallbacks, callbackQueueConfigured } from "@/lib/callback-queue";
+import { dispatchClaimedCallback } from "@/lib/callback-dispatch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,16 +48,8 @@ export async function GET(req: Request) {
   // us clear of ElevenLabs' concurrency limits. A row already claimed above is
   // never left in 'calling' — every branch records a result.
   for (const cb of claimed) {
-    try {
-      const call = await placeOutboundCall({ toNumber: cb.phone, calleeName: cb.name });
-      await markCallPlaced(cb.id, call);
-      placed += 1;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error(`[cron/callback-queue] dial failed for ${cb.id}:`, message);
-      await markCallFailed(cb.id, cb.attempts, message);
-      failed += 1;
-    }
+    if ((await dispatchClaimedCallback(cb)) === "placed") placed += 1;
+    else failed += 1;
   }
 
   // Counts only — the caller is a scheduler, and lead names/numbers have no

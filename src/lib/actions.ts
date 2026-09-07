@@ -26,6 +26,7 @@ import { nightsToDayOption, type Lead } from "@/lib/googleForm";
 import { deliverLead } from "@/lib/lead-delivery";
 import { callbackDelayPhrase } from "@/lib/callback-delay";
 import { enqueueCallback } from "@/lib/callback-queue";
+import { dispatchCallbackNow } from "@/lib/callback-dispatch";
 import { rateLimit } from "@/lib/rate-limit";
 
 export type FormState = {
@@ -80,7 +81,14 @@ async function queueCallback(name: string, phone: string): Promise<boolean> {
     if (!ok) return false;
 
     const queued = await enqueueCallback({ name, phone, source: "contact-form" });
-    if (queued.ok) return true;
+    if (queued.ok) {
+      // Ring them now, in this request. A dial is one POST that returns in under
+      // a second, so there is nothing to wait for and nothing to schedule. If it
+      // fails the row stays `pending` and the recovery drain picks it up — the
+      // customer is still promised a call either way, because one is coming.
+      await dispatchCallbackNow(queued.id);
+      return true;
+    }
     if (queued.reason === "duplicate") return true;
     // invalid_phone is routine here: unlike /request-a-call, this form accepts a
     // landline or an overseas number, and those are enquiries we still want.

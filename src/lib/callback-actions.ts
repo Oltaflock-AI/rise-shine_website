@@ -3,9 +3,12 @@
 /**
  * "Request a call" handler — the entry point behind /request-a-call.
  *
- * It deliberately does NOT dial. It validates, throttles, and parks the lead in
- * the `callback_queue` table; `/api/cron/callback-queue` places the actual
- * ElevenLabs call once `due_at` passes. See lib/callback-queue.ts for why.
+ * It validates, throttles, parks the lead in `callback_queue` — and then dials
+ * it, in this request. That last part used to be impossible: the promise carried
+ * a two-minute wait and a Vercel Hobby function dies at sixty seconds, so the
+ * call had to be placed later by /api/cron/callback-queue. With the wait gone
+ * there is nothing to wait for, and the row is dialled immediately.
+ * /api/cron/callback-queue remains as the recovery path for a dial that failed.
  *
  * The lead is also mirrored to the agency's existing lead pipeline (Google Form,
  * falling back to email — see lib/lead-delivery.ts) on a best-effort basis, so a
@@ -19,6 +22,7 @@ import { deliverLead } from "@/lib/lead-delivery";
 import { rateLimit } from "@/lib/rate-limit";
 import { callbackDelayPhrase } from "@/lib/callback-delay";
 import { enqueueCallback } from "@/lib/callback-queue";
+import { dispatchCallbackNow } from "@/lib/callback-dispatch";
 
 /** A real call costs money and rings a real phone — throttle harder than a form. */
 const MAX_PER_IP = 5;
@@ -96,6 +100,10 @@ export async function requestCallback(
         };
     }
   }
+
+  // Dial inside the request. See lib/callback-dispatch.ts for why this is safe
+  // now and was not when the promise carried a two-minute wait.
+  await dispatchCallbackNow(queued.id);
 
   await mirrorLead(name, phone);
 

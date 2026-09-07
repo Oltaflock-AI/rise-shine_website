@@ -54,7 +54,10 @@ describe("isDiallableIndianNumber", () => {
 
 describe("callbackDelayPhrase", () => {
   it.each([
-    [0, "under a minute"],
+    // No wait: the phone is already ringing while they read the confirmation,
+    // so "under a minute" would undersell it.
+    [0, "a few seconds"],
+    [10, "a few seconds"],
     [30, "under a minute"],
     [60, "about a minute"],
     [120, "about 2 minutes"],
