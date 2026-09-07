@@ -47,6 +47,14 @@ export function passwordProblem(password: string): string | null {
 
 export type SignInReason = "ok" | "unknown_user" | "wrong_password" | "locked" | "inactive";
 
+/**
+ * What dashboard_login_events can hold. A sign-in attempt's own outcome, plus
+ * the two password-reset steps (dashboard-reset.ts) — a reset is another way
+ * into an account, so it belongs in the same log rather than a separate one
+ * nobody thinks to read.
+ */
+export type LogReason = SignInReason | "reset_requested" | "reset_done";
+
 export interface CredentialRow {
   password_hash: string;
   role: Role;
@@ -215,7 +223,7 @@ export interface LoginEvent {
   id: number;
   email: string;
   ok: boolean;
-  reason: SignInReason;
+  reason: LogReason;
   ip: string | null;
   at: string;
 }

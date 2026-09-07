@@ -16,7 +16,16 @@ interface LoginEvent {
   id: number;
   email: string;
   ok: boolean;
-  reason: "ok" | "unknown_user" | "wrong_password" | "locked" | "inactive";
+  reason:
+    | "ok"
+    | "unknown_user"
+    | "wrong_password"
+    | "locked"
+    | "inactive"
+    // Password-reset steps share this log so the account's whole story is in
+    // one place; they are recorded with ok = true.
+    | "reset_requested"
+    | "reset_done";
   ip: string | null;
   at: string;
 }
@@ -35,6 +44,8 @@ const REASON_LABEL: Record<LoginEvent["reason"], string> = {
   wrong_password: "Wrong password",
   locked: "Locked out",
   inactive: "Deactivated",
+  reset_requested: "Reset link sent",
+  reset_done: "Password reset",
 };
 
 function fmtAdded(iso: string): string {

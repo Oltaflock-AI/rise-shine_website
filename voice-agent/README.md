@@ -71,6 +71,21 @@ change their own. Seed the first admin with `DASHBOARD_ADMIN_EMAILS` +
 `DASHBOARD_ADMIN_PASSWORD`, otherwise nobody can sign in to grant anything.
 The store refuses to remove or demote the last admin.
 
+**Forgot password** (`lib/dashboard-reset.ts`, migration `0015`): the sign-in
+page emails a single-use link, valid 45 minutes, that lands on `/reset`. Only
+the sha256 of the token is stored — the raw token exists in the email and
+nowhere else, the same rule `dashboard_sessions` follows. Requesting a link
+answers identically whether or not the address has an account, because a
+"no such user" here would undo the shared "Wrong email or password" on sign-in.
+Redeeming one clears `failed_attempts` and `locked_until` (a locked-out person
+resetting their password is the point), revokes every other session, and kills
+any other outstanding link for the account. At most three live links per
+account, so the form cannot flood an inbox. The emailed URL is built from
+`DASHBOARD_URL`, never the request's Host header — a poisoned Host would
+otherwise deliver the token to a domain of the attacker's choosing. Without
+`RESEND_API_KEY` the route answers `503` and says to ask an admin, rather than
+promising mail that never comes.
+
 ## Data sources
 
 | Page | Source |
@@ -98,6 +113,9 @@ SUPABASE_SERVICE_ROLE_KEY=…
 DASHBOARD_ADMIN_EMAILS=you@example.com  # comma-separated bootstrap admins
 DASHBOARD_ADMIN_PASSWORD=…              # bootstrap password for the seed admin(s)
 # DASHBOARD_AUTH_ENABLED=true           # set in production; unset locally = simulated admin
+RESEND_API_KEY=re_…                     # same Resend account as the main site; without it "forgot password" is off
+EMAIL_FROM=Rise & Shine Travels <no-reply@riseandshinetravel.in>   # must be a verified Resend domain
+DASHBOARD_URL=https://admin.riseandshinetravel.in                  # where the emailed reset link points
 ```
 
 ## Run

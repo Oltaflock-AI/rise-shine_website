@@ -38,7 +38,13 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
   customers. `DASHBOARD_AUTH_ENABLED=true` turns the gate on (unset locally =
   simulated admin, banner says so). Do not add a header- or query-supplied
   email to `emailFromSession()` — that is an impersonation hole wearing a
-  login's clothes.
+  login's clothes. "Forgot password" (`voice-agent/lib/dashboard-reset.ts` ·
+  migration `0015` · `/reset`) emails a single-use 45-minute link through
+  Resend; only the token's sha256 is stored, requesting one never reveals
+  whether the account exists, redeeming clears the lockout and revokes every
+  session, and the link's origin comes from `DASHBOARD_URL` — never the request
+  Host, which would let an attacker have the token delivered to their own
+  domain.
 
 ### The TBO booking layer (`src/lib/`) — server only
 
