@@ -1,15 +1,20 @@
 // Transactional email for the dashboard — Resend's REST API over raw fetch,
-// the same pattern (and the same Resend account) as the main site's
-// src/lib/email.ts. SERVER ONLY.
+// the same account and the same pattern as the main site's src/lib/email.ts.
+// SERVER ONLY.
 //
 // Unlike the main site, a missing key here is NOT a silent no-op: the only mail
 // this app sends is a password-reset link, and swallowing that failure would
 // leave someone staring at "check your inbox" forever. sendEmail() throws, and
 // /api/auth/reset/request refuses up front when the key is absent.
+//
+// EMAIL_FROM must be on a Resend-VERIFIED domain. That is riseandshinetravel
+// .com — the .in host serves the site and the logo but is not the mail domain,
+// and sending from an unverified one is refused by Resend outright.
+
+import { C, FONT, button, callout, esc, heading, paragraph, shell } from "./email-brand";
 
 const API_KEY = process.env.RESEND_API_KEY ?? "";
-/** Resend requires a verified domain; onboarding@resend.dev works for testing. */
-const FROM = process.env.EMAIL_FROM || "Rise & Shine Travels <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM || "Rise & Shine Travels <info@riseandshinetravel.com>";
 
 export const emailConfigured = Boolean(API_KEY);
 
@@ -33,38 +38,45 @@ export async function sendEmail(args: {
   }
 }
 
-function esc(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+export const RESET_SUBJECT = "Reset your Rise & Shine dashboard password";
 
 /**
- * The reset email. Deliberately plain: no images, no tracking, one link, and
- * the URL repeated as text so a client that strips anchors is still usable.
+ * The reset email.
+ *
+ * The link appears twice on purpose — as the brand button, and as plain text
+ * underneath. A reset is the one email that is worthless if its single link
+ * fails to render, and some corporate clients strip anchors or rewrite them
+ * through a scanner that mangles the query string. The URL is escaped both
+ * times: the token is base64url, so it cannot contain a quote, but the escaping
+ * is what makes that true by construction rather than by luck.
+ *
+ * The address is shown so the recipient can tell whose account the link opens —
+ * several staff share this inbox pattern — and it is escaped like everything
+ * else even though it came out of our own database.
  */
-export function resetEmailHtml(link: string, minutes: number): string {
-  const safe = esc(link);
-  return `<!doctype html>
-<html><body style="margin:0;padding:24px;background:#f5f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#12223a">
-  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:28px">
-    <p style="margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#7a8699">Rise &amp; Shine Travels</p>
-    <h1 style="margin:0 0 16px;font-size:20px">Reset your dashboard password</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.55">
-      Someone asked to reset the password for this admin dashboard account.
-      The link below works once and expires in ${minutes} minutes.
-    </p>
-    <p style="margin:0 0 20px">
-      <a href="${safe}" style="display:inline-block;background:#12223a;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:15px">Choose a new password</a>
-    </p>
-    <p style="margin:0 0 20px;font-size:13px;line-height:1.5;color:#5b6779;word-break:break-all">
-      Or paste this into your browser:<br>${safe}
-    </p>
-    <p style="margin:0;font-size:13px;line-height:1.5;color:#5b6779">
-      If you did not ask for this, ignore this email — your password stays as it is.
-    </p>
-  </div>
-</body></html>`;
+export function resetEmailHtml(args: { link: string; minutes: number; email: string }): string {
+  const href = esc(args.link);
+  const body = [
+    heading("Reset your dashboard password"),
+    paragraph(
+      `Someone asked to reset the password for the Rise &amp; Shine admin dashboard account <strong style="color:${C.ink};">${esc(args.email)}</strong>.`,
+    ),
+    paragraph("Choose a new password with the button below."),
+    button("Choose a new password", args.link),
+    `<p style="margin:0 0 14px;font-family:${FONT};font-size:12.5px;line-height:1.6;color:${C.muted};word-break:break-all;">
+      Or paste this link into your browser:<br>
+      <a href="${href}" style="color:${C.navyLight};text-decoration:underline;">${href}</a>
+    </p>`,
+    callout(
+      `This link works <strong>once</strong> and expires in <strong>${args.minutes} minutes</strong>. Setting a new password signs the account out on every other device.`,
+    ),
+    paragraph(
+      `<span style="color:${C.muted};font-size:13.5px;">If you did not ask for this, you can ignore this email — your password stays as it is, and nobody can use this link without opening it from your inbox.</span>`,
+    ),
+  ].join("\n");
+
+  return shell(body, {
+    kicker: "Admin Dashboard",
+    preheader: `Your password reset link — valid for ${args.minutes} minutes.`,
+  });
 }

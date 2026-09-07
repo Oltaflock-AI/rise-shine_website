@@ -84,7 +84,12 @@ account, so the form cannot flood an inbox. The emailed URL is built from
 `DASHBOARD_URL`, never the request's Host header — a poisoned Host would
 otherwise deliver the token to a domain of the attacker's choosing. Without
 `RESEND_API_KEY` the route answers `503` and says to ask an admin, rather than
-promising mail that never comes.
+promising mail that never comes. The mail itself is assembled from
+`lib/email-brand.ts`, a deliberate port of the main site's email design system
+(navy header, red rule, the same footer), so a reset sits in the inbox as
+obviously the same sender as a booking confirmation. Note the domain split: the
+verified SENDING domain is `riseandshinetravel.com`, while the logo and site
+links point at `.in`, which is the host actually serving the site.
 
 ## Data sources
 
@@ -114,7 +119,7 @@ DASHBOARD_ADMIN_EMAILS=you@example.com  # comma-separated bootstrap admins
 DASHBOARD_ADMIN_PASSWORD=…              # bootstrap password for the seed admin(s)
 # DASHBOARD_AUTH_ENABLED=true           # set in production; unset locally = simulated admin
 RESEND_API_KEY=re_…                     # same Resend account as the main site; without it "forgot password" is off
-EMAIL_FROM=Rise & Shine Travels <no-reply@riseandshinetravel.in>   # must be a verified Resend domain
+EMAIL_FROM=Rise & Shine Travels <info@riseandshinetravel.com>       # VERIFIED Resend domain is .com, not .in
 DASHBOARD_URL=https://admin.riseandshinetravel.in                  # where the emailed reset link points
 ```
 

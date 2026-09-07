@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidEmail, normaliseEmail } from "@/lib/access";
 import { requestMeta } from "@/lib/dashboard-auth";
-import { emailConfigured, resetEmailHtml, sendEmail } from "@/lib/email";
+import { RESET_SUBJECT, emailConfigured, resetEmailHtml, sendEmail } from "@/lib/email";
 import { issueReset, logResetEvent, resetLink, resetTtlMinutes } from "@/lib/dashboard-reset";
 
 export const runtime = "nodejs";
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     const minutes = resetTtlMinutes();
     await sendEmail({
       to: email,
-      subject: "Reset your Rise & Shine dashboard password",
-      html: resetEmailHtml(resetLink(issued.token), minutes),
+      subject: RESET_SUBJECT,
+      html: resetEmailHtml({ link: resetLink(issued.token), minutes, email }),
     });
     await logResetEvent(email, "reset_requested", meta);
   } catch (err) {
