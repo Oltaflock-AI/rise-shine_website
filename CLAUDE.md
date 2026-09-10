@@ -194,10 +194,13 @@ never mentions. Don't build anything that assumes a room photo exists.
 
 `/api/cron/healthcheck` runs **every 5 minutes** (`vercel.json`) and answers one
 question: could a customer book a flight right now? In booking order —
-`tbo_proxy` (TCP connect to the static-IP VPS), `tbo_search`, `tbo_quote` (the
-FareQuote that sets the amount charged), `cashfree_auth`, `callback_queue`
-(is anything draining it), `ledger_orphans` (did anyone pay and get nothing).
-It books, charges and dials **nothing**.
+`config` (every production-critical env var still set — `ELEVENLABS_AGENT_ID` once
+vanished and the webhook 200'd every event into the void), `tbo_proxy` (TCP connect
+to the static-IP VPS), `tbo_search`, `tbo_quote` (the FareQuote that sets the amount
+charged), `cashfree_auth`, `callback_queue` (is anything draining it),
+`ledger_orphans` (did anyone pay and get nothing), `email_auth` (Resend accepts the
+key that carries confirmations AND alerts — a revoked key fails twice). It books,
+charges, mails and dials **nothing**.
 
 Two design points that look like omissions and are not:
 
@@ -221,7 +224,10 @@ read it repeats rather than going quiet, held to the reminder cadence by an in-p
 throttle. Every run also logs one `[healthcheck]` line with each verdict and duration,
 so "did the check even run?" is answerable.
 
-Ops mail goes through `alertOps` (`lib/alerts.ts`) to `ALERT_EMAIL`. It also fires on a
+Ops mail goes through `alertOps` (`lib/alerts.ts`) to `ALERT_EMAIL`, and the subject
+(never the details — they carry PAN/email) also goes to Sentry as a message, so
+Sentry's own routing (Slack/SMS) is a second channel when Resend is the thing that
+broke. It also fires on a
 **rejected Cashfree webhook signature** (usually a rotated key or a changed payload
 version — i.e. real money events the ledger is dropping) and on a **Book/Ticket
 timeout**: when it starts, when it recovers, and loudly when four minutes of polling
@@ -444,6 +450,36 @@ ones that migrations `0002`/`0003` created; run it before enabling the webhook.
 
 Cashfree's **Secure ID / VRS** APIs (PAN, GSTIN, bank verification) are a *separate
 product* with separate credentials — nothing here uses them.
+
+### Booking intents — the checkout survives the browser (`lib/booking-intents.ts`, migration `0017`)
+
+Between Cashfree capturing the money and `/api/book` answering, the passenger
+payload used to exist ONLY in the customer's tab. Close it — phone dies, popup
+dismissed, network drop — and the money was captured with nothing on the server
+able to finish the ticket or return it; the hourly orphan alert eventually handed a
+human a manual refund. And "Network error — please try again" re-sent the same paid
+order, so a second Book could ticket twice (the 24h duplicate guard is in-memory and
+non-LCC only).
+
+Now one `booking_intents` row per Cashfree order holds the parsed request:
+
+- `/api/payment/order` (and the hotel one) **writes it, or refuses the order** — an
+  order with no intent is a payment nothing can complete, so fail closed.
+  **Run migration 0017 BEFORE deploying this code**, or every order returns 503.
+- `/api/book` / `/api/hotels/book` **claim it compare-and-swap** (`awaiting_payment|paid
+  → ticketing`) before touching TBO. Lost claim + stored `result` → replay that result
+  (ticketed OR refunded); lost claim, no result → `409 inProgress`. That is the
+  idempotency guard; do not bypass it "for a retry".
+- `/api/cron/settle-intents` runs every minute: a paid, unclaimed **flight** whose
+  TraceId is under 12 min old runs the SAME `ticketPaidFlight()` path the route uses
+  (`lib/flight-checkout.ts` — one implementation, never two); older → refund + email
+  + ops mail. `awaiting_payment` past the 16-min order life → one Get Order decides
+  refund vs. `expired`. A `ticketing` claim older than 8 min → `escalated`, URGENT mail,
+  **no automatic refund** (TBO may have ticketed; check GetBookingDetails first).
+  Hotels are refund-only from the cron — Book is never started unattended.
+- `decideIntentAction` / `interpretClaim` are pure and pinned by
+  `tests/booking-intents.test.ts`. `request` carries passport/PAN; the cron blanks it
+  30 days after settlement.
 
 ### Auth (`src/lib/supabase/` + `src/lib/auth.tsx`)
 

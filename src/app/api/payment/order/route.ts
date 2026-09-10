@@ -8,6 +8,7 @@ import {
   newOrderId,
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
+import { createIntent } from "@/lib/booking-intents";
 
 // Live validation + order creation — never cached. Runs FareRule + FareQuote + SSR.
 export const dynamic = "force-dynamic";
@@ -88,6 +89,30 @@ export async function POST(req: Request) {
 
     if (!order.payment_session_id) {
       return Response.json({ ok: false, error: "Could not start payment." }, { status: 502 });
+    }
+
+    // The server's own copy of this checkout (lib/booking-intents). If the
+    // customer's browser vanishes after paying, this is what lets the settle
+    // cron finish the ticket or return the money — and what lets /api/book
+    // refuse to ticket the same order twice. Without it the order is a payment
+    // nothing can complete, so a failed write stops here: the customer retries
+    // and gets a fresh order; no money has moved.
+    try {
+      await createIntent({
+        orderId,
+        kind: "flight",
+        bind: flightBind(parsed.req.traceId, parsed.req.resultIndex),
+        userId: user?.id ?? null,
+        amountInr: check.publishedFare,
+        email: String(lead?.Email ?? "").trim() || undefined,
+        request: { ...parsed.req, billing: body.billing ?? null },
+      });
+    } catch (e) {
+      console.error("[api/payment/order] intent write failed — order not offered:", e);
+      return Response.json(
+        { ok: false, error: "Could not start payment. Please try again in a moment." },
+        { status: 503 },
+      );
     }
 
     return Response.json({

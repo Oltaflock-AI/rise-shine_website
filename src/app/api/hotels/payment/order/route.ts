@@ -9,6 +9,7 @@ import {
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
 import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
+import { createIntent } from "@/lib/booking-intents";
 
 // Live re-price + order creation — never cached. Runs PreBook.
 export const dynamic = "force-dynamic";
@@ -112,6 +113,28 @@ export async function POST(req: Request) {
 
     if (!order.payment_session_id) {
       return Response.json({ ok: false, error: "Could not start payment." }, { status: 502 });
+    }
+
+    // The server's copy of this checkout (lib/booking-intents): lets /api/hotels/book
+    // refuse to Book the same paid order twice, and lets the settle cron REFUND a
+    // paid order whose browser never came back. Hotel Book is never started from
+    // the cron — refund is the only unattended action. A failed write stops here.
+    try {
+      await createIntent({
+        orderId,
+        kind: "hotel",
+        bind: hotelBind(pb.bookingCode),
+        userId: user?.id ?? null,
+        amountInr,
+        email: String(lead?.email ?? "").trim() || undefined,
+        request: { bookingCode: pb.bookingCode, nationality: draft.nationality, rooms: body.rooms },
+      });
+    } catch (e) {
+      console.error("[api/hotels/payment/order] intent write failed — order not offered:", e);
+      return Response.json(
+        { ok: false, error: "Could not start payment. Please try again in a moment." },
+        { status: 503 },
+      );
     }
 
     return Response.json({

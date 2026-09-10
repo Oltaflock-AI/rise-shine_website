@@ -3,6 +3,7 @@ import { generateHotelVoucher } from "@/lib/tbo-hotel-post";
 import type { HotelValidationInfo } from "@/lib/tbo-hotel";
 import { getUser } from "@/lib/supabase/server";
 import { saveHotelBookingHistory, type HotelStay } from "@/lib/booking-history";
+import { saveBillingAddress, type BillingDetails } from "@/lib/travel-profile";
 import {
   emailConfigured,
   sendEmail,
@@ -13,6 +14,7 @@ import {
 import { alertOps } from "@/lib/alerts";
 import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, hotelBind } from "@/lib/cashfree";
 import { hotelBookingBlockedForMissingPayments, hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
+import { claimIntent, settleIntent } from "@/lib/booking-intents";
 
 // Live TBO hotel booking — never cached; Book can run long.
 export const dynamic = "force-dynamic";
@@ -45,6 +47,8 @@ export async function POST(req: Request) {
     payment?: Payment;
     /** Display context (hotel name/city/dates) mirrored to the account view. */
     stay?: HotelStay;
+    /** Billing address for the address book only — TBO's hotel Book has no address field. */
+    billing?: BillingDetails;
   };
   try {
     body = await req.json();
@@ -114,6 +118,36 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Idempotency gate ──
+  // Same contract as /api/book: one paid order Books once. A repeat submit gets
+  // the stored outcome, a concurrent one is told to wait. See lib/booking-intents.
+  if (payment) {
+    let claim;
+    try {
+      claim = await claimIntent(payment.orderId, "api/hotels/book");
+    } catch (e) {
+      console.error("[api/hotels/book] intent claim failed:", e);
+      return Response.json(
+        { ok: false, error: "We could not start the booking just now. Please try again in a moment — you will not be charged twice." },
+        { status: 503 },
+      );
+    }
+    if (claim.kind === "replay") {
+      const stored = claim.result as { ok: boolean; rule?: string };
+      return Response.json(stored, { status: stored.ok ? 200 : stored.rule ? 422 : 502 });
+    }
+    if (claim.kind === "busy") {
+      return Response.json(
+        {
+          ok: false,
+          inProgress: true,
+          error: "This booking is already being processed. Please wait a moment — your voucher will be emailed to you and appears in your account.",
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const request: HotelBookRequest = {
     bookingCode: body.bookingCode,
     nationality: body.nationality || "IN",
@@ -160,10 +194,9 @@ export async function POST(req: Request) {
           console.error("[api/hotels/book] refund email failed (refund unaffected):", e);
         }
       }
-      return Response.json(
-        { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` },
-        { status: result.rule ? 422 : 502 },
-      );
+      const outcome = { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` };
+      await settleIntent(payment.orderId, { status: "refunded", result: outcome, cfPaymentId: payment.cfPaymentId });
+      return Response.json(outcome, { status: result.rule ? 422 : 502 });
     } catch (e) {
       await alertOps("URGENT: hotel refund FAILED — settle manually", {
         hotel: body.stay?.hotelName,
@@ -174,14 +207,18 @@ export async function POST(req: Request) {
         bookError: result.error,
         refundError: e instanceof Error ? e.message : String(e),
       });
-      return Response.json(
-        {
-          ...result,
-          refunded: false,
-          error: `${result.error ?? "Booking failed."} Your payment could not be auto-refunded — our team will process it manually.`,
-        },
-        { status: 502 },
-      );
+      const outcome = {
+        ...result,
+        refunded: false,
+        error: `${result.error ?? "Booking failed."} Your payment could not be auto-refunded — our team will process it manually.`,
+      };
+      await settleIntent(payment.orderId, {
+        status: "refund_failed",
+        result: outcome,
+        cfPaymentId: payment.cfPaymentId,
+        lastError: e instanceof Error ? e.message : String(e),
+      });
+      return Response.json(outcome, { status: 502 });
     }
   }
 
@@ -189,6 +226,8 @@ export async function POST(req: Request) {
   // awaited BEFORE responding (serverless may freeze after return); a failure
   // here must never fail a paid booking. Guests (no session) aren't persisted.
   if (result.ok) {
+    // Record the outcome first so a repeat submit finds it before anything slower.
+    if (payment) await settleIntent(payment.orderId, { status: "ticketed", result, cfPaymentId: payment.cfPaymentId });
     // GenerateVoucher — TBO portal checkpoint 36. An IsVoucherBooking=true
     // booking is already vouchered at Book, so this is confirmation rather than
     // creation: TBO answering "already generated" is fine and the guest's
@@ -211,6 +250,17 @@ export async function POST(req: Request) {
           result,
           payment ? { ...payment, amountInr: Math.round(paidInr ?? request.netAmount) } : undefined,
         );
+        // Address book: the invoice address, with the lead guest's contact details.
+        // TBO's hotel Book carries no address, so the form's `billing` is the only copy.
+        if (body.billing?.address1) {
+          const lead = request.rooms[0]?.passengers.find((p) => p.leadPassenger) ?? request.rooms[0]?.passengers[0];
+          await saveBillingAddress(user.id, {
+            ...body.billing,
+            phone: lead?.phone,
+            email: lead?.email,
+            nationality: request.nationality,
+          });
+        }
       }
     } catch (e) {
       console.error("[api/hotels/book] booking-history write failed (booking unaffected):", e);

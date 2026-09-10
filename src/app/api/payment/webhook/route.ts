@@ -1,6 +1,7 @@
 import { verifyWebhookSignature, cashfreeWebhookConfigured } from "@/lib/cashfree";
 import { recordPaymentEvent } from "@/lib/payments-ledger";
 import { alertOps } from "@/lib/alerts";
+import { markIntentPaid } from "@/lib/booking-intents";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -74,6 +75,12 @@ export async function POST(req: Request) {
           // Written into order_tags at Create Order time (flights only).
           traceId: order.order_tags?.traceId,
         });
+        // Start the clock on the checkout's own record: from here the settle
+        // cron knows the money moved even if the customer's tab never calls
+        // /api/book. Best-effort — the ledger row above is the money record.
+        if (p.payment_status === "SUCCESS" && order.order_id) {
+          await markIntentPaid(String(order.order_id), p.cf_payment_id != null ? String(p.cf_payment_id) : undefined);
+        }
         break;
       }
       case "REFUND_STATUS_WEBHOOK":

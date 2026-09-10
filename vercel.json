@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/reconcile",
       "schedule": "30 3 * * 1"
+    },
+    {
+      "path": "/api/cron/settle-intents",
+      "schedule": "* * * * *"
     }
   ]
 }

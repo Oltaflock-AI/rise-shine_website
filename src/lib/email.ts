@@ -36,6 +36,38 @@ const FROM = process.env.EMAIL_FROM || "Rise & Shine Travels <onboarding@resend.
 
 export const emailConfigured = Boolean(API_KEY);
 
+/**
+ * Does Resend still accept our key? Sends nothing: lists domains, which is the
+ * cheapest authenticated call. Both confirmation mail AND ops alerts ride this
+ * key, so a revoked one is a silent failure twice over — the customer gets no
+ * ticket email and nobody gets told.
+ */
+export async function probeEmailAuth(): Promise<{ ok: boolean; detail: string }> {
+  if (!emailConfigured) return { ok: false, detail: "RESEND_API_KEY is not set — no confirmation or alert mail can send." };
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 10_000);
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+      signal: ctl.signal,
+      cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403) return { ok: false, detail: `Resend rejected the API key (${res.status}).` };
+    if (!res.ok) return { ok: false, detail: `Resend answered ${res.status}.` };
+    const json = (await res.json().catch(() => ({}))) as { data?: Array<{ name?: string; status?: string }> };
+    const fromDomain = FROM.match(/@([^>\s]+)/)?.[1]?.toLowerCase();
+    const ours = json.data?.find((d) => d.name?.toLowerCase() === fromDomain);
+    if (fromDomain && !fromDomain.endsWith("resend.dev") && ours && ours.status !== "verified") {
+      return { ok: false, detail: `Sender domain ${fromDomain} is "${ours.status}" at Resend — mail from it will bounce.` };
+    }
+    return { ok: true, detail: `key accepted; ${json.data?.length ?? 0} domain(s)` };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export async function sendEmail(args: {
   to: string;
   subject: string;

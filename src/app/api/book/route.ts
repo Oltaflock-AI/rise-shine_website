@@ -1,18 +1,9 @@
-import { bookFlight } from "@/lib/tbo-book";
 import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request";
 import { getUser } from "@/lib/supabase/server";
-import { saveBookingHistory } from "@/lib/booking-history";
-import { saveTravelProfile } from "@/lib/travel-profile";
-import {
-  emailConfigured,
-  sendEmail,
-  flightLeadEmail,
-  flightConfirmationEmail,
-  refundNoticeEmail,
-} from "@/lib/email";
-import { alertOps } from "@/lib/alerts";
-import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, flightBind } from "@/lib/cashfree";
+import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, flightBind, type ConfirmedOrder } from "@/lib/cashfree";
 import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
+import { claimIntent } from "@/lib/booking-intents";
+import { ticketPaidFlight, type TicketOutcome } from "@/lib/flight-checkout";
 
 // Live TBO booking calls — never cached, and Book/Ticket can run to 300s.
 export const dynamic = "force-dynamic";
@@ -27,9 +18,6 @@ type Incoming = IncomingBooking & {
    *  client-side receipt worth trusting, so the server re-reads the order itself. */
   payment?: Payment;
 };
-
-/** A payment we have independently confirmed paid, kept so we can refund it if TBO fails. */
-type ConfirmedPayment = { cfPaymentId: string; orderId: string; amountInr: number };
 
 /**
  * POST /api/book — collect payment (when configured) then run TBO's booking flow.
@@ -72,7 +60,7 @@ export async function POST(req: Request) {
   // server-side (/api/payment/order), so the order's amount — not any client number —
   // is the amount we accept, and the order's `bind` tag proves it was created for THIS
   // itinerary rather than some cheaper one the customer paid for earlier.
-  let payment: ConfirmedPayment | null = null;
+  let payment: ConfirmedOrder | null = null;
   if (cashfreeConfigured) {
     const orderId = body.payment?.orderId;
     if (!orderId) {
@@ -99,93 +87,50 @@ export async function POST(req: Request) {
     }
   }
 
-  const result = await bookFlight(bookingReq);
-
-  // Paid but NOT ticketed → refund immediately. This is the whole point of capturing
-  // up front: the customer is never left out of pocket for a ticket they didn't get.
-  if (payment && !result.ok) {
+  // ── Idempotency gate ──
+  // Claim the intent row before a single TBO call. Two submits of one paid order
+  // (a "please try again" after a dropped connection, a double tap) reach here with
+  // the same orderId and the same PAID verdict; only one may ticket. The loser gets
+  // the stored outcome if there is one, or a "still processing" it can wait on.
+  // Nothing claimed = no intent row (pre-migration order) — the legacy path runs.
+  if (payment) {
+    let claim;
     try {
-      await refundOrder(payment.orderId, {
-        amountInr: payment.amountInr,
-        note: `Ticketing failed for TBO trace ${bookingReq.traceId}`,
-      });
-      await alertOps("Flight ticketing failed after capture — auto-refunded", {
-        route: `${bookingReq.origin} → ${bookingReq.destination}`,
-        departDate: bookingReq.departDate,
-        traceId: bookingReq.traceId,
-        paymentId: payment.cfPaymentId,
-        amountInr: payment.amountInr,
-        error: result.error,
-      });
-      // Tell the customer their money is coming back. Best-effort — the refund
-      // above already succeeded and must be reported regardless.
-      const to = flightLeadEmail(bookingReq);
-      if (emailConfigured && to) {
-        try {
-          await sendEmail({
-            to,
-            ...refundNoticeEmail({ kind: "flight", amountInr: payment.amountInr, reference: payment.cfPaymentId }),
-          });
-        } catch (e) {
-          console.error("[api/book] refund email failed (refund unaffected):", e);
-        }
-      }
-      return Response.json(
-        { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` },
-        { status: result.rule ? 422 : 502 },
-      );
+      claim = await claimIntent(payment.orderId, "api/book");
     } catch (e) {
-      // A failed refund must be loud — it needs manual settlement.
-      await alertOps("URGENT: flight refund FAILED — settle manually", {
-        route: `${bookingReq.origin} → ${bookingReq.destination}`,
-        paymentId: payment.cfPaymentId,
-        orderId: payment.orderId,
-        amountInr: payment.amountInr,
-        ticketError: result.error,
-        refundError: e instanceof Error ? e.message : String(e),
-      });
+      // The guard itself is unavailable. Booking anyway would reopen the double-
+      // ticket hole this exists to close; the money is safe where it is and the
+      // settle cron refunds it if nothing claims the order.
+      console.error("[api/book] intent claim failed:", e);
+      return Response.json(
+        { ok: false, error: "We could not start ticketing just now. Please try again in a moment — you will not be charged twice." },
+        { status: 503 },
+      );
+    }
+    if (claim.kind === "replay") {
+      const stored = claim.result as TicketOutcome;
+      return Response.json(stored, { status: stored.ok ? 200 : stored.rule ? 422 : 502 });
+    }
+    if (claim.kind === "busy") {
       return Response.json(
         {
-          ...result,
-          refunded: false,
-          error: `${result.error ?? "Booking failed."} Your payment could not be auto-refunded — our team will process it manually.`,
+          ok: false,
+          inProgress: true,
+          error: "This booking is already being processed. Please wait a moment — your ticket will be emailed to you and appears in your account.",
         },
-        { status: 502 },
+        { status: 409 },
       );
     }
   }
 
-  // Ticket confirmed (and paid): mirror it to the customer's account. Best-effort and
-  // awaited BEFORE responding — on serverless the function may freeze the instant we
-  // return, so a fire-and-forget write could be killed. A failure here is swallowed:
-  // it must never fail a paid booking. Guests (no session) are simply not persisted.
-  if (result.ok) {
-    try {
-      const user = await getUser();
-      if (user) {
-        await saveBookingHistory(user.id, bookingReq, result, payment ?? undefined);
-        // Remember the travellers + billing address for a one-tap next checkout.
-        // Separate from the history mirror above so a failure in either is
-        // contained; both are best-effort and neither can fail a paid ticket.
-        await saveTravelProfile(user.id, bookingReq, body.billing);
-      }
-    } catch (e) {
-      console.error("[api/book] booking-history write failed (ticket unaffected):", e);
-    }
-    // Confirmation email to the lead passenger — best-effort, awaited before the
-    // response (serverless may freeze after return), never fails the booking.
-    const to = flightLeadEmail(bookingReq);
-    if (emailConfigured && to) {
-      try {
-        await sendEmail({
-          to,
-          ...flightConfirmationEmail(bookingReq, result, payment?.amountInr ?? result.fareInr),
-        });
-      } catch (e) {
-        console.error("[api/book] confirmation email failed (ticket unaffected):", e);
-      }
-    }
-  }
+  const user = await getUser().catch(() => null);
+  const result = await ticketPaidFlight({
+    bookingReq,
+    payment,
+    userId: user?.id ?? null,
+    billing: body.billing,
+    via: "api/book",
+  });
 
   // A failed validation is the caller's fault (422); a held/failed booking is not (200/502).
   const status = result.ok ? 200 : result.rule ? 422 : 502;

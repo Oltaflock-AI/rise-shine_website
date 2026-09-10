@@ -11,6 +11,7 @@ import "server-only";
 
 import { site } from "@/data/site";
 import { emailConfigured, sendEmail } from "@/lib/email";
+import * as Sentry from "@sentry/nextjs";
 
 const ALERT_TO = process.env.ALERT_EMAIL || site.email;
 
@@ -19,6 +20,20 @@ export async function alertOps(
   details: Record<string, unknown>,
 ): Promise<void> {
   console.error(`[ALERT] ${subject}`, details);
+  // Second channel. Email is one transport with one recipient; if Resend is the
+  // thing that broke — or the inbox is full, muted or on holiday — the alert
+  // vanishes. Sentry is a separate path with its own routing (Slack, SMS,
+  // on-call), and a no-op when no DSN is set. Subject only: the details carry
+  // customer email, PAN and order ids, and Sentry's retention is not ours.
+  try {
+    Sentry.captureMessage(`[OPS] ${subject}`, {
+      level: /URGENT|FAILED|DOWN/.test(subject) ? "error" : "warning",
+      tags: { source: "alertOps" },
+      fingerprint: ["alertOps", subject],
+    });
+  } catch (e) {
+    console.error("[ALERT] Sentry capture failed:", e);
+  }
   if (!emailConfigured) return;
   const rows = Object.entries(details)
     .map(

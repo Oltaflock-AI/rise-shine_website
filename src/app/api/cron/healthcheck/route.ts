@@ -5,6 +5,8 @@ import {
   probeProxy,
   probeCallbackQueue,
   probeLedgerOrphans,
+  probeEmail,
+  probeConfig,
 } from "@/lib/health-probe";
 import { recordCheck, type CheckResult } from "@/lib/ops-health";
 import * as Sentry from "@sentry/nextjs";
@@ -35,6 +37,8 @@ const CRON_MONITOR_SLUG = process.env.SENTRY_CRON_MONITOR_SLUG || "rise-shine-he
  *   cashfree_auth   the gateway accepts our keys
  *   callback_queue  something is actually draining the queue
  *   ledger_orphans  nobody paid and got nothing
+ *   email_auth      Resend accepts the key that carries confirmations AND alerts
+ *   config          every production-critical env var is still set
  *
  * It never books, charges or dials. Alerting/de-duplication is `recordCheck`,
  * so a long outage sends one email and a reminder every six hours, not one per
@@ -80,16 +84,18 @@ export async function GET(req: Request) {
   // The proxy check and the Cashfree check share nothing with the TBO booking
   // pair, so they run alongside it. Search → quote is sequential by necessity:
   // the quote needs the trace the search just minted.
-  const [proxy, cashfree, queue, orphans, search] = await Promise.all([
+  const [proxy, cashfree, queue, orphans, email, search] = await Promise.all([
     probeProxy(),
     probeCashfree(),
     probeCallbackQueue(),
     probeLedgerOrphans(),
+    probeEmail(),
     probeTboSearch(),
   ]);
   const quote = await probeTboQuote(search);
+  const config = probeConfig();
 
-  const results: CheckResult[] = [proxy, search, quote, cashfree, queue, orphans];
+  const results: CheckResult[] = [config, proxy, search, quote, cashfree, queue, orphans, email];
 
   // Record sequentially: each one may send mail, and a burst of parallel Resend
   // calls during a total outage is its own small denial of service.

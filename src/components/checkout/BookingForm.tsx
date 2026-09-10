@@ -21,6 +21,12 @@ import { FareEntitlements } from "./FareEntitlements";
 import { BaggageSummary, weakestAllowance } from "@/components/ui/fare-info";
 import { NATIONALITIES } from "@/data/nationalities";
 import {
+  BillingAddressFields,
+  billingAddressError,
+  billingFromSaved,
+  blankBillingAddress,
+} from "./BillingAddress";
+import {
   controlClass,
   controlLabelClass,
   DateField,
@@ -89,6 +95,8 @@ type Booked = {
   refunded?: boolean;
   /** Server says the order was never paid — worded as "not charged", not as a failure. */
   unpaid?: boolean;
+  /** Server already has this order in ticketing (a repeat submit) — nothing to redo. */
+  inProgress?: boolean;
   error?: string;
   rule?: string;
 };
@@ -132,12 +140,7 @@ function contactFromAddress(a: SavedAddress, fallbackEmail: string) {
   return {
     phone: a.phone ?? "",
     email: a.email || fallbackEmail,
-    address1: a.address1 ?? "",
-    address2: a.address2 ?? "",
-    city: a.city ?? "",
-    state: a.state ?? "",
-    pin: a.pin ?? "",
-    countryCode: a.country_code || "IN",
+    ...billingFromSaved(a),
     nationality: a.nationality || a.country_code || "IN",
   };
 }
@@ -173,12 +176,7 @@ export function BookingForm({
   const [contact, setContact] = useState({
     phone: "",
     email: contactEmail,
-    address1: "",
-    address2: "",
-    city: "Ahmedabad",
-    state: "",
-    pin: "",
-    countryCode: "IN",
+    ...blankBillingAddress(),
     nationality: "IN",
   });
   const [gst, setGst] = useState({ GSTCompanyName: "", GSTNumber: "" });
@@ -350,11 +348,6 @@ export function BookingForm({
   ]
     .filter(Boolean)
     .join(", ");
-  // India posts 6-digit PINs; elsewhere the code is free-form, so only length is checked.
-  const pinValid =
-    contact.countryCode === "IN"
-      ? /^\d{6}$/.test(contact.pin.trim())
-      : contact.pin.trim().length >= 3;
 
   const totalFare =
     quote?.publishedFare ?? Number(b.fare || 0) * (adults + children);
@@ -374,12 +367,8 @@ export function BookingForm({
       return "Enter a 10-digit mobile number for the booking contact.";
     if (!contact.email.trim())
       return "Enter an email address — the e-ticket goes there.";
-    if (!contact.address1.trim()) return "Enter the billing address.";
-    if (!contact.city.trim()) return "Enter the billing city.";
-    if (!pinValid)
-      return contact.countryCode === "IN"
-        ? "Enter a 6-digit PIN code for the billing address."
-        : "Enter a postal code for the billing address.";
+    const address = billingAddressError(contact);
+    if (address) return address;
     if (needGst && (!gst.GSTNumber.trim() || !gst.GSTCompanyName.trim()))
       return "This fare needs a GST company name and GSTIN.";
 
@@ -415,7 +404,6 @@ export function BookingForm({
     needFullPassport,
     needPan,
     needGst,
-    pinValid,
   ]);
 
   /** Shape passengers into TBO's Pax objects from the current form state. */
@@ -543,7 +531,16 @@ export function BookingForm({
           : parsed,
       );
     } catch {
-      setBooked({ ok: false, error: "Network error — please try again." });
+      // The request may well have REACHED the server and be ticketing right now;
+      // only the reply was lost. Retrying is safe — /api/book claims the order
+      // once and answers a repeat with the same outcome (lib/booking-intents) —
+      // and even without a retry the server finishes or refunds the checkout
+      // on its own and emails the result.
+      setBooked({
+        ok: false,
+        error:
+          "The connection dropped while we were confirming your ticket. You can try again safely — you will not be charged twice — or check your email and account in a few minutes: your booking is completed or refunded automatically either way.",
+      });
     } finally {
       setBooking(false);
     }
@@ -1040,106 +1037,7 @@ export function BookingForm({
             invoice.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className={label}>
-                Address line 1 <span className="text-red">*</span>
-              </label>
-              <input
-                className={field}
-                value={contact.address1}
-                autoComplete="address-line1"
-                autoCapitalize="words"
-                maxLength={64}
-                onChange={(e) => updateContact({ address1: e.target.value })}
-                placeholder="Flat / house no., building, street"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={label}>Address line 2</label>
-              <input
-                className={field}
-                value={contact.address2}
-                autoComplete="address-line2"
-                autoCapitalize="words"
-                maxLength={64}
-                onChange={(e) => updateContact({ address2: e.target.value })}
-                placeholder="Area, locality, landmark (optional)"
-              />
-            </div>
-            <div>
-              <label className={label}>
-                City <span className="text-red">*</span>
-              </label>
-              <input
-                className={field}
-                value={contact.city}
-                autoComplete="address-level2"
-                autoCapitalize="words"
-                maxLength={32}
-                onChange={(e) => updateContact({ city: e.target.value })}
-                placeholder="Ahmedabad"
-              />
-            </div>
-            <div>
-              <label className={label}>State</label>
-              <input
-                className={field}
-                value={contact.state}
-                autoComplete="address-level1"
-                autoCapitalize="words"
-                maxLength={32}
-                onChange={(e) => updateContact({ state: e.target.value })}
-                placeholder="Gujarat"
-              />
-            </div>
-            <div>
-              <label className={label}>
-                PIN / postal code <span className="text-red">*</span>
-              </label>
-              <input
-                className={field}
-                inputMode={contact.countryCode === "IN" ? "numeric" : "text"}
-                autoComplete="postal-code"
-                maxLength={10}
-                value={contact.pin}
-                onChange={(e) =>
-                  updateContact({
-                    pin:
-                      contact.countryCode === "IN"
-                        ? e.target.value.replace(/\D/g, "").slice(0, 6)
-                        : e.target.value,
-                  })
-                }
-                placeholder={
-                  contact.countryCode === "IN" ? "380015" : "Postal code"
-                }
-              />
-              {contact.pin.trim() !== "" && !pinValid && (
-                <p className="mt-1 text-[0.82rem] font-medium text-red">
-                  {contact.countryCode === "IN"
-                    ? "An Indian PIN code is exactly 6 digits."
-                    : "Enter a valid postal code."}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className={label}>
-                Country <span className="text-red">*</span>
-              </label>
-              <Select
-                value={contact.countryCode}
-                autoComplete="country"
-                onChange={(e) =>
-                  updateContact({ countryCode: e.target.value, pin: "" })
-                }
-              >
-                {NATIONALITIES.map((n) => (
-                  <option key={n.code} value={n.code}>
-                    {n.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            <BillingAddressFields value={contact} onChange={updateContact} />
             {needPassport && (
               <div className="sm:col-span-2">
                 <label className={label}>Nationality (as on passport)</label>

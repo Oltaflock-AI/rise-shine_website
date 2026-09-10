@@ -16,6 +16,7 @@ import { searchFlights } from "@/lib/tbo";
 import { todayInIndiaISO } from "@/lib/stay-dates";
 import { quoteFare } from "@/lib/tbo-book";
 import { probeCashfreeAuth, cashfreeConfigured } from "@/lib/cashfree";
+import { probeEmailAuth } from "@/lib/email";
 import net from "node:net";
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
 import type { CheckResult } from "@/lib/ops-health";
@@ -241,4 +242,66 @@ export async function probeLedgerOrphans(): Promise<CheckResult> {
   } catch (e) {
     return { ...base, ok: false, detail: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Resend — the transport under every confirmation email and every ops alert.
+ * A revoked key fails twice: the customer gets no ticket mail, and the alert
+ * about it cannot send either. Sends nothing.
+ */
+export async function probeEmail(): Promise<CheckResult> {
+  const base = { key: "email_auth", label: "Resend email transport" };
+  try {
+    const { value, ms } = await timed(() => probeEmailAuth());
+    return { ...base, ok: value.ok, detail: value.detail, durationMs: ms };
+  } catch (e) {
+    return { ...base, ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * The environment variables production cannot run without.
+ *
+ * Every one of these has a "degrades silently" failure mode by design — the
+ * build succeeds without any of them, so that dev and CI work — which is also
+ * why a variable dropped in a Vercel settings edit, or never copied to a new
+ * project, shows up as customers quietly not getting something rather than as
+ * an error. `ELEVENLABS_AGENT_ID` did exactly that once: the webhook returned
+ * 200 on every event and recorded none. This turns "unset" into a red check.
+ *
+ * Pure over an env-shaped record so it can be tested without the process.
+ */
+export const REQUIRED_ENV: ReadonlyArray<{ key: string; why: string }> = [
+  { key: "NEXT_PUBLIC_SUPABASE_URL", why: "auth, accounts, every table" },
+  { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY", why: "browser auth" },
+  { key: "SUPABASE_SERVICE_ROLE_KEY", why: "booking mirror, ledger, queues, this monitor's state" },
+  { key: "TBO_CLIENT_ID", why: "flight search and ticketing" },
+  { key: "TBO_USERNAME", why: "flight search and ticketing" },
+  { key: "TBO_PASSWORD", why: "flight search and ticketing" },
+  { key: "CASHFREE_APP_ID", why: "no payment page, no flight bookings" },
+  { key: "CASHFREE_SECRET_KEY", why: "no payment page, webhooks rejected" },
+  { key: "RESEND_API_KEY", why: "confirmation email and every ops alert" },
+  { key: "CRON_SECRET", why: "every cron route answers 503" },
+  { key: "ELEVENLABS_AGENT_ID", why: "outbound calls fail, inbound webhook drops every event" },
+  { key: "ELEVENLABS_API_KEY", why: "callback queue cannot dial" },
+  { key: "ELEVENLABS_PHONE_NUMBER_ID", why: "callback queue cannot dial" },
+  { key: "ELEVENLABS_WEBHOOK_SECRET", why: "call records rejected" },
+];
+
+export function missingRequiredEnv(env: Record<string, string | undefined>): Array<{ key: string; why: string }> {
+  return REQUIRED_ENV.filter(({ key }) => !env[key]?.trim());
+}
+
+export function probeConfig(env: Record<string, string | undefined> = process.env): CheckResult {
+  const base = { key: "config", label: "Required environment variables" };
+  // Only meaningful where the variables are expected to exist: a local run
+  // without ElevenLabs is not an outage.
+  if (env.VERCEL_ENV !== "production") return { ...base, ok: true, detail: `skipped — VERCEL_ENV=${env.VERCEL_ENV ?? "unset"}` };
+  const missing = missingRequiredEnv(env);
+  if (!missing.length) return { ...base, ok: true, detail: `${REQUIRED_ENV.length} present` };
+  return {
+    ...base,
+    ok: false,
+    detail: `missing: ${missing.map((m) => `${m.key} (${m.why})`).join("; ")}`,
+  };
 }
