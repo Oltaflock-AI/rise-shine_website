@@ -9,6 +9,7 @@ import {
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
 import { createIntent } from "@/lib/booking-intents";
+import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
 
 // Live validation + order creation — never cached. Runs FareRule + FareQuote + SSR.
 export const dynamic = "force-dynamic";
@@ -29,6 +30,8 @@ export const maxDuration = 120;
  * confirmed server-side in /api/book (Get Order) before a single ticketing call runs.
  */
 export async function POST(req: Request) {
+  // The kill switch (lib/booking-pause): a deliberate pause reads as one, not as a fault.
+  if (bookingPaused("flight")) return pausedResponse("flight");
   if (!cashfreeConfigured) {
     // No keys → booking stops. There is no unpaid flight path.
     return Response.json({ ok: false, error: "Online payment is not configured." }, { status: 503 });

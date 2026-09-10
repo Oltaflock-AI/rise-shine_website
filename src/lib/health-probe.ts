@@ -305,3 +305,21 @@ export function probeConfig(env: Record<string, string | undefined> = process.en
     detail: `missing: ${missing.map((m) => `${m.key} (${m.why})`).join("; ")}`,
   };
 }
+
+/**
+ * Supabase Auth, as itself. Every booking needs a signed-in customer, so an
+ * auth outage is a booking outage even while search, TBO and Cashfree are
+ * all green. The other probes touch tables through PostgREST, which is a
+ * different service from GoTrue; only an auth call proves auth.
+ */
+export async function probeSupabaseAuth(): Promise<CheckResult> {
+  const base = { key: "supabase_auth", label: "Supabase Auth (customer sign-in)" };
+  if (!supabaseAdminConfigured) return { ...base, ok: false, detail: "Supabase admin is not configured — nobody can sign in or book." };
+  try {
+    const { value, ms } = await timed(() => createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1 }));
+    if (value.error) return { ...base, ok: false, detail: `auth API error: ${value.error.message}`, durationMs: ms };
+    return { ...base, ok: true, detail: "auth API answering", durationMs: ms };
+  } catch (e) {
+    return { ...base, ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}

@@ -15,6 +15,7 @@ import { alertOps } from "@/lib/alerts";
 import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, refundOrder, hotelBind } from "@/lib/cashfree";
 import { hotelBookingBlockedForMissingPayments, hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 import { claimIntent, settleIntent } from "@/lib/booking-intents";
+import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
 
 // Live TBO hotel booking — never cached; Book can run long.
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ type ConfirmedPayment = { cfPaymentId: string; orderId: string };
  * Body: { bookingCode, nationality?, netAmount, isVoucherBooking?, rooms, validation?, payment? }
  */
 export async function POST(req: Request) {
+  if (bookingPaused("hotel")) return pausedResponse("hotel");
   let body: {
     bookingCode?: string;
     nationality?: string;

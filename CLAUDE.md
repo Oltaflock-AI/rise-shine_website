@@ -69,7 +69,11 @@ but stay inert until the keys are set — see **Payments** below. All are
 higher `maxDuration` and refused to run Cron more often than daily, which is why
 several comments and workarounds in this repo are written around a 60-second ceiling
 and an external pinger. Those constraints are gone; the schedules are back in
-`vercel.json` (see **Monitoring** and **Voice**).
+`vercel.json` (see **Monitoring** and **Voice**). **Rolling Releases are on**
+(enabled via API 10-Sep-2026): every production promote serves 10% of visitors for
+15 min, then auto-advances to 100%. A bad deploy hits a tenth of traffic first;
+abort it from the Deployments page or Instant Rollback. Skew Protection came on
+with it.
 
 ### Hotels
 
@@ -197,7 +201,9 @@ question: could a customer book a flight right now? In booking order —
 `config` (every production-critical env var still set — `ELEVENLABS_AGENT_ID` once
 vanished and the webhook 200'd every event into the void), `tbo_proxy` (TCP connect
 to the static-IP VPS), `tbo_search`, `tbo_quote` (the FareQuote that sets the amount
-charged), `cashfree_auth`, `callback_queue` (is anything draining it),
+charged), `cashfree_auth`, `supabase_auth` (GoTrue answers — no sign-in, no booking;
+the table probes go through PostgREST, a different service), `callback_queue` (is
+anything draining it),
 `ledger_orphans` (did anyone pay and get nothing), `email_auth` (Resend accepts the
 key that carries confirmations AND alerts — a revoked key fails twice). It books,
 charges, mails and dials **nothing**.
@@ -450,6 +456,16 @@ ones that migrations `0002`/`0003` created; run it before enabling the webhook.
 
 Cashfree's **Secure ID / VRS** APIs (PAN, GSTIN, bank verification) are a *separate
 product* with separate credentials — nothing here uses them.
+
+### Kill switch — `BOOKING_PAUSED` (`lib/booking-pause.ts`)
+
+`BOOKING_PAUSED=flights` · `hotels` · `flights,hotels` · `all` (+ optional
+`BOOKING_PAUSED_MESSAGE`) stops the order and book routes with a `503 {paused:true}`
+and puts a "call us" strip under the header on every page (`BookingPausedNotice`,
+server component). Search keeps working. It is an env var, not a table row, so an
+outage that takes Supabase cannot take the switch too; flipping it is a Vercel env
+edit + redeploy (~2 min). Orders already open when it flips are refunded by the
+settle cron. Pure parser pinned by `tests/booking-pause.test.ts`.
 
 ### Booking intents — the checkout survives the browser (`lib/booking-intents.ts`, migration `0017`)
 

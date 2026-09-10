@@ -3,6 +3,7 @@ import { getUser } from "@/lib/supabase/server";
 import { cashfreeConfigured, cashfreePaymentsLive, confirmPaidOrder, flightBind, type ConfirmedOrder } from "@/lib/cashfree";
 import { bookingBlockedForMissingPayments } from "@/lib/tbo-env";
 import { claimIntent } from "@/lib/booking-intents";
+import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
 import { ticketPaidFlight, type TicketOutcome } from "@/lib/flight-checkout";
 
 // Live TBO booking calls — never cached, and Book/Ticket can run to 300s.
@@ -32,6 +33,8 @@ type Incoming = IncomingBooking & {
  * titles (TBO rejects "Master"/"Miss"), and owns the payment lifecycle.
  */
 export async function POST(req: Request) {
+  // Paused AFTER an order was opened: the settle cron refunds it; nothing is ticketed.
+  if (bookingPaused("flight")) return pausedResponse("flight");
   let body: Incoming;
   try {
     body = (await req.json()) as Incoming;

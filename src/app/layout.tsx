@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Roboto, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
+import { BookingPausedNotice } from "@/components/layout/BookingPausedNotice";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { GoogleAnalytics } from "@next/third-parties/google";
@@ -140,6 +141,7 @@ export default function RootLayout({
       <body className="flex min-h-dvh flex-col">
         <AuthProvider>
           <Header />
+          <BookingPausedNotice />
           <main className="flex-1">{children}</main>
           <Footer />
           <WhatsAppFloat />

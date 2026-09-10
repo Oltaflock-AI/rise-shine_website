@@ -10,6 +10,7 @@ import {
 import { getUser } from "@/lib/supabase/server";
 import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 import { createIntent } from "@/lib/booking-intents";
+import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
 
 // Live re-price + order creation — never cached. Runs PreBook.
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export const maxDuration = 120;
  * Body: same as /api/hotels/book minus payment: { bookingCode, nationality?, rooms }.
  */
 export async function POST(req: Request) {
+  if (bookingPaused("hotel")) return pausedResponse("hotel");
   // Whether this booking needs paying for is decided HERE, server-side, never by the
   // browser. Two situations answer "no": TBO's certification hosts, where booking
   // without a gateway is the intended flow and is how portal verification runs, and

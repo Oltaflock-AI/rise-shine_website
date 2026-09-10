@@ -582,10 +582,15 @@ export function BookingForm({
         body: JSON.stringify(commonPayload(passengers)),
       });
       if (r.status === 503) {
+        // A deliberate pause (BOOKING_PAUSED) carries its own sentence; a missing
+        // gateway gets the generic one.
+        const j = (await r.clone().json().catch(() => ({}))) as { paused?: boolean; error?: string };
         setBooked({
           ok: false,
           error:
-            "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll ticket it for you.",
+            j.paused && j.error
+              ? j.error
+              : "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll ticket it for you.",
         });
         setBooking(false);
         return;

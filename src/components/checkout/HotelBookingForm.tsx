@@ -455,6 +455,8 @@ export function HotelBookingForm({
         // money collected — so there the booking stops here.
         const j = (await r.json().catch(() => ({}))) as {
           unpaidBookingAllowed?: boolean;
+          paused?: boolean;
+          error?: string;
         };
         if (j.unpaidBookingAllowed) {
           await sendToBook(null);
@@ -463,7 +465,9 @@ export function HotelBookingForm({
         setBooked({
           ok: false,
           error:
-            "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll book it for you.",
+            j.paused && j.error
+              ? j.error
+              : "Online payment is temporarily unavailable, so we can't confirm this booking right now. Please call us and we'll book it for you.",
         });
         setBooking(false);
         return;
