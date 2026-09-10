@@ -71,6 +71,14 @@ export async function GET(req: Request) {
 
   const failing = results.filter((r) => !r.ok);
 
+  // One line per run, always. Alerts only fire on transitions, so without this
+  // a healthy monitor is indistinguishable in the logs from one that never ran —
+  // and "did the check even happen?" is the first question during an incident.
+  console.log(
+    `[healthcheck] ${failing.length ? `FAILING: ${failing.map((f) => f.key).join(", ")}` : "all ok"} · ` +
+      results.map((r) => `${r.key}=${r.ok ? "ok" : "FAIL"}(${r.durationMs ?? "-"}ms)`).join(" "),
+  );
+
   // 200 even when checks fail: the response describes the SITE's health, and a
   // non-200 here would make an uptime pinger alert about the monitor instead of
   // about the thing that broke. `ok` in the body is the signal.
