@@ -26,6 +26,19 @@ import { alertOps } from "@/lib/alerts";
 /** How long a check may stay broken before it earns another email. */
 const REMIND_AFTER_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+/**
+ * Last-resort throttle for when the state store itself is unavailable — the
+ * table not migrated yet, or Supabase down.
+ *
+ * The rule above is "repeat rather than go quiet", which is right, but taken
+ * alone it means a single broken check mails every five minutes forever and the
+ * address gets muted — the precise outcome this module exists to prevent. The
+ * process is reused between cron invocations, so remembering in memory absorbs
+ * most of it; a cold start just sends one more mail, which is the correct way
+ * for this to fail.
+ */
+const lastAlertInProcess = new Map<string, number>();
+
 export type CheckResult = {
   /** Stable identifier — the primary key in ops_health. */
   key: string;
@@ -94,12 +107,19 @@ export function decideAlert(args: {
   return { reason: "none", since };
 }
 
+/** True when this key has not been alerted in-process inside the reminder window. */
+function throttleAllows(key: string): boolean {
+  const last = lastAlertInProcess.get(key);
+  return !last || Date.now() - last > REMIND_AFTER_MS;
+}
+
 export async function recordCheck(
   result: CheckResult,
 ): Promise<{ alerted: boolean; reason: "transition" | "reminder" | "recovery" | "none" | "no-state" }> {
   if (!supabaseAdminConfigured) {
-    // Nowhere to remember state. Alert on failure rather than swallowing it.
-    if (!result.ok) {
+    // Nowhere to remember state. Alert on failure rather than swallowing it,
+    // but not on every run.
+    if (!result.ok && throttleAllows(result.key)) {
       await alertOps(`DOWN: ${result.label}`, {
         check: result.key,
         detail: result.detail,
@@ -141,7 +161,13 @@ export async function recordCheck(
   const reason = decision.reason;
   let alerted = false;
 
-  if (reason === "transition" || reason === "reminder") {
+  // When the stored state could not be read, `decideAlert` deliberately returns
+  // "transition" every time. Hold that back to the reminder cadence in memory,
+  // so an un-migrated or unreachable ops_health cannot turn one broken check
+  // into a mail every five minutes.
+  const suppressed = stateReadFailed && !throttleAllows(result.key);
+
+  if (!suppressed && (reason === "transition" || reason === "reminder")) {
     await alertOps(
       reason === "reminder"
         ? `STILL DOWN (${humanDuration(now.getTime() - since.getTime())}): ${result.label}`
@@ -155,13 +181,15 @@ export async function recordCheck(
       },
     );
     alerted = true;
-  } else if (reason === "recovery") {
+    lastAlertInProcess.set(result.key, now.getTime());
+  } else if (!suppressed && reason === "recovery") {
     await alertOps(`Recovered: ${result.label}`, {
       check: result.key,
       detail: result.detail,
       wasDownFor: humanDuration(now.getTime() - new Date(prev!.since).getTime()),
     });
     alerted = true;
+    lastAlertInProcess.set(result.key, now.getTime());
   }
 
   try {

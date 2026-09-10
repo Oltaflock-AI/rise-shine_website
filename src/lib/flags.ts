@@ -5,4 +5,4 @@
  * management (hotel cancellation) lives. Auth is therefore back ON.
  * Flip to true to hide the login gate, header auth UI and /login + /signup.
  */
-export const AUTH_DISABLED = false;
+export const AUTH_DISABLED = true;
