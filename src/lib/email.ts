@@ -44,14 +44,21 @@ export const emailConfigured = Boolean(API_KEY);
  */
 export async function probeEmailAuth(): Promise<{ ok: boolean; detail: string }> {
   if (!emailConfigured) return { ok: false, detail: "RESEND_API_KEY is not set — no confirmation or alert mail can send." };
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 10_000);
+  // One retry, on a hang or a network error only. On 10-Sep-2026 a single
+  // request to Resend sat for the full 10s and the next answered in 102ms; that
+  // is a slow request, not an outage, and it paged as one. A 4xx is a real
+  // answer and is never retried — a rejected key is rejected.
+  let res: Response;
   try {
-    const res = await fetch("https://api.resend.com/domains", {
-      headers: { Authorization: `Bearer ${API_KEY}` },
-      signal: ctl.signal,
-      cache: "no-store",
-    });
+    res = await fetchWithTimeout("https://api.resend.com/domains");
+  } catch (first) {
+    try {
+      res = await fetchWithTimeout("https://api.resend.com/domains");
+    } catch {
+      return { ok: false, detail: `${first instanceof Error ? first.message : String(first)} (twice)` };
+    }
+  }
+  try {
     if (res.status === 401 || res.status === 403) return { ok: false, detail: `Resend rejected the API key (${res.status}).` };
     if (!res.ok) return { ok: false, detail: `Resend answered ${res.status}.` };
     const json = (await res.json().catch(() => ({}))) as { data?: Array<{ name?: string; status?: string }> };
@@ -63,6 +70,18 @@ export async function probeEmailAuth(): Promise<{ ok: boolean; detail: string }>
     return { ok: true, detail: `key accepted; ${json.data?.length ?? 0} domain(s)` };
   } catch (e) {
     return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 10_000);
+  try {
+    return await fetch(url, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+      signal: ctl.signal,
+      cache: "no-store",
+    });
   } finally {
     clearTimeout(t);
   }
