@@ -13,10 +13,17 @@ import * as Sentry from "@sentry/nextjs";
  * for errors, not for performance billing.
  */
 export function register() {
-  if (!process.env.SENTRY_DSN) return;
+  // Vercel's Sentry integration provisions NEXT_PUBLIC_SENTRY_DSN and no
+  // server-side SENTRY_DSN, so reading only the latter left every route-handler
+  // and RSC crash unreported while the dashboard looked correctly configured.
+  // A DSN is not a secret — it ships inside the browser bundle by design — so
+  // falling back to the public one is safe and removes a manual step that is
+  // easy to forget and silent when forgotten.
+  const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn) return;
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   Sentry.init({
-    dsn: process.env.SENTRY_DSN,
+    dsn,
     environment: process.env.VERCEL_ENV || "development",
     tracesSampleRate: 0.05,
     // Never ship a customer's passport, PAN, card or address to a third party.
