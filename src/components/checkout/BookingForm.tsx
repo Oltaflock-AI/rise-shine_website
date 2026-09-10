@@ -582,11 +582,28 @@ export function BookingForm({
         setBooking(false);
         return;
       }
-      order = await r.json();
-    } catch {
+      // Read as text first: a platform-level failure (function timeout, crashed
+      // deploy) answers with an HTML error page, and `r.json()` would then throw
+      // into the same catch as a dropped connection — leaving a payment failure
+      // report with no way to tell a flaky phone network from a broken server.
+      const raw = await r.text();
+      try {
+        order = JSON.parse(raw) as typeof order;
+      } catch {
+        console.error(`[checkout] /api/payment/order → HTTP ${r.status}`, raw.slice(0, 300));
+        setBooked({
+          ok: false,
+          error: `Could not start payment (server error ${r.status}). Nothing has been charged — please try again, or call us and we'll ticket it for you.`,
+        });
+        setBooking(false);
+        return;
+      }
+    } catch (e) {
+      console.error("[checkout] /api/payment/order request failed", e);
       setBooked({
         ok: false,
-        error: "Could not start payment. Please try again.",
+        error:
+          "Could not reach our payment server. Check your connection and try again — nothing has been charged.",
       });
       setBooking(false);
       return;

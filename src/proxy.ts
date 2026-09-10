@@ -36,9 +36,20 @@ export async function proxy(request: NextRequest) {
   });
 
   // IMPORTANT: getUser() re-validates the token — do not replace with getSession().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  //
+  // It is a network call to Supabase, and the proxy runs on EVERY request, so a
+  // Supabase blip that throws here would 500 the whole site — including POST
+  // /api/payment/order, whose caller then sees a platform error page instead of
+  // JSON and can only report "could not start payment". Treat a failure as
+  // "not signed in": the worst case is one redirect to /login, never a dead site.
+  let user = null;
+  try {
+    ({
+      data: { user },
+    } = await supabase.auth.getUser());
+  } catch (e) {
+    console.error("[proxy] Supabase getUser failed — treating request as signed out", e);
+  }
 
   const path = request.nextUrl.pathname;
   if (!user && PROTECTED.some((p) => path === p || path.startsWith(`${p}/`))) {

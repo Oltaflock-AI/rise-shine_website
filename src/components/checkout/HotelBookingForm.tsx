@@ -398,11 +398,28 @@ export function HotelBookingForm({
         setBooking(false);
         return;
       }
-      order = await r.json();
-    } catch {
+      // Text first — see the note in BookingForm: a platform error page would
+      // otherwise throw out of r.json() and be indistinguishable from a dropped
+      // connection, which is the difference between "our server broke" and
+      // "your phone lost signal".
+      const raw = await r.text();
+      try {
+        order = JSON.parse(raw) as typeof order;
+      } catch {
+        console.error(`[checkout] /api/hotels/payment/order → HTTP ${r.status}`, raw.slice(0, 300));
+        setBooked({
+          ok: false,
+          error: `Could not start payment (server error ${r.status}). Nothing has been charged — please try again, or call us and we'll book it for you.`,
+        });
+        setBooking(false);
+        return;
+      }
+    } catch (e) {
+      console.error("[checkout] /api/hotels/payment/order request failed", e);
       setBooked({
         ok: false,
-        error: "Could not start payment. Please try again.",
+        error:
+          "Could not reach our payment server. Check your connection and try again — nothing has been charged.",
       });
       setBooking(false);
       return;
