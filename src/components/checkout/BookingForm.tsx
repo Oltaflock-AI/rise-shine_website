@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackPurchase } from "@/lib/analytics";
 import {
   BadgeCheck,
   CalendarDays,
@@ -520,7 +520,18 @@ export function BookingForm({
         }),
       });
       const parsed = (await r.json()) as Booked;
-      if (parsed.ok) trackEvent("booking_confirmed", { kind: "flight" });
+      if (parsed.ok) {
+        // `totalFare` is the confirmed FareQuote total the Cashfree order was opened
+        // for, so GA's revenue matches what was actually charged. The order id is the
+        // transaction id wherever there is one — it de-duplicates a reloaded
+        // confirmation page, which the PNR fallback cannot do as reliably.
+        trackPurchase({
+          transactionId: orderId ?? parsed.pnr ?? String(parsed.bookingId ?? ""),
+          value: totalFare,
+          kind: "flight",
+          itemName: `${b.from}-${b.to} ${b.airlineCode ?? ""}${b.flightNo ?? ""}`.trim(),
+        });
+      }
       // A 402 means the customer closed checkout or the payment never went through.
       // Say so plainly rather than surfacing it as a booking failure.
       setBooked(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackPurchase } from "@/lib/analytics";
 import {
   BadgeCheck,
   CheckCircle2,
@@ -302,7 +302,21 @@ export function HotelBookingForm({
         }),
       });
       const parsed = (await r.json()) as Booked;
-      if (parsed.ok) trackEvent("booking_confirmed", { kind: "hotel" });
+      if (parsed.ok) {
+        // `amountInr` is the PreBook-confirmed total the order was opened for. On the
+        // certification hosts there is no gateway and `orderId` is null, so fall back
+        // to TBO's own confirmation reference.
+        trackPurchase({
+          transactionId:
+            orderId ??
+            parsed.confirmationNo ??
+            parsed.bookingRefNo ??
+            String(parsed.bookingId ?? ""),
+          value: amountInr,
+          kind: "hotel",
+          itemName: `${b.hotel ?? "Hotel"}${b.city ? `, ${b.city}` : ""}`,
+        });
+      }
       setBooked(
         parsed.unpaid
           ? {
