@@ -462,3 +462,41 @@ export function verifyWebhookSignature(
     ),
   );
 }
+
+// ── Health probe ──────────────────────────────────────────────────────────────
+
+/**
+ * Is the gateway reachable and are our credentials still accepted?
+ *
+ * Reads an order id that cannot exist. Cashfree answers `404 order_not_found`
+ * only AFTER authenticating the caller, so a 404 is the healthy result — it
+ * proves the keys, the API version and the network path all work. `401`/`403`
+ * means the credentials are rejected (rotated, revoked, wrong account).
+ *
+ * Deliberately a READ of nothing rather than a Create Order. A monitor that
+ * opened a real order every few minutes would leave hundreds of unpaid orders a
+ * day on the live account, and gateways read an abandoned-order ratio as a risk
+ * signal — the check would slowly damage the thing it exists to protect. The one
+ * step this cannot cover, Create Order itself, fails only on auth or config,
+ * which is exactly what the 404 already proves.
+ */
+export async function probeCashfreeAuth(
+  kind: CashfreeKind = "flight",
+): Promise<{ ok: boolean; detail: string }> {
+  if (!cashfreeConfigured) return { ok: false, detail: "Cashfree keys are not configured." };
+  const creds = cashfreeCredsFor(kind);
+  try {
+    await cf(`/orders/health_probe_does_not_exist`, {}, creds);
+    // Cashfree answering 200 for an id we never minted would mean the reply is not
+    // about our request at all; treat it as a failure rather than a pass.
+    return { ok: false, detail: "Unexpected 200 for a non-existent order." };
+  } catch (e) {
+    if (e instanceof CashfreeError) {
+      if (e.status === 404) return { ok: true, detail: `authenticated (${creds.mode})` };
+      if (e.status === 401 || e.status === 403)
+        return { ok: false, detail: `credentials rejected (${e.status}): ${e.message}` };
+      return { ok: false, detail: `unexpected ${e.status ?? "?"}: ${e.message}` };
+    }
+    return { ok: false, detail: `unreachable: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}

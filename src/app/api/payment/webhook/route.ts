@@ -1,5 +1,6 @@
 import { verifyWebhookSignature, cashfreeWebhookConfigured } from "@/lib/cashfree";
 import { recordPaymentEvent } from "@/lib/payments-ledger";
+import { alertOps } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,6 +30,17 @@ export async function POST(req: Request) {
   const signature = req.headers.get("x-webhook-signature") ?? "";
   const timestamp = req.headers.get("x-webhook-timestamp") ?? "";
   if (!verifyWebhookSignature(raw, signature, timestamp)) {
+    // A rejected signature is never routine. Either someone is posting forged
+    // payment events at us, or — far likelier — a key was rotated or the
+    // endpoint's payload version was changed in the dashboard, in which case
+    // Cashfree is reporting real money movements that the ledger is now
+    // silently dropping. Both need a human today, so it does not stay a 400.
+    await alertOps("Cashfree webhook signature REJECTED", {
+      hasSignature: Boolean(signature),
+      hasTimestamp: Boolean(timestamp),
+      bodyBytes: raw.length,
+      hint: "Check the endpoint's API/payload version and that CASHFREE_SECRET_KEY matches the account delivering.",
+    });
     return Response.json({ ok: false, error: "Invalid signature." }, { status: 400 });
   }
 

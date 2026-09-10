@@ -14,6 +14,7 @@
  */
 import { displayAirportName } from "./place-names";
 import { tboFetch } from "./tbo-fetch";
+import { alertOps } from "./alerts";
 import { isEmptyFareRule, sanitizeFareRuleHtml } from "./fare-rules";
 import type { MiniFareRule } from "./tbo";
 import {
@@ -325,7 +326,25 @@ async function recoverFromTimeout(
   bookingId?: number,
   pnr?: string,
 ): Promise<Json | null> {
-  if (!bookingId && !pnr) return null;
+  // Reaching here means a Book or Ticket call timed out: the customer's money is
+  // already captured and TBO's state is unknown. It is the single worst position
+  // the system can be in, it cannot be retried, and until now it was only ever a
+  // thrown error the customer saw. Tell ops the moment it starts, not after.
+  await alertOps("Flight Book/Ticket TIMED OUT — recovering, do NOT re-book", {
+    traceId,
+    bookingId: bookingId ?? "—",
+    pnr: pnr ?? "—",
+    action: "Polling GetBookingDetails. Check TBO's booking queue before any manual retry.",
+  });
+  if (!bookingId && !pnr) {
+    // Nothing to poll on (an LCC Ticket that timed out before returning an id).
+    // The booking may still exist at TBO, so this must be looked at by hand.
+    await alertOps("URGENT: flight timed out with no BookingId/PNR to recover from", {
+      traceId,
+      action: "Search TBO's booking queue by trace/passenger before refunding or re-booking.",
+    });
+    return null;
+  }
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 12_000)); // 10–15s cadence per TBO
     try {
@@ -336,11 +355,26 @@ async function recoverFromTimeout(
       );
       const msg = errOf(res).message;
       if (/booking under process/i.test(msg)) continue;
-      if (res?.Response?.FlightItinerary) return res.Response;
+      if (res?.Response?.FlightItinerary) {
+        await alertOps("Flight recovered after timeout — booking found at TBO", {
+          traceId,
+          bookingId: res.Response?.BookingId ?? bookingId ?? "—",
+          pnr: res.Response?.PNR ?? pnr ?? "—",
+        });
+        return res.Response;
+      }
     } catch {
       // keep polling — a transient failure here must not trigger a re-book
     }
   }
+  // Four minutes of polling and TBO still will not say. Someone has paid and we
+  // cannot tell them whether they are ticketed.
+  await alertOps("URGENT: flight timeout NOT recovered — settle by hand", {
+    traceId,
+    bookingId: bookingId ?? "—",
+    pnr: pnr ?? "—",
+    action: "Check TBO's booking queue, then either issue the ticket or refund. Never re-book blind.",
+  });
   return null;
 }
 

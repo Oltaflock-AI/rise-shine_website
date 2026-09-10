@@ -1,6 +1,14 @@
 {
   "crons": [
     {
+      "path": "/api/cron/healthcheck",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/callback-queue",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/reconcile",
       "schedule": "30 3 * * 1"
     }

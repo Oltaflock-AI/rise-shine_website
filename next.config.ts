@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
  * Permanent redirects from the old riseandshinetravel.com static tour URLs to
@@ -51,4 +52,27 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Sentry is wrapped in only when it is actually configured.
+ *
+ * `withSentryConfig` wants an org/project to upload source maps to, and the
+ * production build here is required to succeed with NO external credentials at
+ * all (see AGENTS.md). Wrapping unconditionally would trade that away for a
+ * feature that cannot work without a DSN anyway.
+ */
+const sentryEnabled = Boolean(process.env.SENTRY_DSN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT);
+
+export default sentryEnabled
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      // Upload source maps only when there is a token to upload them with, so a
+      // build without one still succeeds (with unminified-stack quality lost).
+      silent: true,
+      widenClientFileUpload: true,
+      // Route browser events through our own domain so ad blockers, which are
+      // common on mobile, do not quietly drop the errors we most need.
+      tunnelRoute: "/monitoring",
+      disableLogger: true,
+    })
+  : nextConfig;

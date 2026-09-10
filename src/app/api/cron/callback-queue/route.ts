@@ -4,8 +4,9 @@ import { dispatchClaimedCallback } from "@/lib/callback-dispatch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// Hobby caps functions at 60s. The batch is sized to finish well inside that —
-// `outbound-call` only *initiates* the call, it doesn't wait for it to connect.
+// The batch is sized to finish well inside a minute — `outbound-call` only
+// *initiates* the call, it doesn't wait for it to connect — so the drain can
+// never overlap the next minute's run.
 export const maxDuration = 60;
 
 const BATCH = 10;
@@ -13,11 +14,15 @@ const BATCH = 10;
 /**
  * GET /api/cron/callback-queue — drain due callbacks and dial them.
  *
- * Called on a short interval by an external pinger (cron-job.org, UptimeRobot, a
- * GitHub Actions schedule…) sending `Authorization: Bearer $CRON_SECRET`, same
- * contract Vercel Cron uses for /api/cron/reconcile. It is NOT in vercel.json:
- * Vercel Cron on the Hobby plan won't run at the per-minute cadence a ~2 minute
- * callback promise needs, so the schedule lives outside the platform.
+ * Run every minute by Vercel Cron (vercel.json), which sends
+ * `Authorization: Bearer $CRON_SECRET`.
+ *
+ * It used to live on an external pinger because Hobby would not schedule below
+ * daily, and a ~2 minute callback promise needs per-minute cadence. That pinger
+ * died silently in August 2026 and leads sat in the queue unanswered with
+ * nothing to announce it — which is why the schedule is back on the platform
+ * now that the project is on Pro, and why /api/cron/healthcheck separately
+ * alerts on overdue rows rather than trusting any scheduler to stay alive.
  *
  * Safe to call as often as you like — it claims rows compare-and-swap style, so
  * overlapping runs can't dial the same lead twice, and an empty queue is a
