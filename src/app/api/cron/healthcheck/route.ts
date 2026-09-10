@@ -7,12 +7,16 @@ import {
   probeLedgerOrphans,
 } from "@/lib/health-probe";
 import { recordCheck, type CheckResult } from "@/lib/ops-health";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // TBO Search + FareQuote against a live supplier; generous, but it must never be
 // the monitor that times out and reports the site as broken.
 export const maxDuration = 120;
+
+/** The Sentry Cron monitor this route checks in to. Upserted on first run. */
+const CRON_MONITOR_SLUG = process.env.SENTRY_CRON_MONITOR_SLUG || "rise-shine-healthcheck";
 
 /**
  * GET /api/cron/healthcheck — does the money path still work?
@@ -47,6 +51,32 @@ export async function GET(req: Request) {
 
   const started = Date.now();
 
+  // Heartbeat to Sentry Cron Monitoring.
+  //
+  // Everything else here watches the site; nothing watched THIS. The route runs
+  // on the same platform it monitors, so a broken deploy, a suspended project or
+  // a Vercel outage takes the monitor down with the site — and silence is
+  // indistinguishable from health. A check-in inverts that: Sentry alerts when
+  // the heartbeat DOESN'T arrive, from outside our infrastructure.
+  //
+  // `monitorConfig` upserts the monitor, so there is nothing to create by hand.
+  // Best-effort throughout: a Sentry failure must never stop the health checks.
+  let checkInId: string | undefined;
+  try {
+    checkInId = Sentry.captureCheckIn(
+      { monitorSlug: CRON_MONITOR_SLUG, status: "in_progress" },
+      {
+        schedule: { type: "crontab", value: "*/5 * * * *" },
+        // Generous: a slow TBO search is not a dead monitor.
+        checkinMargin: 5,
+        maxRuntime: 5,
+        timezone: "Etc/UTC",
+      },
+    );
+  } catch (e) {
+    console.error("[healthcheck] Sentry check-in failed to start", e);
+  }
+
   // The proxy check and the Cashfree check share nothing with the TBO booking
   // pair, so they run alongside it. Search → quote is sequential by necessity:
   // the quote needs the trace the search just minted.
@@ -78,6 +108,20 @@ export async function GET(req: Request) {
     `[healthcheck] ${failing.length ? `FAILING: ${failing.map((f) => f.key).join(", ")}` : "all ok"} · ` +
       results.map((r) => `${r.key}=${r.ok ? "ok" : "FAIL"}(${r.durationMs ?? "-"}ms)`).join(" "),
   );
+
+  try {
+    if (checkInId) {
+      Sentry.captureCheckIn({
+        checkInId,
+        monitorSlug: CRON_MONITOR_SLUG,
+        // "error" marks the RUN as failing, which is what a failing dependency
+        // is. The per-check email is still the detailed signal.
+        status: failing.length ? "error" : "ok",
+      });
+    }
+  } catch (e) {
+    console.error("[healthcheck] Sentry check-in failed to close", e);
+  }
 
   // 200 even when checks fail: the response describes the SITE's health, and a
   // non-200 here would make an uptime pinger alert about the monitor instead of
