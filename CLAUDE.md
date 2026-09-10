@@ -64,10 +64,12 @@ but stay inert until the keys are set — see **Payments** below. All are
 `runtime = "nodejs"`, `dynamic =
 "force-dynamic"`; book declares `maxDuration = 300`, order `120`.
 
-**Those durations are aspirational.** The Vercel project is on the **Hobby** plan,
-which caps every function at **60 seconds** regardless of a higher `maxDuration`, and
-will not run Vercel Cron more often than daily. Assume 60s when reasoning about any
-timeout, and drive sub-daily schedules from an external pinger (see **Voice**).
+**Those durations are real as of 10-Sep-2026** — the project moved to the Vercel
+**Pro** plan that day. Before it, Hobby capped every function at 60s regardless of a
+higher `maxDuration` and refused to run Cron more often than daily, which is why
+several comments and workarounds in this repo are written around a 60-second ceiling
+and an external pinger. Those constraints are gone; the schedules are back in
+`vercel.json` (see **Monitoring** and **Voice**).
 
 ### Hotels
 
@@ -188,6 +190,49 @@ never mentions. Don't build anything that assumes a room photo exists.
   own RSP sample codes (`scripts/tbo-hotel-rsp-probe.ts` re-checks this) — the B2C feed
   has to be enabled on TBO's side before the floor can ever apply.
 
+### Monitoring — the money path watches itself
+
+`/api/cron/healthcheck` runs **every 5 minutes** (`vercel.json`) and answers one
+question: could a customer book a flight right now? In booking order —
+`tbo_proxy` (TCP connect to the static-IP VPS), `tbo_search`, `tbo_quote` (the
+FareQuote that sets the amount charged), `cashfree_auth`, `callback_queue`
+(is anything draining it), `ledger_orphans` (did anyone pay and get nothing).
+It books, charges and dials **nothing**.
+
+Two design points that look like omissions and are not:
+
+- **The Cashfree probe READS an order id that cannot exist.** A 404 proves the keys,
+  because Cashfree authenticates before it looks the order up. Opening a real order
+  every 5 minutes would leave hundreds of abandoned orders a day on the live account,
+  and gateways read that ratio as a risk signal — the monitor would damage the thing
+  it protects.
+- **The proxy is checked by connecting TO it, never THROUGH it.** The proxy only
+  permits CONNECT to TBO's hosts, so the first version — asking an IP-echo service for
+  our egress address — reported a dead proxy while that proxy was serving live
+  searches. The whitelist half needs no probe: TBO rejects any other IP, so a rebuilt
+  VPS surfaces as a failing `tbo_search` in the same run.
+
+**Alerts are transitions, not repetitions** (`lib/ops-health.ts`, table `ops_health`,
+migration `0016`): one mail when a check breaks, a reminder every 6h while it stays
+broken, one when it recovers, silence otherwise. Mailing on every failing run is how
+an address gets muted — and a muted monitor is the next silent failure. `decideAlert`
+is pure and pinned by `tests/ops-health.test.ts`; when the state store itself cannot be
+read it repeats rather than going quiet, held to the reminder cadence by an in-process
+throttle. Every run also logs one `[healthcheck]` line with each verdict and duration,
+so "did the check even run?" is answerable.
+
+Ops mail goes through `alertOps` (`lib/alerts.ts`) to `ALERT_EMAIL`. It also fires on a
+**rejected Cashfree webhook signature** (usually a rotated key or a changed payload
+version — i.e. real money events the ledger is dropping) and on a **Book/Ticket
+timeout**: when it starts, when it recovers, and loudly when four minutes of polling
+still cannot say whether a paid customer holds a ticket.
+
+**Sentry** (`src/instrumentation.ts` server, `src/instrumentation-client.ts` browser) is
+off unless `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` are set, and `next.config.ts` only
+wraps it in when `SENTRY_ORG` and `SENTRY_PROJECT` are set too — the production build
+must keep succeeding with no credentials. `sendDefaultPii` is false in both: these forms
+carry passport, PAN and address fields.
+
 ### Voice (ElevenLabs) — two halves that are easy to confuse
 
 | Direction | Trigger | Lib | Route | Table |
@@ -202,9 +247,12 @@ appears in both. Join on `callback_queue.phone` = `voice_calls.lead_phone`.
 The form never dials — it parks a row with a `due_at` and returns. The 60s function cap
 makes an in-request wait impossible for a ~2 minute callback, and a queue additionally
 survives a redeploy between submit and dial. Do not "simplify" it into an inline delay.
-Because Hobby cannot run per-minute cron, `/api/cron/callback-queue` is deliberately
-**not** in `vercel.json`; an external pinger calls it with `Authorization: Bearer
-$CRON_SECRET`, the same secret `/api/cron/reconcile` uses.
+`/api/cron/callback-queue` runs **every minute** from `vercel.json`, with
+`Authorization: Bearer $CRON_SECRET` — the same secret every `/api/cron/*` route uses.
+It used to depend on an external pinger (Hobby would not schedule below daily); that
+pinger **died unnoticed in Aug 2026** and leads sat unanswered, which is why
+`/api/cron/healthcheck` now alerts on overdue rows rather than trusting any scheduler
+to still be alive.
 
 Double-dialling is prevented structurally, not by convention: a partial unique index
 allows one outstanding callback per number, and the dispatcher claims rows
