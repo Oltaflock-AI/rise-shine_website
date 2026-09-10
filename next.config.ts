@@ -60,7 +60,11 @@ const nextConfig: NextConfig = {
  * all (see AGENTS.md). Wrapping unconditionally would trade that away for a
  * feature that cannot work without a DSN anyway.
  */
-const sentryEnabled = Boolean(process.env.SENTRY_DSN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT);
+const sentryEnabled = Boolean(
+  (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT,
+);
 
 export default sentryEnabled
   ? withSentryConfig(nextConfig, {
