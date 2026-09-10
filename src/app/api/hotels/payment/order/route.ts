@@ -3,7 +3,7 @@ import { validateHotelPax, type HotelBookRequest, type HotelBookRoom } from "@/l
 import {
   createOrder,
   cashfreeConfigured,
-  CASHFREE_MODE,
+  cashfreeCredsFor,
   hotelBind,
   newOrderId,
 } from "@/lib/cashfree";
@@ -105,6 +105,7 @@ export async function POST(req: Request) {
         kind: "hotel",
         userId: user?.id ?? "guest",
       },
+      kind: "hotel",
       note: "Hotel booking",
       expiryMinutes: 16, // Cashfree's floor; see ORDER_EXPIRY_FLOOR_MIN
     });
@@ -117,7 +118,9 @@ export async function POST(req: Request) {
       ok: true,
       orderId: order.order_id,
       paymentSessionId: order.payment_session_id,
-      mode: CASHFREE_MODE, // the browser SDK must be initialised in the matching mode
+      // The browser SDK must open in the mode of the account that minted this session —
+      // hotel certification runs on the sandbox account (see cashfreeCredsFor).
+      mode: cashfreeCredsFor("hotel").mode,
       amount: order.order_amount, // rupees — Cashfree is not paise-denominated
       currency: order.order_currency,
       fareInr: amountInr,

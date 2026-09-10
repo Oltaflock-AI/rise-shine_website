@@ -360,9 +360,28 @@ never used it and the same five points came back "unable to make payments" on 07
 Removed — **do not reintroduce a setup step the verifier has to perform.** Clear
 `TBO_VERIFICATION_TOKEN` from Vercel.
 
-`HOTEL_CERT_REQUIRE_PAYMENT=true` puts the payment page back on certification, for one
-purpose: rehearsing the real Cashfree hotel flow before hotels go live. It cannot make
-booking impossible — with no keys at all, unpaid stays the only way through.
+`HOTEL_CERT_REQUIRE_PAYMENT=true` puts the payment page back on certification. TBO
+refused the no-payment route on 09-Sep-2026 — "we need to do test bookings on your portal",
+and "the Flight API and Hotel API certification processes are different" — so hotel
+certification now runs WITH a payment page.
+
+**It must not be the LIVE account.** A certification host holds no real room, so a real
+payment settles against nothing and TBO's verifier would be spending their own money;
+that is what stalled three rounds. So `cashfreeCredsFor(kind)` picks the account per
+product: hotels on certification hosts use a second, SANDBOX pair
+(`CASHFREE_SANDBOX_APP_ID` / `CASHFREE_SANDBOX_SECRET_KEY`) with Cashfree's test cards,
+while FLIGHTS stay on the live account. `kind` must be threaded through
+`createOrder` → `confirmPaidOrder` → `refundOrder`: an order opened on one account
+cannot be read or refunded on the other. It defaults to `"flight"` (live), so a forgotten
+`kind` fails loudly with "order not found" rather than quietly moving money.
+
+`tboHotelIsLive()` gates the whole thing — sandbox money must never hold a real room,
+the same hole `cashfreePaymentsLive` closes. Pinned by `tests/cashfree-creds.test.ts`.
+The webhook route accepts a signature from EITHER secret, since both accounts deliver
+to the one endpoint.
+
+`tests/cashfree-confirm.test.ts` covers `confirmPaidOrder` and the `bind` hash — the
+paid-and-bound gate, which had no coverage at all until 10-Sep-2026.
 
 **`cashfreeConfigured` vs `cashfreePaymentsLive` — do not swap these.** The first means
 "keys present, so run the payment gate"; the second means "the money is real"

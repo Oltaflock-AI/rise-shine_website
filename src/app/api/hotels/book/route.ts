@@ -95,6 +95,7 @@ export async function POST(req: Request) {
       const confirmed = await confirmPaidOrder({
         orderId,
         expectBind: hotelBind(body.bookingCode),
+        kind: "hotel",
       });
       if (!confirmed.ok) {
         return Response.json(
@@ -132,6 +133,7 @@ export async function POST(req: Request) {
       await refundOrder(payment.orderId, {
         amountInr: paidInr ?? undefined,
         note: "Hotel booking failed after payment",
+        kind: "hotel",
       });
       await alertOps("Hotel booking failed after capture — auto-refunded", {
         hotel: body.stay?.hotelName,

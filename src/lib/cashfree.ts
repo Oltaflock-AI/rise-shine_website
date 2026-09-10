@@ -31,6 +31,7 @@ import "server-only";
  * routes fall back to their staging-only unpaid path (see lib/tbo-env.ts).
  */
 import crypto from "node:crypto";
+import { tboHotelIsLive } from "./tbo-env";
 
 /** True once both credentials are present. Gates whether payment is enforced at all. */
 export const cashfreeConfigured = Boolean(
@@ -71,8 +72,62 @@ export const CASHFREE_MODE: "sandbox" | "production" = resolveMode(process.env.C
  */
 export const cashfreePaymentsLive = cashfreeConfigured && CASHFREE_MODE === "production";
 
-const API =
-  CASHFREE_MODE === "production" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
+const SANDBOX_API = "https://sandbox.cashfree.com/pg";
+const PRODUCTION_API = "https://api.cashfree.com/pg";
+
+/** Which product a call belongs to. Decides WHICH Cashfree account answers it. */
+export type CashfreeKind = "flight" | "hotel";
+
+export type CashfreeCreds = {
+  appId: string;
+  secret: string;
+  mode: "sandbox" | "production";
+  api: string;
+};
+
+const DEFAULT_CREDS: CashfreeCreds = {
+  appId: process.env.CASHFREE_APP_ID ?? "",
+  secret: process.env.CASHFREE_SECRET_KEY ?? "",
+  mode: CASHFREE_MODE,
+  api: CASHFREE_MODE === "production" ? PRODUCTION_API : SANDBOX_API,
+};
+
+/** A second, SANDBOX credential pair, used only for hotel certification. */
+const sandboxCredsConfigured = Boolean(
+  process.env.CASHFREE_SANDBOX_APP_ID && process.env.CASHFREE_SANDBOX_SECRET_KEY,
+);
+
+/**
+ * Which Cashfree account handles this call.
+ *
+ * Hotels on TBO's CERTIFICATION hosts run on sandbox credentials; everything else runs
+ * on whatever `CASHFREE_ENV` selects — in production, the live account.
+ *
+ * Why the split exists. TBO's portal verification requires test bookings made through
+ * the real checkout, but a certification host holds no real room, so asking their
+ * verifier to pay real money for one is what stalled five checkpoints across three
+ * rounds. Sandbox credentials give them a genuine payment page, a genuine
+ * order/pay/verify/Book/refund cycle, and Cashfree's test cards instead of their own.
+ *
+ * The host half is absolute and is the whole safety story: `tboHotelIsLive()` gates it,
+ * so the day live hotel credentials arrive this returns the live account for hotels too.
+ * Sandbox money must never be able to hold a real room — that is the same hole
+ * `cashfreePaymentsLive` exists to close, and `tests/cashfree-creds.test.ts` pins it.
+ *
+ * Defaults to the live account: a call site that forgets to say `hotel` reads a sandbox
+ * order against the live account, which fails loudly rather than moving money wrongly.
+ */
+export function cashfreeCredsFor(kind: CashfreeKind = "flight"): CashfreeCreds {
+  if (kind === "hotel" && sandboxCredsConfigured && !tboHotelIsLive()) {
+    return {
+      appId: process.env.CASHFREE_SANDBOX_APP_ID ?? "",
+      secret: process.env.CASHFREE_SANDBOX_SECRET_KEY ?? "",
+      mode: "sandbox",
+      api: SANDBOX_API,
+    };
+  }
+  return DEFAULT_CREDS;
+}
 
 /**
  * Pinned API version. Cashfree serves per-request response shapes off this header, so
@@ -98,13 +153,17 @@ export class CashfreeError extends Error {
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-async function cf(path: string, opts: { method?: string; json?: unknown } = {}): Promise<Json> {
-  const r = await fetch(`${API}${path}`, {
+async function cf(
+  path: string,
+  opts: { method?: string; json?: unknown } = {},
+  creds: CashfreeCreds = DEFAULT_CREDS,
+): Promise<Json> {
+  const r = await fetch(`${creds.api}${path}`, {
     method: opts.method ?? "GET",
     headers: {
       "x-api-version": API_VERSION,
-      "x-client-id": process.env.CASHFREE_APP_ID ?? "",
-      "x-client-secret": process.env.CASHFREE_SECRET_KEY ?? "",
+      "x-client-id": creds.appId,
+      "x-client-secret": creds.secret,
       Accept: "application/json",
       ...(opts.json !== undefined ? { "Content-Type": "application/json" } : {}),
     },
@@ -205,6 +264,8 @@ export async function createOrder(args: {
    * see ORDER_EXPIRY_FLOOR_MIN.
    */
   expiryMinutes?: number;
+  /** Which Cashfree account opens this order — see `cashfreeCredsFor`. */
+  kind?: CashfreeKind;
 }): Promise<CfOrder> {
   const body: Json = {
     order_id: args.orderId,
@@ -225,11 +286,11 @@ export async function createOrder(args: {
     const minutes = Math.max(args.expiryMinutes, ORDER_EXPIRY_FLOOR_MIN);
     body.order_expiry_time = new Date(Date.now() + minutes * 60_000).toISOString();
   }
-  return cf("/orders", { method: "POST", json: body }) as Promise<CfOrder>;
+  return cf("/orders", { method: "POST", json: body }, cashfreeCredsFor(args.kind)) as Promise<CfOrder>;
 }
 
-export async function fetchOrder(orderId: string): Promise<CfOrder> {
-  return cf(`/orders/${encodeURIComponent(orderId)}`) as Promise<CfOrder>;
+export async function fetchOrder(orderId: string, kind?: CashfreeKind): Promise<CfOrder> {
+  return cf(`/orders/${encodeURIComponent(orderId)}`, {}, cashfreeCredsFor(kind)) as Promise<CfOrder>;
 }
 
 export type CfPayment = {
@@ -244,8 +305,12 @@ export type CfPayment = {
 };
 
 /** Every payment attempt against an order — an order can have several, at most one SUCCESS. */
-export async function fetchOrderPayments(orderId: string): Promise<CfPayment[]> {
-  const data = (await cf(`/orders/${encodeURIComponent(orderId)}/payments`)) as unknown;
+export async function fetchOrderPayments(orderId: string, kind?: CashfreeKind): Promise<CfPayment[]> {
+  const data = (await cf(
+    `/orders/${encodeURIComponent(orderId)}/payments`,
+    {},
+    cashfreeCredsFor(kind),
+  )) as unknown;
   return Array.isArray(data) ? (data as CfPayment[]) : [];
 }
 
@@ -284,8 +349,10 @@ export type ConfirmResult =
 export async function confirmPaidOrder(args: {
   orderId: string;
   expectBind: string;
+  /** MUST match the kind the order was created with, or the lookup hits the wrong account. */
+  kind?: CashfreeKind;
 }): Promise<ConfirmResult> {
-  const order = await fetchOrder(args.orderId);
+  const order = await fetchOrder(args.orderId, args.kind);
 
   if (order.order_status !== "PAID") {
     return { ok: false, error: "This payment has not been completed.", unpaid: true };
@@ -296,7 +363,7 @@ export async function confirmPaidOrder(args: {
     return { ok: false, error: "This payment does not belong to this booking.", unpaid: false };
   }
 
-  const payments = await fetchOrderPayments(args.orderId);
+  const payments = await fetchOrderPayments(args.orderId, args.kind);
   const success = payments.find((p) => p.payment_status === "SUCCESS");
   if (!success) {
     return { ok: false, error: "This payment has not been completed.", unpaid: true };
@@ -336,16 +403,17 @@ export type CfRefund = {
  */
 export async function refundOrder(
   orderId: string,
-  opts?: { amountInr?: number; note?: string },
+  opts?: { amountInr?: number; note?: string; kind?: CashfreeKind },
 ): Promise<CfRefund> {
   const refundId = `rf${orderId.replace(/[^a-zA-Z0-9]/g, "")}`.slice(0, 40);
   const json: Json = { refund_id: refundId };
   if (opts?.amountInr != null) json.refund_amount = Math.round(opts.amountInr * 100) / 100;
   if (opts?.note) json.refund_note = opts.note.slice(0, 100);
-  return cf(`/orders/${encodeURIComponent(orderId)}/refunds`, {
-    method: "POST",
-    json,
-  }) as Promise<CfRefund>;
+  return cf(
+    `/orders/${encodeURIComponent(orderId)}/refunds`,
+    { method: "POST", json },
+    cashfreeCredsFor(opts?.kind),
+  ) as Promise<CfRefund>;
 }
 
 // ── Webhooks ──────────────────────────────────────────────────────────────────
@@ -378,11 +446,19 @@ export function verifyWebhookSignature(
   signature: string,
   timestamp: string,
 ): boolean {
-  const secret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY || "";
-  if (!secret || !signature || !timestamp) return false;
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}${rawBody}`)
-    .digest("base64");
-  return timingSafeEquals(expected, signature);
+  if (!signature || !timestamp) return false;
+  // Either account may deliver: hotel certification runs on the sandbox credentials
+  // (see `cashfreeCredsFor`), and both endpoints point at this one route.
+  const secrets = [
+    process.env.CASHFREE_WEBHOOK_SECRET,
+    process.env.CASHFREE_SECRET_KEY,
+    process.env.CASHFREE_SANDBOX_SECRET_KEY,
+  ].filter((v): v is string => Boolean(v));
+  if (!secrets.length) return false;
+  return secrets.some((secret) =>
+    timingSafeEquals(
+      crypto.createHmac("sha256", secret).update(`${timestamp}${rawBody}`).digest("base64"),
+      signature,
+    ),
+  );
 }
