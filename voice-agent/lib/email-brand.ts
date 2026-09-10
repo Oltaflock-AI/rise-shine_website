@@ -39,9 +39,9 @@ export const C = {
 
 export const FONT = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-/** The logo is served from the .in host — .com still serves the old static site. */
-const LOGO = "https://www.riseandshinetravel.in/brand/logo-white.png";
-const SITE_URL = "https://www.riseandshinetravel.in";
+/** .com is the live site; .in now redirects to it, so link the destination. */
+const LOGO = "https://www.riseandshinetravel.com/brand/logo-white.png";
+const SITE_URL = "https://www.riseandshinetravel.com";
 
 /** Mirrors src/data/site.ts. Kept literal so this file has no cross-app import. */
 const NAP = {
@@ -140,7 +140,7 @@ export function shell(body: string, opts: ShellOpts): string {
   <tr><td bgcolor="${C.cream}" style="background:${C.cream};padding:20px 30px;border-top:1px solid ${C.line};">
     <div style="font-family:${FONT};font-size:12px;line-height:1.65;color:${C.muted};">
       <strong style="color:${C.ink};">${NAP.name}</strong> &middot; Est. ${NAP.established} &middot; Ahmedabad<br>
-      <a href="${SITE_URL}" style="color:${C.navyLight};text-decoration:none;">riseandshinetravel.in</a>
+      <a href="${SITE_URL}" style="color:${C.navyLight};text-decoration:none;">riseandshinetravel.com</a>
       &middot; <a href="mailto:${NAP.email}" style="color:${C.navyLight};text-decoration:none;">${NAP.email}</a>
     </div>
   </td></tr>

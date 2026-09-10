@@ -85,7 +85,7 @@ export async function buildSamples(): Promise<Sample[]> {
       note: "Sent from /api/auth/forgot-password. Amber accent = action needed.",
       ...passwordResetEmail({
         name: "Hardik Patel",
-        resetUrl: "https://www.riseandshinetravel.in/auth/confirm?token_hash=sample&type=recovery",
+        resetUrl: "https://www.riseandshinetravel.com/auth/confirm?token_hash=sample&type=recovery",
       }),
     },
     {
@@ -104,25 +104,25 @@ export async function buildSamples(): Promise<Sample[]> {
         intro:
           "The rains make these three cheaper and emptier than they will be all year. Fares below are per person, twin sharing, ex-Ahmedabad.",
         validUntil: "12-09-26",
-        unsubscribeUrl: "https://www.riseandshinetravel.in/unsubscribe?t=sample-token",
+        unsubscribeUrl: "https://www.riseandshinetravel.com/unsubscribe?t=sample-token",
         items: [
           {
             title: "Kerala · 6 nights",
             blurb: "Backwaters at Alleppey, tea country at Munnar, two nights on the coast.",
             fromInr: 38900,
-            url: "https://www.riseandshinetravel.in/packages/domestic/kerala",
+            url: "https://www.riseandshinetravel.com/packages/domestic/kerala",
           },
           {
             title: "Andaman · 5 nights",
             blurb: "Havelock and Neil, with the ferry transfers and permits handled.",
             fromInr: 44500,
-            url: "https://www.riseandshinetravel.in/packages/domestic/andaman",
+            url: "https://www.riseandshinetravel.com/packages/domestic/andaman",
           },
           {
             title: "Rajasthan · 7 nights",
             blurb: "Udaipur, Jodhpur and Jaisalmer, ending with a night in the dunes.",
             fromInr: 31200,
-            url: "https://www.riseandshinetravel.in/packages/domestic/rajasthan",
+            url: "https://www.riseandshinetravel.com/packages/domestic/rajasthan",
           },
         ],
       }),

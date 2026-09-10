@@ -15,13 +15,13 @@ import {
 const OFFER = {
   headline: "Three monsoon escapes",
   intro: "Cheaper and emptier than they will be all year.",
-  unsubscribeUrl: "https://www.riseandshinetravel.in/unsubscribe?t=abc-123",
+  unsubscribeUrl: "https://www.riseandshinetravel.com/unsubscribe?t=abc-123",
   items: [
     {
       title: "Kerala · 6 nights",
       blurb: "Backwaters and tea country.",
       fromInr: 38900,
-      url: "https://www.riseandshinetravel.in/packages/domestic/kerala",
+      url: "https://www.riseandshinetravel.com/packages/domestic/kerala",
     },
   ],
 };
