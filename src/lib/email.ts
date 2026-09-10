@@ -71,11 +71,11 @@ export async function sendEmail(args: {
 }
 
 /**
- * Where a "view this" button should land. The site lives on .in; `site.url` still
- * declares .com, which serves the old static site, so a link built from it would
- * take a customer to a 2021 page instead of their booking.
+ * Where a "view this" button should land. Built from `site.url` — the canonical
+ * host. This was hardcoded to .in while .com still served the old static site;
+ * .com became the primary domain on 10-Sep-2026, so it follows site.url again.
  */
-const ACCOUNT_URL = "https://www.riseandshinetravel.in/account";
+const ACCOUNT_URL = `${site.url}/account`;
 
 // ── templates ────────────────────────────────────────────────────────────────
 
@@ -361,7 +361,7 @@ export function offerEmail(args: {
       (args.validUntil
         ? callout(`These fares are held until <strong>${esc(args.validUntil)}</strong>, subject to availability.`)
         : "") +
-      button("Talk to a travel expert", "https://www.riseandshinetravel.in/request-a-call"),
+      button("Talk to a travel expert", `${site.url}/request-a-call`),
     {
       kicker: "Offer",
       tone: "offer",

@@ -1,4 +1,5 @@
 import "server-only";
+import { site } from "@/data/site";
 
 /**
  * Auth email links that WE mint and WE send.
@@ -40,7 +41,7 @@ export type AuthLinkType = "recovery" | "signup" | "magiclink" | "email_change_c
 export function siteOrigin(req?: Request): string {
   if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/+$/, "");
   if (req) return new URL(req.url).origin;
-  return "https://www.riseandshinetravel.in";
+  return site.url;
 }
 
 export interface MintedLink {

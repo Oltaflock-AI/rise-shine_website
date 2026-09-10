@@ -69,7 +69,7 @@ export default async function UnsubscribePage({
             href="/"
             className="mt-7 inline-flex min-h-11 items-center font-semibold text-red hover:underline"
           >
-            Back to riseandshinetravel.in
+            Back to riseandshinetravel.com
           </Link>
         </div>
       </Container>

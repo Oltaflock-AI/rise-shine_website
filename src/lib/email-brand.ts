@@ -76,8 +76,8 @@ export type Tone = "confirm" | "account" | "offer" | "notice";
 export const FONT = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 /** The logo is served from the .in host — .com still serves the old static site. */
-const LOGO = "https://www.riseandshinetravel.in/brand/logo-white.png";
-const SITE_URL = "https://www.riseandshinetravel.in";
+const LOGO = `${site.url}/brand/logo-white.png`;
+const SITE_URL = site.url;
 
 export const esc = (s: string): string =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -189,7 +189,7 @@ export function shell(body: string, opts: ShellOpts): string {
   <tr><td bgcolor="${C.cream}" style="background:${C.cream};padding:20px 30px;border-top:1px solid ${C.line};">
     <div style="font-family:${FONT};font-size:12px;line-height:1.65;color:${C.muted};">
       <strong style="color:${C.ink};">${esc(site.name)}</strong> &middot; Est. ${site.established} &middot; Ahmedabad<br>
-      <a href="${SITE_URL}" style="color:${C.navyLight};text-decoration:none;">riseandshinetravel.in</a>
+      <a href="${SITE_URL}" style="color:${C.navyLight};text-decoration:none;">${esc(SITE_URL.replace(/^https?:\/\/(www\.)?/, ""))}</a>
       &middot; <a href="mailto:${site.email}" style="color:${C.navyLight};text-decoration:none;">${site.email}</a>
       ${
         opts.unsubscribeUrl
