@@ -509,6 +509,16 @@ on it.
 Names are always an explicit pick; only the most recent address auto-applies. A
 wrong auto-filled name is a wasted ticket, a wrong address is a corrected field.
 
+**Both checkouts share one address block** — `checkout/BillingAddress.tsx`
+(`BillingAddressFields` + `billingAddressError`). State is a dropdown of
+`data/indian-states.ts` for India and free text elsewhere. A 6-digit PIN calls
+`GET /api/pincode` (India Post's directory via `lib/pincode.ts`, 4s ceiling, pure
+parser tested in `tests/pincode.test.ts`): state is always set from it, city only
+while it still holds a value we filled — a typed city is never clobbered, since
+one PIN can straddle districts. The hotel form sends its `billing` block for the
+address book only: TBO's `HotelPassenger` has no address field, so nothing from it
+reaches the supplier.
+
 ## Rules that will bite you if ignored
 
 - **Never import `tbo*.ts` from a client component.** They read credentials from

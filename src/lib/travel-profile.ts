@@ -137,20 +137,43 @@ export async function saveTravelProfile(
   // The address is the booker's; the lead passenger is who carries it on the
   // ticket, but the structured version comes from the form (see BillingDetails).
   const lead = req.passengers.find((p) => p.IsLeadPax) ?? req.passengers[0];
-  const address1 = (billing?.address1 ?? lead?.AddressLine1 ?? "").trim();
-  if (!lead || !address1) return;
+  if (!lead) return;
+  await saveBillingAddress(userId, {
+    phone: billing?.phone ?? lead.ContactNo,
+    email: billing?.email ?? lead.Email,
+    address1: billing?.address1 ?? lead.AddressLine1,
+    address2: billing?.address2,
+    city: billing?.city ?? lead.City,
+    state: billing?.state,
+    pin: billing?.pin,
+    countryCode: billing?.countryCode || lead.CountryCode,
+    nationality: billing?.nationality || lead.Nationality,
+  });
+}
+
+/**
+ * Upsert one address into the customer's address book. Shared by the flight
+ * path above and the hotel book route, whose supplier request carries no
+ * address at all — the form's `billing` block is the only copy.
+ */
+export async function saveBillingAddress(userId: string, billing: BillingDetails): Promise<void> {
+  if (!supabaseAdminConfigured) return;
+  const address1 = (billing.address1 ?? "").trim();
+  if (!address1) return;
+  const admin = createAdminClient();
+  const nowISO = new Date().toISOString();
 
   const addr = {
     user_id: userId,
-    phone: (billing?.phone ?? lead.ContactNo ?? "").trim() || null,
-    email: (billing?.email ?? lead.Email ?? "").trim() || null,
+    phone: (billing.phone ?? "").trim() || null,
+    email: (billing.email ?? "").trim() || null,
     address1,
-    address2: (billing?.address2 ?? "").trim() || null,
-    city: (billing?.city ?? lead.City ?? "").trim() || null,
-    state: (billing?.state ?? "").trim() || null,
-    pin: (billing?.pin ?? "").trim() || null,
-    country_code: billing?.countryCode || lead.CountryCode || "IN",
-    nationality: billing?.nationality || lead.Nationality || null,
+    address2: (billing.address2 ?? "").trim() || null,
+    city: (billing.city ?? "").trim() || null,
+    state: (billing.state ?? "").trim() || null,
+    pin: (billing.pin ?? "").trim() || null,
+    country_code: billing.countryCode || "IN",
+    nationality: billing.nationality || null,
   };
 
   try {

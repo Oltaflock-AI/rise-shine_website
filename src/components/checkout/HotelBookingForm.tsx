@@ -35,6 +35,19 @@ import { RateConditionList } from "@/components/ui/RateConditionList";
 import { cn } from "@/lib/cn";
 import { controlClass, DateField, Select } from "@/components/ui/form-controls";
 import {
+  BillingAddressFields,
+  billingAddressError,
+  billingFromSaved,
+  blankBillingAddress,
+  type BillingAddress,
+} from "./BillingAddress";
+import { SavedAddressPicker } from "./SavedDetails";
+import {
+  forgetSaved,
+  loadSavedAddresses,
+  type SavedAddress,
+} from "@/lib/saved-details";
+import {
   openCashfreeCheckout,
   type CashfreeMode,
 } from "@/lib/cashfree-checkout";
@@ -162,8 +175,48 @@ export function HotelBookingForm({
     }
     return list;
   });
+  /**
+   * Billing address for the invoice and the guest's address book. TBO's hotel
+   * Book has no address field, so nothing here reaches the supplier — it is
+   * mirrored to `saved_addresses` after a confirmed booking so the next
+   * checkout (flight or hotel) is a pick rather than a re-type.
+   */
+  const [billing, setBilling] = useState<BillingAddress>(blankBillingAddress);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [addressId, setAddressId] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
+
+  // The most recently used address is applied straight away — re-typing it is
+  // the friction the address book exists to remove. Fully editable afterwards.
+  useEffect(() => {
+    let alive = true;
+    loadSavedAddresses().then((addresses) => {
+      if (!alive) return;
+      setSavedAddresses(addresses);
+      const first = addresses[0];
+      if (first) {
+        setAddressId(first.id);
+        setBilling(billingFromSaved(first));
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Any edit means the form no longer holds the saved row as-is. */
+  const updateBilling = (patch: Partial<BillingAddress>) => {
+    setBilling((a) => ({ ...a, ...patch }));
+    setAddressId(null);
+  };
+
+  async function forgetAddress(a: SavedAddress) {
+    if (await forgetSaved("saved_addresses", a.id)) {
+      setSavedAddresses((list) => list.filter((x) => x.id !== a.id));
+      if (addressId === a.id) setAddressId(null);
+    }
+  }
 
   /**
    * On a phone the summary aside — and with it this failure message — sits below
@@ -271,6 +324,7 @@ export function HotelBookingForm({
       isVoucherBooking: true,
       rooms: buildRooms(),
       validation: v,
+      billing,
       // Display context mirrored into the customer's account view.
       stay: {
         hotelName: b.hotel,
@@ -337,6 +391,8 @@ export function HotelBookingForm({
     // Light client check; the order route re-validates authoritatively before charging.
     // The rate's own ValidationInfo decides whether two guests may share a first
     // name (see validateHotelPax) — the same full name is never allowed.
+    const address = billingAddressError(billing);
+    if (address) return setBooked({ ok: false, rule: true, error: address });
     const firstNamesMustDiffer = v?.samePaxNameAllowed !== true;
     const fullNames = new Set<string>();
     const firstNames = new Set<string>();
@@ -711,6 +767,30 @@ export function HotelBookingForm({
             </div>
           </div>
         ))}
+
+        {/* ── billing address ── */}
+        <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+          <h3 className="mb-1 text-lead font-bold text-ink">Billing address</h3>
+          <p className="mb-4 text-meta text-muted">
+            For your invoice. Enter the PIN code and the city and state fill in.
+          </p>
+          <SavedAddressPicker
+            addresses={savedAddresses}
+            selectedId={addressId}
+            onPick={(a) => {
+              setAddressId(a.id);
+              setBilling(billingFromSaved(a));
+            }}
+            onNew={() => {
+              setAddressId(null);
+              setBilling(blankBillingAddress());
+            }}
+            onForget={forgetAddress}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <BillingAddressFields value={billing} onChange={updateBilling} />
+          </div>
+        </div>
 
         {v?.panMandatory && (
           <p className="text-meta text-muted">
