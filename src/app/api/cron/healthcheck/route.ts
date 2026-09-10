@@ -118,6 +118,14 @@ export async function GET(req: Request) {
         // is. The per-check email is still the detailed signal.
         status: failing.length ? "error" : "ok",
       });
+      // captureCheckIn only QUEUES the event. On a serverless function the
+      // response goes out and the instance freezes before the SDK's transport
+      // gets to send it — so the opening "in_progress" arrived (the function
+      // kept running for seconds after it) and the closing "ok" silently did
+      // not, and Sentry reported every run as timed out while the site was
+      // healthy. Wait for the transport; a couple of seconds is nothing next to
+      // the TBO calls above.
+      await Sentry.flush(3000);
     }
   } catch (e) {
     console.error("[healthcheck] Sentry check-in failed to close", e);
