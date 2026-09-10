@@ -6,7 +6,7 @@
  * never need to check config — an unmounted GA just drops the event (the
  * try/catch swallows @next/third-parties' "not initialized" path).
  *
- * Funnel: search → checkout_opened → payment_started → purchase,
+ * Funnel: search → checkout_opened → payment_started → purchase + booking_completed,
  * each tagged { kind: "flight" | "hotel" }.
  */
 
@@ -48,6 +48,12 @@ export type PurchaseInput = {
  * the Monetisation reports, revenue-per-channel and `transaction_id` de-duplication
  * only switch on for this name — a custom "booking_confirmed" is counted but never
  * carries money.
+ *
+ * A plain `booking_completed` is sent beside it. Reserved ecommerce events are
+ * processed differently from custom ones and on 10-Sep-2026 `purchase` hits that
+ * GA acknowledged (204) never surfaced in Realtime or DebugView while
+ * `checkout_opened` did — so the funnel count must not depend on `purchase`
+ * alone. Mark `booking_completed` a Key event in GA; it is the conversion count.
  */
 export function trackPurchase({
   transactionId,
@@ -69,5 +75,11 @@ export function trackPurchase({
         quantity: 1,
       },
     ],
+  });
+  trackEvent("booking_completed", {
+    kind,
+    transaction_id: transactionId,
+    value,
+    currency: "INR",
   });
 }
