@@ -151,6 +151,15 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* The clip has to sit on the ROOT, not on body. body's overflow only
+       reaches the viewport by propagation, and iOS Safari does not apply that
+       propagated clip to `position: fixed` boxes — so the closed mobile drawer
+       (fixed inset-0, translate-x-full, i.e. a full viewport width parked off
+       to the right) still widened the scrollable area. Safari then zooms out to
+       fit it, which is why the checkout page rendered at ~83% width with a dead
+       grey gutter down the right. `clip`, not `hidden`: `hidden` would make
+       this a scroll container and re-anchor every `position: sticky` to it. */
+    overflow-x: clip;
   }
   body {
     background: var(--color-cream);
@@ -166,7 +175,7 @@
     /* NOTE: this hides real overflow rather than preventing it, and did so for
        long enough that a 3-column flight card clipping between 640-715px went
        unnoticed. Kept only until the remaining clip sources are gone. */
-    overflow-x: hidden;
+    overflow-x: clip;
   }
   h1,
   h2,

@@ -121,8 +121,29 @@ export function FarePolicyTable({ rules }: { rules: MiniFareRule[] }) {
     return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
   });
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[26rem] border-collapse text-left text-[0.88rem]">
+    <div>
+      {/* A four-column grid does not survive a 400px phone: at `min-w-[26rem]`
+          the whole penalty table sat in a sideways scroller, and every cell
+          wrapped into a two-line mess ("Airline / fee", "AMD-/BOM"). A refund
+          penalty is a contract term the guest has to be able to read, so on
+          mobile each rule becomes its own labelled block and the table starts
+          at `sm`, where the columns actually fit. */}
+      <ul className="flex flex-col gap-2.5 sm:hidden">
+        {sorted.map((r, i) => (
+          <li key={i} className="rounded-brand border border-line bg-cream-2 px-3.5 py-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[0.92rem] font-semibold text-ink">{r.type || "Fee"}</span>
+              <span className="text-[0.92rem] font-semibold tabular-nums text-ink">
+                {r.details}
+              </span>
+            </div>
+            <p className="mt-1 text-[0.85rem] text-muted">{window_(r)}</p>
+            {r.journey && <p className="text-[0.85rem] text-muted">{r.journey}</p>}
+          </li>
+        ))}
+      </ul>
+
+      <table className="hidden w-full border-collapse text-left text-[0.88rem] sm:table">
         <thead>
           <tr className="text-muted">
             <th className="border-b border-line py-1.5 pr-3 font-semibold">Charge</th>

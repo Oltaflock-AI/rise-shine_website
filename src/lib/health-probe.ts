@@ -16,23 +16,13 @@ import { searchFlights } from "@/lib/tbo";
 import { todayInIndiaISO } from "@/lib/stay-dates";
 import { quoteFare } from "@/lib/tbo-book";
 import { probeCashfreeAuth, cashfreeConfigured } from "@/lib/cashfree";
-import { tboFetch } from "@/lib/tbo-fetch";
+import net from "node:net";
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
 import type { CheckResult } from "@/lib/ops-health";
 
 /** The route the monitor prices. Busy, always-served domestic pair. */
 const PROBE_FROM = "AMD";
 const PROBE_TO = "BOM";
-
-/**
- * The static egress IP TBO whitelists for our production credentials. If the
- * proxy VPS is rebuilt and comes back on a different address, every TBO call
- * starts failing and nothing else in the system would say why.
- */
-const EXPECTED_EGRESS_IP = process.env.TBO_EXPECTED_EGRESS_IP?.trim() || "";
-
-/** Two services, because a single one being down must not read as our outage. */
-const IP_ECHO_URLS = ["https://api.ipify.org?format=json", "https://ifconfig.co/json"];
 
 async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }> {
   const t0 = Date.now();
@@ -124,53 +114,51 @@ export async function probeCashfree(): Promise<CheckResult> {
 }
 
 /**
- * The static-IP proxy, checked as itself.
+ * The static-IP proxy VPS, checked as itself.
  *
- * TBO Search failing already implies something is wrong, but not what: this
- * separates "the proxy VPS is gone" and "the VPS came back on a new IP" — which
- * silently voids the whitelist — from "TBO is having a bad day". Set
- * TBO_EXPECTED_EGRESS_IP to the whitelisted address to get the second check.
+ * Opens a TCP connection to the proxy and closes it. That is deliberately all:
+ * the proxy only permits CONNECT to TBO's hosts, so an earlier version of this
+ * check that asked an IP-echo service what our egress address was could not get
+ * out and reported a false outage on a proxy that was serving live searches
+ * perfectly well. Reachability is the part that can be tested without going
+ * through it.
+ *
+ * Whether the address is still the WHITELISTED one needs no separate check:
+ * TBO rejects calls from any other IP, so `tbo_search` fails within the same
+ * five minutes if the VPS is rebuilt onto a new address. This probe's job is to
+ * tell "the box is gone" apart from "TBO is having a bad day".
  */
-export async function probeEgressIp(): Promise<CheckResult> {
-  const base = { key: "tbo_egress_ip", label: "TBO static-IP proxy" };
-  if (!process.env.TBO_PROXY_URL?.trim()) {
-    return { ...base, ok: true, detail: "no proxy configured (direct egress)" };
+export async function probeProxy(): Promise<CheckResult> {
+  const base = { key: "tbo_proxy", label: "TBO static-IP proxy" };
+  const raw = process.env.TBO_PROXY_URL?.trim();
+  if (!raw) return { ...base, ok: true, detail: "no proxy configured (direct egress)" };
+
+  let host: string;
+  let port: number;
+  try {
+    const u = new URL(raw);
+    host = u.hostname;
+    port = Number(u.port) || (u.protocol === "https:" ? 443 : 80);
+  } catch {
+    return { ...base, ok: false, detail: "TBO_PROXY_URL is not a valid URL" };
   }
-  const failures: string[] = [];
-  for (const url of IP_ECHO_URLS) {
-    try {
-      const { value: ip, ms } = await timed(async () => {
-        const r = await tboFetch(url, {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10_000),
-        });
-        const j = (await r.json()) as { ip?: string };
-        return (j.ip ?? "").trim();
-      });
-      if (!ip) {
-        failures.push(`${url}: no ip in response`);
-        continue;
-      }
-      if (EXPECTED_EGRESS_IP && ip !== EXPECTED_EGRESS_IP) {
-        return {
-          ...base,
-          ok: false,
-          detail: `egress IP is ${ip}, expected ${EXPECTED_EGRESS_IP} — TBO's whitelist will reject this`,
-          durationMs: ms,
-        };
-      }
-      return {
-        ...base,
-        ok: true,
-        detail: EXPECTED_EGRESS_IP ? `egress IP ${ip} (whitelisted)` : `egress IP ${ip} (no expected IP set)`,
-        durationMs: ms,
-      };
-    } catch (e) {
-      failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-  // Both echo services failed THROUGH the proxy — the proxy is the common factor.
-  return { ...base, ok: false, detail: `proxy unreachable — ${failures.join("; ")}` };
+
+  const t0 = Date.now();
+  const outcome = await new Promise<{ ok: boolean; detail: string }>((resolve) => {
+    const sock = new net.Socket();
+    const done = (ok: boolean, detail: string) => {
+      sock.removeAllListeners();
+      sock.destroy();
+      resolve({ ok, detail });
+    };
+    sock.setTimeout(8000);
+    sock.once("connect", () => done(true, `TCP connect to ${host}:${port} ok`));
+    sock.once("timeout", () => done(false, `no answer from ${host}:${port} within 8s — VPS down or firewalled`));
+    sock.once("error", (e) => done(false, `${host}:${port} — ${e.message}`));
+    sock.connect(port, host);
+  });
+
+  return { ...base, ...outcome, durationMs: Date.now() - t0 };
 }
 
 /**

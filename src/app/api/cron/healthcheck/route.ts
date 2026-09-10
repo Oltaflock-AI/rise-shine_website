@@ -2,7 +2,7 @@ import {
   probeTboSearch,
   probeTboQuote,
   probeCashfree,
-  probeEgressIp,
+  probeProxy,
   probeCallbackQueue,
   probeLedgerOrphans,
 } from "@/lib/health-probe";
@@ -25,7 +25,7 @@ export const maxDuration = 120;
  * below would have answered it in seconds.
  *
  * What it covers, in the order a booking needs them:
- *   tbo_egress_ip   the static-IP proxy is up AND still on the whitelisted address
+ *   tbo_proxy       the static-IP proxy VPS is answering at all
  *   tbo_search      credentials, token, supplier inventory
  *   tbo_quote       the re-price that sets the amount charged
  *   cashfree_auth   the gateway accepts our keys
@@ -50,8 +50,8 @@ export async function GET(req: Request) {
   // The proxy check and the Cashfree check share nothing with the TBO booking
   // pair, so they run alongside it. Search → quote is sequential by necessity:
   // the quote needs the trace the search just minted.
-  const [egress, cashfree, queue, orphans, search] = await Promise.all([
-    probeEgressIp(),
+  const [proxy, cashfree, queue, orphans, search] = await Promise.all([
+    probeProxy(),
     probeCashfree(),
     probeCallbackQueue(),
     probeLedgerOrphans(),
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
   ]);
   const quote = await probeTboQuote(search);
 
-  const results: CheckResult[] = [egress, search, quote, cashfree, queue, orphans];
+  const results: CheckResult[] = [proxy, search, quote, cashfree, queue, orphans];
 
   // Record sequentially: each one may send mail, and a burst of parallel Resend
   // calls during a total outage is its own small denial of service.
