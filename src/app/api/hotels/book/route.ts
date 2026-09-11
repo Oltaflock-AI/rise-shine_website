@@ -2,6 +2,7 @@ import { bookHotel, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-
 import { generateHotelVoucher } from "@/lib/tbo-hotel-post";
 import type { HotelValidationInfo } from "@/lib/tbo-hotel";
 import { getUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity";
 import { saveHotelBookingHistory, type HotelStay } from "@/lib/booking-history";
 import { saveBillingAddress, type BillingDetails } from "@/lib/travel-profile";
 import {
@@ -162,6 +163,22 @@ export async function POST(req: Request) {
   };
 
   const result = await bookHotel(request);
+
+  // CRM timeline — one line per outcome, before the slower follow-ups. Best-effort;
+  // never touches the booking or the refund.
+  {
+    const user = await getUser().catch(() => null);
+    await logActivity(user?.id, result.ok ? "booking_confirmed" : "booking_failed", {
+      kind: "hotel",
+      orderId: body.payment?.orderId,
+      hotel: body.stay?.hotelName,
+      checkIn: body.stay?.checkIn,
+      checkOut: body.stay?.checkOut,
+      ref: result.confirmationNo,
+      amountInr: Math.round(paidInr ?? request.netAmount),
+      reason: result.ok ? undefined : result.rule ? "validation" : result.status ?? "supplier",
+    });
+  }
 
   // Paid but NOT booked → refund immediately.
   if (payment && !result.ok) {

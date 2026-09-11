@@ -1,5 +1,6 @@
 import { quoteFare } from "@/lib/tbo-book";
 import { tooMany } from "@/lib/rate-limit";
+import { logViewerActivity } from "@/lib/activity";
 
 // Live TBO pricing — never cached.
 export const dynamic = "force-dynamic";
@@ -31,5 +32,9 @@ export async function POST(req: Request) {
     searchedAt: body.searchedAt ?? Date.now(),
     resultIndex: body.resultIndex,
   });
+  // The checkout form's first call — the closest thing to "started checkout".
+  if (result.ok) {
+    await logViewerActivity("checkout_started", { kind: "flight", amountInr: result.publishedFare });
+  }
   return Response.json(result, { status: result.ok ? 200 : 502 });
 }

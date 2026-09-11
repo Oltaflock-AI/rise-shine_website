@@ -23,6 +23,7 @@ import { GOOGLE_FORM, buildFormBody, type Lead } from "@/lib/googleForm";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { detailsTable, esc, heading, paragraph, row, shell } from "@/lib/email-brand";
 import { formatDate } from "@/lib/format-date";
+import { logViewerActivity } from "@/lib/activity";
 
 /** Where a fallback lead lands. Same inbox ops alerts use. */
 const LEAD_TO = process.env.ALERT_EMAIL || site.email;
@@ -121,6 +122,16 @@ export async function deliverLead(lead: Lead, context: string): Promise<Delivery
       console.error("[lead] fallback email failed:", e);
     }
   }
+
+  // CRM timeline for a signed-in customer. Logged even when both channels
+  // failed: the dashboard is then the only place the enquiry exists at all.
+  // /request-a-call mirrors its lead through here too — that one is a callback,
+  // not an enquiry, and gets its own event name so the timeline reads right.
+  await logViewerActivity(context === "request-a-call" ? "callback_requested" : "enquiry_sent", {
+    context,
+    to: lead.destination,
+    depart: lead.departure,
+  });
 
   if (delivered.length === 0) {
     console.error("[lead] LEAD LOST — no channel accepted it:", {

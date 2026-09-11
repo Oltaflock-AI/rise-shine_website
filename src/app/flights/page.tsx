@@ -9,6 +9,7 @@ import { SearchBar } from "@/components/sections/SearchBar";
 import { FlightResultsClient } from "@/components/ui/FlightResultsClient";
 import { RecentSearches } from "@/components/ui/RecentSearches";
 import { searchFlights, defaultDates } from "@/lib/tbo";
+import { logViewerActivity } from "@/lib/activity";
 import { resolveAirport } from "@/data/airports";
 import { site } from "@/data/site";
 import { whatsappEnabled } from "@/lib/whatsapp";
@@ -256,6 +257,18 @@ async function FlightResults({
     cabin,
     directOnly,
     preferredAirlines,
+  });
+  // CRM timeline (signed-in customers only, best-effort, never blocks the page).
+  await logViewerActivity("search_flights", {
+    kind: "flight",
+    from,
+    to,
+    depart: departISO,
+    return: returnISO,
+    adults,
+    children: childCount,
+    infants: infantCount,
+    results: res.ok ? res.outbound.length : 0,
   });
 
   // Everything the checkout needs to price + issue the ticket with TBO. Both the

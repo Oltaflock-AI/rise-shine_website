@@ -8,6 +8,7 @@ import {
   newOrderId,
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity";
 import { createIntent } from "@/lib/booking-intents";
 import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
 
@@ -117,6 +118,15 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+
+    await logActivity(user?.id, "payment_opened", {
+      kind: "flight",
+      orderId,
+      amountInr: check.publishedFare,
+      from: parsed.req.origin,
+      to: parsed.req.destination,
+      depart: parsed.req.departDate,
+    });
 
     return Response.json({
       ok: true,

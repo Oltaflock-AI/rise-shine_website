@@ -17,6 +17,7 @@ import { hotelRatingsBatch } from "@/lib/hotel-ratings";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
 import { RecentSearches } from "@/components/ui/RecentSearches";
 import { resolveCity } from "@/lib/hotel-city-search";
+import { logViewerActivity } from "@/lib/activity";
 import {
   nationalityAllowed,
   nationalityLabel,
@@ -378,6 +379,17 @@ async function HotelResults({
     })),
     refundableOnly,
     mealType: meal,
+  });
+  // CRM timeline (signed-in customers only, best-effort, never blocks the page).
+  await logViewerActivity("search_hotels", {
+    kind: "hotel",
+    city: city.label,
+    checkIn: sp.checkIn,
+    checkOut: sp.checkOut,
+    rooms,
+    adults: adultsPerRoom,
+    children: childAges.length,
+    results: res.ok ? res.offers.length : 0,
   });
 
   // Photos + authoritative star ratings (TBO static) and Google review scores,

@@ -17,6 +17,7 @@ import { emailConfigured, sendEmail, flightLeadEmail, flightConfirmationEmail, r
 import { alertOps } from "@/lib/alerts";
 import { refundOrder, type ConfirmedOrder } from "@/lib/cashfree";
 import { settleIntent } from "@/lib/booking-intents";
+import { logActivity } from "@/lib/activity";
 
 export type TicketOutcome = BookingResult & { refunded?: boolean };
 
@@ -34,6 +35,19 @@ export async function ticketPaidFlight(args: {
   const orderId = payment?.orderId;
 
   const result = await bookFlight(bookingReq);
+
+  // CRM timeline — one line per outcome, before any of the slower follow-ups.
+  // Best-effort; never touches the ticket or the refund.
+  await logActivity(args.userId, result.ok ? "booking_confirmed" : "booking_failed", {
+    kind: "flight",
+    orderId,
+    from: bookingReq.origin,
+    to: bookingReq.destination,
+    depart: bookingReq.departDate,
+    pnr: result.pnr,
+    amountInr: payment?.amountInr ?? result.fareInr,
+    reason: result.ok ? undefined : result.rule ?? "supplier",
+  });
 
   // Paid but NOT ticketed → refund immediately. This is the whole point of capturing
   // up front: the customer is never left out of pocket for a ticket they didn't get.

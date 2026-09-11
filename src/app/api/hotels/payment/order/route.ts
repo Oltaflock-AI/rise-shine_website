@@ -8,6 +8,7 @@ import {
   newOrderId,
 } from "@/lib/cashfree";
 import { getUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity";
 import { hotelUnpaidBookingAllowed } from "@/lib/tbo-env";
 import { createIntent } from "@/lib/booking-intents";
 import { bookingPaused, pausedResponse } from "@/lib/booking-pause";
@@ -138,6 +139,8 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+
+    await logActivity(user?.id, "payment_opened", { kind: "hotel", orderId, amountInr });
 
     return Response.json({
       ok: true,

@@ -1,5 +1,6 @@
 import { preBookHotel } from "@/lib/tbo-hotel";
 import { tooMany } from "@/lib/rate-limit";
+import { logViewerActivity } from "@/lib/activity";
 
 // Live TBO re-price — never cached.
 export const dynamic = "force-dynamic";
@@ -36,6 +37,10 @@ export async function POST(req: Request) {
   const cc = body.destinationCountry?.trim().toUpperCase();
   if (result.ok && cc && cc !== "IN" && result.validation && !result.validation.panMandatory) {
     result.validation = { ...result.validation, panMandatory: true };
+  }
+  // The checkout page's first call — the closest thing to "started checkout".
+  if (result.ok) {
+    await logViewerActivity("checkout_started", { kind: "hotel", amountInr: result.totalFare });
   }
   return Response.json(result, { status: result.ok ? 200 : 502 });
 }

@@ -50,6 +50,7 @@ import {
   supplementCurrencyNote,
 } from "@/lib/hotel-display";
 import { cn } from "@/lib/cn";
+import { logViewerActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,16 @@ export default async function HotelDetailPage({
   const info = await hotelInfoWithRooms(code);
   const nights = hasStay ? nightsBetween(sp.checkIn!, sp.checkOut!) : 1;
   const name = info?.name || `Hotel ${code}`;
+  // CRM timeline (signed-in customers only, best-effort).
+  await logViewerActivity("view_hotel", {
+    kind: "hotel",
+    hotel: name,
+    city: cityLabel,
+    checkIn: sp.checkIn,
+    checkOut: sp.checkOut,
+    rooms,
+    adults: adultsPerRoom,
+  });
   // Lead the mosaic with TBO's own primary photo, then the rest of the feed
   // minus that shot, so the best image is first and never appears twice.
   const galleryImages = info?.heroImage

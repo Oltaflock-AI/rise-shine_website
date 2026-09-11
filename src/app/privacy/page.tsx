@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
     <LegalPage
       crumb="Privacy Policy"
       title="Privacy Policy"
-      lastUpdated="18-08-2026 13:55:00"
+      lastUpdated="11-09-2026 17:15:00"
       photoId="photo-1521295121783-8a321d551ad2"
     >
       <p>
@@ -45,6 +45,16 @@ export default function PrivacyPolicyPage() {
           <b>Account information.</b> If you create an account, your email
           address and a securely hashed password, plus any traveller details you
           choose to save for faster checkout.
+        </li>
+        <li>
+          <b>Account activity.</b> While you are signed in, we keep a record of
+          the key actions you take on the site &mdash; the searches you run, the
+          hotels you view, the checkouts you start, the bookings you make and the
+          enquiries you send &mdash; together with the date and time. This record
+          holds only the trip details of each action (route, dates, guests,
+          amount), never your PAN, passport or address. Our team uses it to
+          service your account and follow up on a trip you were planning. It is
+          kept for 18 months and deleted with your account.
         </li>
         <li>
           <b>Payment information.</b> We do <b>not</b> collect or store your

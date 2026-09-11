@@ -8,6 +8,7 @@ import {
   intentsConfigured,
   type IntentRow,
 } from "@/lib/booking-intents";
+import { purgeOldActivity } from "@/lib/activity";
 import { confirmPaidOrder, refundOrder, cashfreeConfigured } from "@/lib/cashfree";
 import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request";
 import { ticketPaidFlight } from "@/lib/flight-checkout";
@@ -172,6 +173,7 @@ export async function GET(req: Request) {
   }
 
   await purgeSettledRequests();
+  await purgeOldActivity();
 
   // Counts only — passenger data has no place in a scheduler's log.
   console.log(`[settle-intents] ${rows.length} row(s) · ${Object.entries(tally).map(([k, v]) => `${k}=${v}`).join(" ")}`);
