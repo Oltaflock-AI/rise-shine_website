@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCalls } from "@/lib/useCalls";
 import { fmtWhen } from "@/lib/format";
 import {
+  IconContact,
   IconOverview,
   IconPhone,
   IconPlane,
@@ -22,6 +23,7 @@ export function Sidebar() {
     { href: "/calls", label: "Voice Calls", Icon: IconPhone, count: calls.length },
     { href: "/queue", label: "Callback Queue", Icon: IconPhone },
     { href: "/leads", label: "Trips & Leads", Icon: IconPlane, count: qualified },
+    { href: "/customers", label: "Customers", Icon: IconContact },
   ];
 
   const adminItems = [{ href: "/access", label: "Team Access", Icon: IconUsers }];

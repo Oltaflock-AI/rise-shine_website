@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RESET_SUBJECT, resetEmailHtml } from "@/lib/email";
 
-const LINK = "https://admin.riseandshinetravel.in/reset?token=abc123_-";
+const LINK = "https://admin.riseandshinetravel.com/reset?token=abc123_-";
 
 function html(over: Partial<{ link: string; minutes: number; email: string }> = {}) {
   return resetEmailHtml({ link: LINK, minutes: 45, email: "someone@example.com", ...over });

@@ -49,3 +49,18 @@ export const IconTrash = (p: P) => (
 export const IconInfo = (p: P) => (
   <svg {...base} {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.8v.6" /></svg>
 );
+export const IconContact = (p: P) => (
+  <svg {...base} {...p}><rect x="4" y="3.5" width="16" height="17" rx="2.5" /><circle cx="12" cy="10" r="2.6" /><path d="M7.5 17.5a4.5 4.5 0 0 1 9 0" /><path d="M2.5 8h1.5M2.5 12h1.5M2.5 16h1.5" /></svg>
+);
+export const IconMail = (p: P) => (
+  <svg {...base} {...p}><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m3.5 7 8.5 6 8.5-6" /></svg>
+);
+export const IconHotel = (p: P) => (
+  <svg {...base} {...p}><path d="M3 20V9.5a1.5 1.5 0 0 1 1.5-1.5H12v12M12 20h9V13a1.5 1.5 0 0 0-1.5-1.5H12" /><path d="M6.5 12h2M6.5 15.5h2M15 15h2" /><path d="M3 20h18" /></svg>
+);
+export const IconCard = (p: P) => (
+  <svg {...base} {...p}><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><path d="M7 14.5h4" /></svg>
+);
+export const IconSearch = (p: P) => (
+  <svg {...base} {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>
+);

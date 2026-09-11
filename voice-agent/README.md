@@ -98,12 +98,16 @@ links point at `.in`, which is the host actually serving the site.
 | Overview · Voice Calls · call detail | ElevenLabs Conversation API, live (transcript, summary, collected fields) |
 | Callback Queue (`/queue`) | `callback_queue` table — `/request-a-call` requests waiting for or through the dialler |
 | Trips & Leads → CRM Records | `voice_calls` table (post-call webhook), joined to the queue on phone |
+| Customers | `customer_directory` view + `customer_events` (main-site migration 0018), `bookings`/`passengers`/`payments`/`travellers`/`saved_addresses`/`enquiries`, voice rows joined on phone. Read-only; PAN/passport masked server-side |
 
 ## Hosting
 
-Deployed as its own Vercel project at **admin.riseandshinetravel.in** (Cloudflare
-CNAME `admin` → `cname.vercel-dns.com`, DNS-only). Still excluded from the main
-site's deploy by the root `.vercelignore`.
+Deployed as its own Vercel project at **admin.riseandshinetravel.com** (Cloudflare
+CNAME `admin` → `cname.vercel-dns.com`, DNS-only, in the `.com` zone). It moved
+from `admin.riseandshinetravel.in` on 2026-09-11 to match the main site, which
+serves on `.com` and redirects `.in`; the `.in` hostname stays attached to the
+Vercel project as a redirect so old reset links and bookmarks keep working.
+Still excluded from the main site's deploy by the root `.vercelignore`.
 
 ## Environment
 
@@ -120,7 +124,7 @@ DASHBOARD_ADMIN_PASSWORD=…              # bootstrap password for the seed admi
 # DASHBOARD_AUTH_ENABLED=true           # set in production; unset locally = simulated admin
 RESEND_API_KEY=re_…                     # same Resend account as the main site; without it "forgot password" is off
 EMAIL_FROM=Rise & Shine Travels <info@riseandshinetravel.com>       # VERIFIED Resend domain is .com, not .in
-DASHBOARD_URL=https://admin.riseandshinetravel.in                  # where the emailed reset link points
+DASHBOARD_URL=https://admin.riseandshinetravel.com                  # where the emailed reset link points
 ```
 
 ## Run

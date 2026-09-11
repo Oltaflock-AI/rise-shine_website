@@ -79,7 +79,7 @@ describe("resetLink", () => {
 
   it("falls back to the production dashboard when unset", () => {
     delete process.env.DASHBOARD_URL;
-    expect(resetLink("abc")).toBe("https://admin.riseandshinetravel.in/reset?token=abc");
+    expect(resetLink("abc")).toBe("https://admin.riseandshinetravel.com/reset?token=abc");
   });
 
   it("does not double the slash when the configured URL has a trailing one", () => {

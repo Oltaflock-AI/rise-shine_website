@@ -7,7 +7,7 @@
 // given and never reads it back out to a caller.
 //
 // This replaced the git-ignored .data/access.json file when the dashboard
-// moved onto Vercel (admin.riseandshinetravel.in): a serverless filesystem is
+// moved onto Vercel (admin.riseandshinetravel.com, formerly .in): a serverless filesystem is
 // ephemeral, and a team list that silently resets on a cold start is worse
 // than none.
 

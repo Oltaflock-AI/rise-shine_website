@@ -19,13 +19,14 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
   not components.
 - **`supabase/migrations/`** — account, passenger, payment-ledger, hotel-booking,
   voice-call-log (`0005`), callback-queue (`0006`), Cashfree column rename
-  (`0007`) and saved traveller/address details (`0008`) schema. TBO remains canonical;
+  (`0007`), saved traveller/address details (`0008`) and the customer
+  activity log + directory view (`0018`) schema. TBO remains canonical;
   Supabase is an account-facing mirror.
 - **`voice-agent/`** — separate Next.js 15 app: a dashboard over the ElevenLabs
   conversation API. Its own package manifest; run it from that directory. It is
   excluded from this project's deploy by `.vercelignore`, so it never ships with
   the website; it deploys as its **own Vercel project at
-  admin.riseandshinetravel.in**. The call data is read-only — the submit form,
+  admin.riseandshinetravel.com** (moved from `.in` 11-Sep-2026; `.in` redirects). The call data is read-only — the submit form,
   WhatsApp preview and outbound-call route were removed, and placing calls now
   belongs to `/request-a-call` (see **Voice** below). It also reads
   `callback_queue` (`/queue`) and `voice_calls` (CRM panel on leads) with the
@@ -45,6 +46,19 @@ older majors — check `node_modules/next/dist/docs/` before writing framework c
   session, and the link's origin comes from `DASHBOARD_URL` — never the request
   Host, which would let an attacker have the token delivered to their own
   domain.
+
+  **`/customers`** (`lib/customers.ts`) is the account-holder view: every
+  `auth.users` row through the `customer_directory` VIEW (main-site migration
+  `0018` — the view runs as its owner to read `auth.users`, so it is revoked
+  from `anon`/`authenticated`), plus bookings, payments, saved travellers,
+  addresses, enquiries, voice rows joined on phone, and the `customer_events`
+  timeline. READ-ONLY, and PAN/passport are masked in `lib/customers.ts`
+  before a page sees them — there is no reveal. Activity rows are written by
+  the MAIN site's `src/lib/activity.ts` from server code that already holds
+  the session (search pages, quote/order/book routes, lead delivery); there
+  is deliberately no public write route, and `sanitizeActivityProps` is a
+  closed whitelist so nothing identifying rides in `props`. Retention 18
+  months (privacy policy), pruned by `/api/cron/settle-intents`.
 
 ### The TBO booking layer (`src/lib/`) — server only
 

@@ -76,7 +76,7 @@ export function tooManyOutstanding(activeCount: number): boolean {
  * reset token delivered to a domain of their choosing.
  */
 export function resetLink(token: string): string {
-  const base = (process.env.DASHBOARD_URL || "https://admin.riseandshinetravel.in").replace(/\/+$/, "");
+  const base = (process.env.DASHBOARD_URL || "https://admin.riseandshinetravel.com").replace(/\/+$/, "");
   return `${base}/reset?token=${encodeURIComponent(token)}`;
 }
 
