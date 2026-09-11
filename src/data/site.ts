@@ -23,7 +23,7 @@ export const site = {
   // these are only used when that feed is unavailable (or in the client-side Hero).
   reviews: {
     rating: 5.0,
-    count: 97,
+    count: 110, // live Places value on 11-Sep-2026
     // TODO(khush): confirm the public Google Business profile / reviews URL.
     url: "https://www.google.com/search?q=Rise+%26+Shine+Travel+Chandkheda+Ahmedabad+reviews",
   },

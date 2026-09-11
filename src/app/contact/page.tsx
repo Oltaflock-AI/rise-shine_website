@@ -4,8 +4,10 @@ import { SectionHeading } from "@/components/sections/SectionHeading";
 import { Container } from "@/components/ui/Container";
 import { InfoCard } from "@/components/ui/InfoCard";
 import { Reveal } from "@/components/ui/Reveal";
+import { GooglePlaceCard } from "@/components/ui/GooglePlaceCard";
 import { ContactForm } from "@/components/forms/ContactForm";
 import { site } from "@/data/site";
+import { getGooglePlace } from "@/lib/google-place";
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -14,7 +16,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/contact" },
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  // Live Google Business Profile beside the map; null → static NAP card.
+  const place = await getGooglePlace();
+
   return (
     <>
       <PageHero
@@ -68,19 +73,24 @@ export default function ContactPage() {
             title="Locate our Ahmedabad office"
             className="mb-8"
           />
-          <Reveal>
-            <div className="overflow-hidden rounded-brand-lg shadow-brand">
-              <iframe
-                src={site.address.mapEmbed}
-                title="Rise & Shine Travels office location on Google Maps"
-                width="100%"
-                height={430}
-                style={{ border: 0, display: "block" }}
-                loading="lazy"
-                allowFullScreen
-              />
-            </div>
-          </Reveal>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-stretch">
+            <Reveal className="min-h-[430px]">
+              <div className="h-full overflow-hidden rounded-brand-lg shadow-brand">
+                <iframe
+                  src={site.address.mapEmbed}
+                  title="Rise & Shine Travels office location on Google Maps"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0, display: "block", minHeight: 430 }}
+                  loading="lazy"
+                  allowFullScreen
+                />
+              </div>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <GooglePlaceCard place={place} />
+            </Reveal>
+          </div>
         </Container>
       </section>
     </>
