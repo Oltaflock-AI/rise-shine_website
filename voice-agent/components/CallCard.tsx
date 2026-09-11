@@ -24,7 +24,7 @@ export function CallCard({ call }: { call: CallRecord }) {
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="card-name">{call.name ?? call.phone ?? "Unknown lead"}</div>
           <div className="card-meta">
-            {call.phone ?? "—"} · {fmtDuration(call.duration_secs)} · {fmtWhen(call.started_at_unix)}
+            <span className="num">{call.phone ?? "—"}</span> · {fmtDuration(call.duration_secs)} · {fmtWhen(call.started_at_unix)}
           </div>
         </div>
         <div className="card-badges">

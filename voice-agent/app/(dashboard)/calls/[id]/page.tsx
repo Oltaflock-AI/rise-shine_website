@@ -61,7 +61,7 @@ export default function CallDetail() {
         <div className="detail-id">
           <h1 className="detail-name">{call.name ?? call.phone ?? "Unknown lead"}</h1>
           <div className="detail-meta">
-            {call.phone ?? "—"} · {fmtDuration(call.duration_secs)} · {fmtAbsolute(call.started_at_unix)}
+            <span className="num">{call.phone ?? "—"}</span> · {fmtDuration(call.duration_secs)} · {fmtAbsolute(call.started_at_unix)}
             {call.language ? ` · ${call.language.toUpperCase()}` : ""}
           </div>
         </div>

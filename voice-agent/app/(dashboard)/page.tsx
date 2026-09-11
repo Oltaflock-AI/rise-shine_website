@@ -83,18 +83,14 @@ export default function Overview() {
     <>
       <PageHeader title="Overview" subtitle="AI voice sales engine · live travel pipeline" />
 
-      <div className="kpis">
-        <Kpi label="Voice Calls" value={m.total} sub={m.total ? `${m.answerRate}% answered` : "none yet"} icon={<IconPhone className="i" />} />
-        <Kpi label="Hot Leads" value={m.hot} sub={`${m.warm} warm behind them`} icon={<IconStar className="i" />} />
-        <Kpi label="Qualified Leads" value={m.qualified} sub={m.connected ? `${m.qualRate}% of connected calls` : "—"} icon={<IconCheck className="i" />} />
-        <Kpi label="Callbacks Booked" value={m.callbacks} sub="1–4 PM slots locked" icon={<IconCalendar className="i" />} />
-      </div>
-
-      <div className="kpis">
-        <Kpi label="Connected Calls" value={m.connected} sub={`of ${m.total} placed`} icon={<IconPhone className="i" />} />
+      {/* The five numbers that describe the funnel, in funnel order:
+          placed → picked up → qualified → how long → booked. */}
+      <div className="kpis kpis-5">
+        <Kpi label="Voice Calls" value={m.total} sub={`${m.connected} connected · ${fmtDuration(m.talkSecs)} talk time`} icon={<IconPhone className="i" />} />
+        <Kpi label="Pickup Rate" value={m.total ? `${m.answerRate}%` : "—"} sub={m.total ? `${m.connected} of ${m.total} answered` : "no calls yet"} icon={<IconPhone className="i" />} />
+        <Kpi label="Qualified Leads" value={m.qualified} sub={m.connected ? `${m.qualRate}% of connected · ${m.hot} hot` : "—"} icon={<IconCheck className="i" />} />
         <Kpi label="Avg Call Time" value={fmtDuration(m.avg)} sub="per connected call" icon={<IconClock className="i" />} />
-        <Kpi label="Total Talk Time" value={fmtDuration(m.talkSecs)} sub="across every call" icon={<IconClock className="i" />} />
-        <Kpi label="Callback Rate" value={m.connected ? `${Math.round((m.callbacks / m.connected) * 100)}%` : "—"} sub="connected calls that booked" icon={<IconCalendar className="i" />} />
+        <Kpi label="Callback Rate" value={m.connected ? `${Math.round((m.callbacks / m.connected) * 100)}%` : "—"} sub={`${m.callbacks} booked · 1–4 PM slots`} icon={<IconCalendar className="i" />} />
       </div>
 
       <div className="two-col">
