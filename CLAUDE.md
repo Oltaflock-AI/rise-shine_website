@@ -84,8 +84,19 @@ verification, and refund path mirrors the flight one and is live-ready but keyle
 Post-booking detail, voucher, and cancellation calls live in `tbo-hotel-post.ts`.
 Never retry Hotel Book after a timeout; recover by client reference.
 
-**The static-IP proxy truncates large responses.** `TBO_PROXY_URL` drops the
-socket part-way through anything much over ~1 MB. `HotelDetails` returns ~21 kB
+**The static-IP proxy USED TO truncate large responses.** Through 11-Sep-2026
+the VPS ran tinyproxy 1.11, which dropped CONNECT tunnels part-way through
+anything much over ~2 MB (`Error reading readable client_fd`, 224× in a week).
+It now runs **Squid** (same droplet, same IP `64.227.157.194`, ports 8888 +
+8889, allowlist `tektravels.com` · `tbotechnology.in` ·
+`travelboutiqueonline.com` — the last one is where FLIGHTS authenticate; leaving
+it out took flight search down for 100 s during the cutover). A 4.3 MB
+HotelDetails failed 4/12 through tinyproxy and 0/12 through Squid;
+`scripts/proxy-truncation-probe.mts` re-measures that exact number. Rebuild and
+snapshot SOP for Adnan: `reference/hotel-cert/static-ip-proxy/`. Managed-proxy
+break-glass plan: `platform_docs/tbo-proxy-managed-fallback.md`. The history
+below is kept because the chunking it produced is still the right shape:
+`TBO_PROXY_URL` dropped the socket part-way through anything much over ~1 MB. `HotelDetails` returns ~21 kB
 per hotel, so asking for a whole result page in one call was a 3–4 MB response
 that failed **5 times in 12** through the proxy and 0 in 12 without it — and
 because `hotelInfoBatch` swallowed the error, ~40% of hotel searches rendered
