@@ -23,7 +23,7 @@ export default async function HotelVoucherPage({
   const id = Number(bookingId);
 
   return (
-    <main className="pt-28 sm:pt-32">
+    <main className="pt-28 sm:pt-32" data-clarity-mask="True">
       {Number.isFinite(id) && id > 0 ? (
         <HotelVoucherView bookingId={id} />
       ) : (

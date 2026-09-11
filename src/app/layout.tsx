@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
+import { Clarity } from "@/components/layout/Clarity";
 import { AuthProvider } from "@/lib/auth";
 import { site } from "@/data/site";
 import { cn } from "@/lib/cn";
@@ -155,6 +156,7 @@ export default function RootLayout({
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
         )}
         <Analytics />
+        <Clarity />
       </body>
     </html>
   );

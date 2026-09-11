@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MaskedFromReplay } from "@/components/layout/MaskedFromReplay";
 import { AccountView } from "@/components/auth/AccountView";
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function AccountPage() {
-  return <AccountView />;
+  return (
+    <MaskedFromReplay>
+      <AccountView />
+    </MaskedFromReplay>
+  );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MaskedFromReplay } from "@/components/layout/MaskedFromReplay";
 import { HotelCheckoutView } from "@/components/checkout/HotelCheckoutView";
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function HotelCheckoutPage() {
-  return <HotelCheckoutView />;
+  return (
+    <MaskedFromReplay>
+      <HotelCheckoutView />
+    </MaskedFromReplay>
+  );
 }
