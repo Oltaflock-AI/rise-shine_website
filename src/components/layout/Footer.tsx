@@ -129,21 +129,20 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h2 className="mb-5 text-[1.05rem] text-white">Get in touch</h2>
+            {/* Each icon sits in a box as tall as the FIRST line beside it, so
+                it centres on that line rather than floating above it: h-6 for
+                plain text, h-11 where the link carries a 44px tap target. */}
             <ul className="flex flex-col gap-4 text-[0.91rem] text-white/65">
               <li className="flex gap-3">
-                <MapPin
-                  size={18}
-                  className="flex-none text-silver"
-                  aria-hidden
-                />
-                <span>{site.address.full}</span>
+                <span className="flex h-6 flex-none items-center">
+                  <MapPin size={18} className="text-silver" aria-hidden />
+                </span>
+                <span className="leading-6">{site.address.full}</span>
               </li>
               <li className="flex gap-3">
-                <Phone
-                  size={18}
-                  className="flex-none text-silver"
-                  aria-hidden
-                />
+                <span className="flex h-11 flex-none items-center">
+                  <Phone size={18} className="text-silver" aria-hidden />
+                </span>
                 <span className="flex flex-col">
                   <a href={site.phone.landlineHref} className="inline-flex min-h-11 items-center hover:text-white">
                     {site.phone.landlineDisplay}
@@ -154,7 +153,9 @@ export function Footer() {
                 </span>
               </li>
               <li className="flex gap-3">
-                <Mail size={18} className="flex-none text-silver" aria-hidden />
+                <span className="flex h-11 flex-none items-center">
+                  <Mail size={18} className="text-silver" aria-hidden />
+                </span>
                 <a href={`mailto:${site.email}`} className="inline-flex min-h-11 items-center break-all hover:text-white">
                   {site.email}
                 </a>
