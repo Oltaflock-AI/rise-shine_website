@@ -8,7 +8,7 @@ import { Stars } from "./Stars";
 
 /**
  * The Google Business Profile listing, rendered like a Maps knowledge card:
- * cover photo, name, rating, live open/closed, address, phone, hours and the
+ * brand header, name, rating, live open/closed, address, phone, hours and the
  * Directions / Write-a-review links. Given `null` (no key, API down) it falls
  * back to the NAP in `data/site.ts` so /contact never loses the panel.
  */
@@ -33,22 +33,26 @@ export function GooglePlaceCard({ place }: { place: GooglePlace | null }) {
       aria-label={`${name} on Google`}
       className="flex h-full flex-col overflow-hidden rounded-brand-lg border border-line bg-white shadow-brand"
     >
-      {place?.photo && (
-        <div className="relative aspect-[16/9] w-full bg-cream-3">
-          <Image
-            src={place.photo.url}
-            alt={`${name} office`}
-            fill
-            sizes="(min-width: 1024px) 380px, 100vw"
-            className="object-cover"
-          />
-          {place.photo.credit && (
-            <span className="absolute bottom-1.5 right-2 rounded bg-black/45 px-1.5 py-0.5 text-meta text-white/90">
-              Photo: {place.photo.credit}
-            </span>
-          )}
-        </div>
-      )}
+      {/* Brand header instead of a Places photo: the listing's photos are all
+          customer holiday shots, and a mountain range says nothing about an
+          Ahmedabad office. */}
+      <div className="grad-navy relative flex h-36 items-center justify-center overflow-hidden">
+        <span
+          aria-hidden
+          className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/[0.06]"
+        />
+        <span
+          aria-hidden
+          className="absolute -bottom-14 -left-8 h-36 w-36 rounded-full bg-white/[0.05]"
+        />
+        <Image
+          src="/brand/logo-white.png"
+          alt={site.name}
+          width={216}
+          height={81}
+          className="relative h-14 w-auto"
+        />
+      </div>
 
       <div className="flex flex-1 flex-col gap-4 p-6">
         <div>

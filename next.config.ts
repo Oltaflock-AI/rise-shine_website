@@ -41,12 +41,6 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "tboholidays.com",
       },
-      // Google Business Profile cover photo (lib/google-place resolves the
-      // Places photo to this keyless CDN URL).
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-      },
     ],
   },
   async redirects() {

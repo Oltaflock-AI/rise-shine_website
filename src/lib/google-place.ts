@@ -2,14 +2,15 @@
  * Google Business Profile listing — SERVER ONLY (reads GOOGLE_MAPS_API_KEY).
  *
  * Feeds the listing card beside the office map on /contact: name, address,
- * rating, hours, phone, the Google Maps / directions / write-a-review links
- * and one cover photo. Places API (New, v1) only — the legacy Place Details
- * endpoint is not enabled on the project's key (it answers REQUEST_DENIED),
- * which is also why `google-reviews.ts` ends up on its v1 fallback.
+ * rating, hours, phone and the Google Maps / directions / write-a-review
+ * links. Places API (New, v1) only — the legacy Place Details endpoint is not
+ * enabled on the project's key (it answers REQUEST_DENIED), which is also why
+ * `google-reviews.ts` ends up on its v1 fallback.
  *
- * The cover photo goes through `/media?skipHttpRedirect=true`, which answers
- * with a keyless `lh3.googleusercontent.com` URL. The direct media URL needs
- * the API key in the query string, and that must never reach the browser.
+ * No photo on purpose: every photo on the listing is a customer's holiday
+ * shot (checked 11-Sep-2026 — mountains, safaris, a skydive), so the card
+ * wears the brand header instead. If one is ever wanted, resolve it through
+ * `/media?skipHttpRedirect=true` — the direct media URL carries the API key.
  *
  * Cached in the Next.js data cache for 6h (same window as the reviews feed).
  * Returns `null` on any failure so the card falls back to the NAP in
@@ -32,7 +33,6 @@ export type GooglePlace = {
   /** "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY" */
   status: string | null;
   links: { place: string; directions: string | null; review: string | null };
-  photo: { url: string; width: number; height: number; credit: string | null } | null;
 };
 
 const REVALIDATE_SECONDS = 21_600;
@@ -52,7 +52,6 @@ const FIELD_MASK = [
   "businessStatus",
   "googleMapsUri",
   "googleMapsLinks",
-  "photos",
 ].join(",");
 
 function apiKey(): string {
@@ -79,40 +78,6 @@ async function findPlaceId(): Promise<string | null> {
   return data.places?.[0]?.id ?? null;
 }
 
-type V1Photo = {
-  name: string;
-  widthPx?: number;
-  heightPx?: number;
-  authorAttributions?: { displayName?: string }[];
-};
-
-/** Resolve a photo resource to its public CDN URL (no key in it). */
-async function resolvePhoto(photo: V1Photo): Promise<GooglePlace["photo"]> {
-  const url =
-    `https://places.googleapis.com/v1/${photo.name}/media` +
-    `?maxWidthPx=900&skipHttpRedirect=true&key=${apiKey()}`;
-  const res = await fetch(url, cache);
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (typeof data.photoUri !== "string") return null;
-  return {
-    url: data.photoUri,
-    width: photo.widthPx ?? 900,
-    height: photo.heightPx ?? 600,
-    credit: photo.authorAttributions?.[0]?.displayName ?? null,
-  };
-}
-
-/**
- * Prefer a landscape photo — the card's cover is 16:9, and a 3:4 portrait
- * (typical for a phone shot of the office door) crops to a sliver of nothing.
- */
-function pickPhoto(photos: V1Photo[]): V1Photo | undefined {
-  return (
-    photos.find((p) => (p.widthPx ?? 0) > (p.heightPx ?? 0)) ?? photos[0]
-  );
-}
-
 async function fetchPlace(): Promise<GooglePlace | null> {
   const placeId = process.env.GOOGLE_PLACE_ID || (await findPlaceId());
   if (!placeId) return null;
@@ -124,9 +89,6 @@ async function fetchPlace(): Promise<GooglePlace | null> {
   if (!res.ok) return null;
   const d = await res.json();
   if (!d.displayName?.text) return null;
-
-  const photoRes = pickPhoto(d.photos ?? []);
-  const photo = photoRes ? await resolvePhoto(photoRes).catch(() => null) : null;
 
   const intl: string | undefined = d.internationalPhoneNumber;
   const phone = intl
@@ -155,7 +117,6 @@ async function fetchPlace(): Promise<GooglePlace | null> {
       directions: d.googleMapsLinks?.directionsUri ?? null,
       review: d.googleMapsLinks?.writeAReviewUri ?? null,
     },
-    photo,
   };
 }
 
