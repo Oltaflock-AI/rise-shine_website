@@ -22,6 +22,24 @@ interface CrmCall {
   queue_status: string | null;
 }
 
+// One tone vocabulary for queue states and call outcomes.
+function statusTone(v: string): "ok" | "fail" | "proc" | "" {
+  switch (v) {
+    case "done":
+    case "success":
+      return "ok";
+    case "failed":
+    case "failure":
+    case "cancelled":
+      return "fail";
+    case "pending":
+    case "calling":
+      return "proc";
+    default:
+      return "";
+  }
+}
+
 export default function Leads() {
   const { calls, loading } = useCalls();
   const [qualifiedOnly, setQualifiedOnly] = useState(true);
@@ -145,7 +163,7 @@ export default function Leads() {
             <div className="panel-empty">No webhook records yet — they appear after the next completed call.</div>
           ) : (
             <div className="trip-table">
-              <div className="trip-row trip-head">
+              <div className="trip-row crm-row trip-head">
                 <span>Lead</span>
                 <span>Destination</span>
                 <span>Summary</span>
@@ -154,12 +172,12 @@ export default function Leads() {
                 <span>When</span>
               </div>
               {crm.map((c) => (
-                <Link key={c.conversation_id} href={`/calls/${c.conversation_id}`} className="trip-row">
+                <Link key={c.conversation_id} href={`/calls/${c.conversation_id}`} className="trip-row crm-row">
                   <span className="trip-name">{c.lead_name ?? c.lead_phone ?? "Unknown"}</span>
                   <span>{c.destination ?? "—"}</span>
-                  <span className="dim">{c.summary ? `${c.summary.slice(0, 90)}…` : "—"}</span>
-                  <span>{c.queue_status ? <span className="chip">{c.queue_status}</span> : "—"}</span>
-                  <span><span className="chip">{c.call_successful ?? "unknown"}</span></span>
+                  <span className="crm-summary">{c.summary ?? "—"}</span>
+                  <span>{c.queue_status ? <span className={`pill ${statusTone(c.queue_status)}`}>{c.queue_status}</span> : "—"}</span>
+                  <span><span className={`pill ${statusTone(c.call_successful ?? "unknown")}`}>{c.call_successful ?? "unknown"}</span></span>
                   <span className="trip-when">{c.started_at ? fmtWhen(Date.parse(c.started_at) / 1000) : "—"}</span>
                 </Link>
               ))}

@@ -25,6 +25,14 @@ interface QueueRow {
   created_at: string;
 }
 
+const TONE: Record<QueueRow["status"], "ok" | "fail" | "proc"> = {
+  pending: "proc",
+  calling: "proc",
+  done: "ok",
+  failed: "fail",
+  cancelled: "fail",
+};
+
 const GROUPS: { title: string; statuses: QueueRow["status"][]; empty: string }[] = [
   { title: "Waiting to be dialled", statuses: ["pending", "calling"], empty: "Nothing queued right now." },
   { title: "Completed", statuses: ["done"], empty: "No completed callbacks yet." },
@@ -83,7 +91,7 @@ export default async function QueuePage() {
                         <span className="num">{r.phone}</span>
                         <span>{fmtWhen(Date.parse(r.due_at) / 1000)}</span>
                         <span className="num">{r.attempts}</span>
-                        <span><span className="chip">{r.status}</span></span>
+                        <span><span className={`pill ${TONE[r.status]}`}>{r.status}</span></span>
                         <span className="dim">{r.last_error ?? r.source ?? "—"}</span>
                       </div>
                     ))}

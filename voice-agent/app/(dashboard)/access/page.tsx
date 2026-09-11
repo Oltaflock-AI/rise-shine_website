@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { IconInfo, IconTrash, IconUsers } from "@/components/icons";
+import { IconCheck, IconInfo, IconTrash, IconUsers } from "@/components/icons";
+import { initial } from "@/lib/format";
 import {
   ROLES,
   ROLE_INFO,
@@ -64,6 +65,9 @@ export default function AccessPage() {
   const [password, setPassword] = useState("");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
+  // Inline "reset password" row: which member is open, and the draft password.
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [resetPw, setResetPw] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -130,16 +134,19 @@ export default function AccessPage() {
       body: JSON.stringify({ email: member.email, role: nextRole }),
     });
 
-  const onResetPassword = async (member: AccessMember) => {
-    const fresh = window.prompt(`New password for ${member.email} (at least 10 characters):`);
-    if (fresh === null) return;
+  async function onResetPassword(e: React.FormEvent, member: AccessMember) {
+    e.preventDefault();
     const ok = await mutate("/api/access", {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ email: member.email, password: fresh }),
+      body: JSON.stringify({ email: member.email, password: resetPw }),
     });
-    if (ok) setNotice(`Password reset for ${member.email}. Their other sessions were signed out.`);
-  };
+    if (ok) {
+      setNotice(`Password reset for ${member.email}. Their other sessions were signed out.`);
+      setResetFor(null);
+      setResetPw("");
+    }
+  }
 
   const onRemove = (member: AccessMember) => {
     if (!window.confirm(`Remove access for ${member.email}? They will be signed out immediately.`)) return;
@@ -199,44 +206,50 @@ export default function AccessPage() {
             <IconUsers className="panel-head-icon" />
           </div>
           <div className="panel-body">
-            <form className="access-form" onSubmit={onAdd}>
-              <input
-                className="input"
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                aria-label="Email address"
-              />
-              <input
-                className="input"
-                type="password"
-                placeholder="Initial password (10+ characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={10}
-                required
-                autoComplete="new-password"
-                aria-label="Initial password"
-              />
-              <select
-                className="select"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                aria-label="Role"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_INFO[r].label}</option>
-                ))}
-              </select>
+            <form className="access-form access-form-add" onSubmit={onAdd}>
+              <label className="field">
+                <span className="label">Email</span>
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span className="label">Initial password</span>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="10+ characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={10}
+                  required
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="field">
+                <span className="label">Role</span>
+                <select
+                  className="select"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>{ROLE_INFO[r].label}</option>
+                  ))}
+                </select>
+              </label>
               <button className="btn btn-inline" type="submit" disabled={busy}>
-                {busy ? "Saving…" : "Add"}
+                {busy ? "Saving…" : "Add member"}
               </button>
             </form>
             <p className="access-hint">
-              {ROLE_INFO[role].blurb} Share the password with them directly; they can
-              change it once signed in.
+              <b>{ROLE_INFO[role].label}:</b> {ROLE_INFO[role].blurb} Share the
+              password with them directly; they can change it once signed in.
             </p>
           </div>
         </div>
@@ -258,59 +271,96 @@ export default function AccessPage() {
           ) : (
             <div className="member-table">
               <div className="member-row member-head">
-                <span>Email</span>
+                <span>Member</span>
                 <span>Role</span>
                 <span>Added</span>
-                <span />
+                <span className="member-actions-head">{canManage ? "Actions" : ""}</span>
               </div>
-              {members.map((m) => (
-                <div className="member-row" key={m.email}>
-                  <span className="member-email">{m.email}</span>
-                  {canManage ? (
-                    <select
-                      className="select sm"
-                      value={m.role}
-                      disabled={busy}
-                      onChange={(e) => void onChangeRole(m, e.target.value as Role)}
-                      aria-label={`Role for ${m.email}`}
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{ROLE_INFO[r].label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="badge q">{ROLE_INFO[m.role].label}</span>
-                  )}
-                  <span className="member-added">
-                    {fmtAdded(m.addedAt)}
-                    {m.addedBy && <em className="member-by"> by {m.addedBy}</em>}
-                  </span>
-                  {canManage ? (
-                    <span className="member-actions">
-                      <button
-                        className="btn-quiet"
-                        type="button"
-                        onClick={() => void onResetPassword(m)}
-                        disabled={busy}
-                      >
-                        Reset password
-                      </button>
-                      <button
-                        className="icon-btn"
-                        type="button"
-                        onClick={() => onRemove(m)}
-                        disabled={busy}
-                        aria-label={`Remove ${m.email}`}
-                        title="Remove access"
-                      >
-                        <IconTrash className="i" />
-                      </button>
+              {members.map((m) => {
+                const isYou = !!snap?.viewer && !snap.viewer.simulated && snap.viewer.email === m.email;
+                const open = resetFor === m.email;
+                return (
+                  <div className={`member-row${open ? " open" : ""}`} key={m.email}>
+                    <span className="trip-lead">
+                      <span className="avatar sm">{initial(m.email, null)}</span>
+                      <span className="trip-lead-text">
+                        <span className="member-email">
+                          {m.email}
+                          {isYou && <span className="badge q you">you</span>}
+                        </span>
+                      </span>
                     </span>
-                  ) : (
-                    <span />
-                  )}
-                </div>
-              ))}
+                    <span>
+                      {canManage ? (
+                        <select
+                          className="select sm"
+                          value={m.role}
+                          disabled={busy}
+                          onChange={(e) => void onChangeRole(m, e.target.value as Role)}
+                          aria-label={`Role for ${m.email}`}
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>{ROLE_INFO[r].label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="badge q">{ROLE_INFO[m.role].label}</span>
+                      )}
+                    </span>
+                    <span className="member-added">
+                      {fmtAdded(m.addedAt)}
+                      {m.addedBy && <em className="member-by">by {m.addedBy}</em>}
+                    </span>
+                    {canManage ? (
+                      <span className="member-actions">
+                        <button
+                          className={`btn-quiet${open ? " active" : ""}`}
+                          type="button"
+                          onClick={() => {
+                            setResetFor(open ? null : m.email);
+                            setResetPw("");
+                          }}
+                          disabled={busy}
+                        >
+                          {open ? "Cancel" : "Reset password"}
+                        </button>
+                        <button
+                          className="icon-btn"
+                          type="button"
+                          onClick={() => onRemove(m)}
+                          disabled={busy || isYou}
+                          aria-label={`Remove ${m.email}`}
+                          title={isYou ? "You cannot remove yourself" : "Remove access"}
+                        >
+                          <IconTrash className="i" />
+                        </button>
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    {open && (
+                      <form className="member-reset" onSubmit={(e) => void onResetPassword(e, m)}>
+                        <input
+                          className="input"
+                          type="password"
+                          placeholder={`New password for ${m.email} (10+ characters)`}
+                          value={resetPw}
+                          onChange={(e) => setResetPw(e.target.value)}
+                          minLength={10}
+                          required
+                          autoComplete="new-password"
+                          autoFocus
+                          aria-label={`New password for ${m.email}`}
+                        />
+                        <button className="btn btn-inline" type="submit" disabled={busy}>
+                          <IconCheck className="btn-icon" /> {busy ? "Saving…" : "Save password"}
+                        </button>
+                        <span className="member-reset-hint">Their other sessions are signed out when this saves.</span>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -322,32 +372,36 @@ export default function AccessPage() {
             <div className="panel-title">Change my password</div>
           </div>
           <div className="panel-body">
-            <form className="access-form" onSubmit={onChangeOwnPassword}>
-              <input
-                className="input"
-                type="password"
-                placeholder="Current password"
-                value={current}
-                onChange={(e) => setCurrent(e.target.value)}
-                required
-                autoComplete="current-password"
-                aria-label="Current password"
-              />
-              <input
-                className="input"
-                type="password"
-                placeholder="New password (10+ characters)"
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
-                minLength={10}
-                required
-                autoComplete="new-password"
-                aria-label="New password"
-              />
+            <form className="access-form access-form-pw" onSubmit={onChangeOwnPassword}>
+              <label className="field">
+                <span className="label">Current password</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={current}
+                  onChange={(e) => setCurrent(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </label>
+              <label className="field">
+                <span className="label">New password</span>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="10+ characters"
+                  value={next}
+                  onChange={(e) => setNext(e.target.value)}
+                  minLength={10}
+                  required
+                  autoComplete="new-password"
+                />
+              </label>
               <button className="btn btn-inline" type="submit" disabled={busy}>
-                {busy ? "Saving…" : "Change"}
+                {busy ? "Saving…" : "Change password"}
               </button>
             </form>
+            <p className="access-hint">Signed in as <b>{snap?.viewer?.email}</b>. Changing it signs out your other devices.</p>
           </div>
         </div>
       )}
@@ -363,20 +417,20 @@ export default function AccessPage() {
               <div className="panel-empty">No sign-in attempts yet.</div>
             ) : (
               <div className="member-table">
-                <div className="member-row member-head">
+                <div className="event-row member-head">
                   <span>Email</span>
                   <span>Result</span>
                   <span>When</span>
                   <span>IP</span>
                 </div>
                 {snap.events.map((ev) => (
-                  <div className="member-row" key={ev.id}>
+                  <div className="event-row" key={ev.id}>
                     <span className="member-email">{ev.email}</span>
                     <span>
                       <span className={`badge ${ev.ok ? "q" : "fail"}`}>{REASON_LABEL[ev.reason]}</span>
                     </span>
-                    <span className="member-added">{fmtWhen(Date.parse(ev.at) / 1000)}</span>
-                    <span className="dim">{ev.ip ?? "—"}</span>
+                    <span className="member-added" title={ev.at}>{fmtWhen(Date.parse(ev.at) / 1000)}</span>
+                    <span className="dim num">{ev.ip ?? "—"}</span>
                   </div>
                 ))}
               </div>
