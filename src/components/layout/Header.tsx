@@ -86,7 +86,8 @@ export function Header() {
   // children live under /packages so the prefix match already covers them; the
   // check stays for any future child whose path sits outside its parent's.
   const itemActive = (item: NavItem) =>
-    isActive(item.href) || (item.children?.some((child) => isActive(child.href)) ?? false);
+    isActive(item.href) ||
+    (item.children?.some((child) => isActive(child.href)) ?? false);
 
   // Pages that render a LIGHT background at the very top (no dark hero) need
   // dark header text even before scrolling, or the nav is invisible.
@@ -95,109 +96,117 @@ export function Header() {
   const navText = onLight ? "text-ink" : "text-white";
 
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled
-          ? "bg-cream/92 py-3 shadow-[0_8px_30px_rgba(8,50,73,0.08)] backdrop-blur-md"
-          : "py-5",
-      )}
-    >
-      <Container>
-        <nav className="flex items-center justify-between gap-6">
-          {/* Logo — white over the dark hero, red once scrolled */}
-          <Link
-            href="/"
-            className="relative flex min-h-11 items-center"
-            aria-label={`${site.name}, home`}
-          >
-            <Image
-              src="/brand/logo-white.png"
-              alt={site.name}
-              width={216}
-              height={81}
-              priority
-              className={cn(
-                "h-9 w-auto transition-opacity duration-300 sm:h-11",
-                onLight && "opacity-0",
-              )}
-            />
-            <Image
-              src="/brand/logo.png"
-              alt=""
-              width={216}
-              height={81}
-              className={cn(
-                "absolute left-0 top-0 h-9 w-auto transition-opacity duration-300 sm:h-11",
-                onLight ? "opacity-100" : "opacity-0",
-              )}
-            />
-          </Link>
-
-          {/* Desktop nav */}
-          <ul className="hidden items-center gap-1 lg:flex">
-            {navItems.map((item) => (
-              <li key={item.href} className="group relative">
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "relative inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[0.95rem] font-medium transition-colors",
-                    "after:absolute after:inset-x-4 after:bottom-1.5 after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:bg-red after:transition-transform after:duration-300 hover:after:scale-x-100",
-                    navText,
-                    itemActive(item) && "after:scale-x-100",
-                  )}
-                >
-                  {item.label}
-                  {item.children && (
-                    <ChevronDown size={15} strokeWidth={2.2} aria-hidden />
-                  )}
-                </Link>
-                {item.children && (
-                  <ul className="invisible absolute left-0 top-[120%] min-w-[220px] translate-y-2 rounded-2xl bg-white p-2.5 opacity-0 shadow-brand transition-all duration-200 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                    {item.children.map((child) => (
-                      <li key={child.href}>
-                        <Link
-                          href={child.href}
-                          className="flex items-center rounded-xl px-3.5 py-3 text-[0.92rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
-                        >
-                          {child.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+    <>
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-50 transition-all duration-300",
+          scrolled
+            ? "bg-cream/92 py-3 shadow-[0_8px_30px_rgba(8,50,73,0.08)] backdrop-blur-md"
+            : "py-5",
+        )}
+      >
+        <Container>
+          <nav className="flex items-center justify-between gap-6">
+            {/* Logo — white over the dark hero, red once scrolled */}
+            <Link
+              href="/"
+              className="relative flex min-h-11 items-center"
+              aria-label={`${site.name}, home`}
+            >
+              <Image
+                src="/brand/logo-white.png"
+                alt={site.name}
+                width={216}
+                height={81}
+                priority
+                className={cn(
+                  "h-9 w-auto transition-opacity duration-300 sm:h-11",
+                  onLight && "opacity-0",
                 )}
-              </li>
-            ))}
-          </ul>
+              />
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                width={216}
+                height={81}
+                className={cn(
+                  "absolute left-0 top-0 h-9 w-auto transition-opacity duration-300 sm:h-11",
+                  onLight ? "opacity-100" : "opacity-0",
+                )}
+              />
+            </Link>
 
-          {/* CTA + burger */}
-          <div className="flex items-center gap-2">
-            <HeaderAuth scrolled={onLight} />
-            <Button
-              href="/plan-my-trip"
-              arrow
-              className="hidden lg:inline-flex"
-            >
-              Plan My Trip
-            </Button>
-            <button
-              type="button"
-              className={cn(
-                "grid h-11 w-11 place-items-center rounded-full lg:hidden",
-                navText,
-              )}
-              ref={menuButtonRef}
-              aria-label="Open menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(true)}
-            >
-              <Menu size={26} />
-            </button>
-          </div>
-        </nav>
-      </Container>
+            {/* Desktop nav */}
+            <ul className="hidden items-center gap-1 lg:flex">
+              {navItems.map((item) => (
+                <li key={item.href} className="group relative">
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "relative inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[0.95rem] font-medium transition-colors",
+                      "after:absolute after:inset-x-4 after:bottom-1.5 after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:bg-red after:transition-transform after:duration-300 hover:after:scale-x-100",
+                      navText,
+                      itemActive(item) && "after:scale-x-100",
+                    )}
+                  >
+                    {item.label}
+                    {item.children && (
+                      <ChevronDown size={15} strokeWidth={2.2} aria-hidden />
+                    )}
+                  </Link>
+                  {item.children && (
+                    <ul className="invisible absolute left-0 top-[120%] min-w-[220px] translate-y-2 rounded-2xl bg-white p-2.5 opacity-0 shadow-brand transition-all duration-200 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                      {item.children.map((child) => (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
+                            className="flex items-center rounded-xl px-3.5 py-3 text-[0.92rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
+                          >
+                            {child.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
 
-      {/* Mobile menu */}
+            {/* CTA + burger */}
+            <div className="flex items-center gap-2">
+              <HeaderAuth scrolled={onLight} />
+              <Button
+                href="/plan-my-trip"
+                arrow
+                className="hidden lg:inline-flex"
+              >
+                Plan My Trip
+              </Button>
+              <button
+                type="button"
+                className={cn(
+                  "grid h-11 w-11 place-items-center rounded-full lg:hidden",
+                  navText,
+                )}
+                ref={menuButtonRef}
+                aria-label="Open menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen(true)}
+              >
+                <Menu size={26} />
+              </button>
+            </div>
+          </nav>
+        </Container>
+      </header>
+
+      {/*
+       * The drawer is a SIBLING of <header>, never a child. Once scrolled the
+       * header carries `backdrop-blur-md`, and a backdrop-filter makes an
+       * element a containing block for its `position: fixed` descendants — so
+       * nested here the drawer's `inset-0` resolved against the ~66px header
+       * box and the menu rendered as a clipped strip instead of full screen.
+       */}
       <div
         className={cn(
           "grad-navy fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain px-8 pt-24 transition-transform duration-300 lg:hidden",
@@ -251,6 +260,6 @@ export function Header() {
           <HeaderAuthMobile onNavigate={() => setMenuOpen(false)} />
         </nav>
       </div>
-    </header>
+    </>
   );
 }
