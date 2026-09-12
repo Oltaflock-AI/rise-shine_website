@@ -94,3 +94,48 @@ describe("decideAlert", () => {
     expect(d.reason).toBe("none");
   });
 });
+
+/**
+ * Two failing runs before anyone hears about it. A single 5-minute blip used
+ * to send DOWN and Recovered five minutes apart — ten mails overnight on
+ * 12-Sep-2026 for nothing anyone could act on.
+ */
+describe("decideAlert with confirm", () => {
+  const base = { since: ago(5 * HOUR), lastAlertAt: null, confirm: true, now: NOW };
+
+  it("stores the first failure as suspect and says nothing", () => {
+    const d = decideAlert({ ...base, prevStatus: "ok", ok: false });
+    expect(d.reason).toBe("suspect");
+    expect(d.status).toBe("suspect");
+    expect(d.since).toEqual(NOW);
+  });
+
+  it("alerts on the second failure, dated from the first", () => {
+    const d = decideAlert({ ...base, prevStatus: "suspect", since: ago(5 * 60_000), ok: false });
+    expect(d.reason).toBe("transition");
+    expect(d.status).toBe("fail");
+    expect(d.since.toISOString()).toBe(ago(5 * 60_000));
+  });
+
+  it("swallows a blip: ok after suspect is not a recovery", () => {
+    const d = decideAlert({ ...base, prevStatus: "suspect", since: ago(5 * 60_000), ok: true });
+    expect(d.reason).toBe("none");
+    expect(d.status).toBe("ok");
+  });
+
+  it("still recovers from a confirmed failure", () => {
+    const d = decideAlert({ ...base, prevStatus: "fail", ok: true });
+    expect(d.reason).toBe("recovery");
+  });
+
+  it("money checks skip confirmation", () => {
+    const d = decideAlert({ ...base, confirm: false, prevStatus: "ok", ok: false });
+    expect(d.reason).toBe("transition");
+    expect(d.status).toBe("fail");
+  });
+
+  it("a failed state read still alerts rather than waiting", () => {
+    const d = decideAlert({ ...base, prevStatus: null, stateReadFailed: true, ok: false });
+    expect(d.reason).toBe("transition");
+  });
+});

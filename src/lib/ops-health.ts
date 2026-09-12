@@ -78,7 +78,7 @@ function humanDuration(ms: number): string {
  * Returns what it decided, so the cron response can show it — a monitor whose
  * own decisions are invisible is hard to trust and harder to debug.
  */
-export type AlertReason = "transition" | "reminder" | "recovery" | "none";
+export type AlertReason = "transition" | "reminder" | "recovery" | "suspect" | "none";
 
 /**
  * Should this outcome send mail, and when did the current state begin?
@@ -94,25 +94,41 @@ export function decideAlert(args: {
   lastAlertAt: string | null;
   ok: boolean;
   stateReadFailed?: boolean;
+  /**
+   * Require two consecutive failing runs before calling it down. The first
+   * failure is stored as 'suspect' and says nothing; a second one alerts with
+   * `since` set to the FIRST failure, so "failing for 10 min" stays true. An
+   * 'ok' after 'suspect' is a blip nobody hears about. Overnight on
+   * 12-Sep-2026 five such blips each mailed DOWN + Recovered — ten mails for
+   * nothing anyone could act on. Money checks pass `false`: those are already
+   * windowed by an hour and a real orphan must not wait another five minutes.
+   */
+  confirm?: boolean;
   now: Date;
-}): { reason: AlertReason; since: Date } {
-  const status = args.ok ? "ok" : "fail";
-  const changed = args.prevStatus === null || args.prevStatus !== status;
-  const since = changed || !args.since ? args.now : new Date(args.since);
+}): { reason: AlertReason; since: Date; status: "ok" | "suspect" | "fail" } {
+  const wasDown = args.prevStatus === "fail";
+  const wasSuspect = args.prevStatus === "suspect";
   const lastAlert = args.lastAlertAt ? new Date(args.lastAlertAt) : null;
+  const stored = args.since ? new Date(args.since) : args.now;
 
   if (!args.ok) {
     // A failed state read means we cannot know whether this was already
     // reported. Repeat rather than risk saying nothing.
-    if (changed || args.stateReadFailed) return { reason: "transition", since };
-    if (!lastAlert || args.now.getTime() - lastAlert.getTime() > REMIND_AFTER_MS)
-      return { reason: "reminder", since };
-    return { reason: "none", since };
+    if (args.stateReadFailed) return { reason: "transition", since: args.now, status: "fail" };
+    if (wasDown) {
+      const remind = !lastAlert || args.now.getTime() - lastAlert.getTime() > REMIND_AFTER_MS;
+      return { reason: remind ? "reminder" : "none", since: stored, status: "fail" };
+    }
+    if (wasSuspect) return { reason: "transition", since: stored, status: "fail" };
+    if (args.confirm) return { reason: "suspect", since: args.now, status: "suspect" };
+    return { reason: "transition", since: args.now, status: "fail" };
   }
 
-  // A first-ever 'ok' row is not a recovery — there was no outage to recover from.
-  if (changed && args.prevStatus === "fail") return { reason: "recovery", since };
-  return { reason: "none", since };
+  // A first-ever 'ok' row is not a recovery — there was no outage to recover
+  // from — and neither is an 'ok' after 'suspect': nobody was told.
+  if (wasDown) return { reason: "recovery", since: args.now, status: "ok" };
+  const since = args.prevStatus === "ok" ? stored : args.now;
+  return { reason: "none", since, status: "ok" };
 }
 
 /** True when this key has not been alerted in-process inside the reminder window. */
@@ -123,7 +139,7 @@ function throttleAllows(key: string): boolean {
 
 export async function recordCheck(
   result: CheckResult,
-): Promise<{ alerted: boolean; reason: "transition" | "reminder" | "recovery" | "none" | "no-state" }> {
+): Promise<{ alerted: boolean; reason: AlertReason | "no-state" }> {
   if (!supabaseAdminConfigured) {
     // Nowhere to remember state. Alert on failure rather than swallowing it,
     // but not on every run.
@@ -144,7 +160,6 @@ export async function recordCheck(
 
   const admin = createAdminClient();
   const now = new Date();
-  const status = result.ok ? "ok" : "fail";
 
   let prev: Stored | null = null;
   let stateReadFailed = false;
@@ -166,9 +181,11 @@ export async function recordCheck(
     lastAlertAt: prev?.last_alert_at ?? null,
     ok: result.ok,
     stateReadFailed,
+    confirm: !MONEY_CHECKS.has(result.key),
     now,
   });
   const since = decision.since;
+  const status = decision.status;
   const lastAlert = prev?.last_alert_at ? new Date(prev.last_alert_at) : null;
   const reason = decision.reason;
   let alerted = false;

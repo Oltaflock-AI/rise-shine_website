@@ -112,6 +112,15 @@ new orders in ~2 minutes and puts a "call us" strip on the site. Search still
 works. Use it the moment two customers hit the same fault. Orders already open
 are refunded by the settle cron.
 
+## What is NOT a false alert
+
+- Every non-money check needs **two consecutive failing runs** (10 min)
+  before it mails. A single blip is stored as `suspect` in `ops_health` and
+  never mentioned. So a `DOWN:` mail means it was broken for two probes.
+- Money checks (`ledger_orphans`) alert on the first run — they are already
+  windowed by an hour.
+- `Recovered:` mails are email-only; they never reach Sentry.
+
 ## Alert routing (what pages vs. what mails)
 
 Every alert mails `ALERT_EMAIL` and reaches Sentry with a `tier` tag

@@ -28,15 +28,20 @@ export async function alertOps(
   // vanishes. Sentry is a separate path with its own routing (Slack, SMS,
   // on-call), and a no-op when no DSN is set. Subject only: the details carry
   // customer email, PAN and order ids, and Sentry's retention is not ours.
-  try {
-    // `tier` is what the Sentry alert rules route on — see lib/alert-tier.ts.
-    Sentry.captureMessage(`[OPS] ${subject}`, {
-      level: sentryLevel(tier),
-      tags: { source: "alertOps", tier },
-      fingerprint: ["alertOps", subject],
-    });
-  } catch (e) {
-    console.error("[ALERT] Sentry capture failed:", e);
+  // Recoveries and self-settled refunds are for the email trail only. In
+  // Sentry every one re-opened a "[OPS] Recovered: …" issue that then read as
+  // a regression the moment someone resolved it.
+  if (tier !== "info") {
+    try {
+      // `tier` is what the Sentry alert rules route on — see lib/alert-tier.ts.
+      Sentry.captureMessage(`[OPS] ${subject}`, {
+        level: sentryLevel(tier),
+        tags: { source: "alertOps", tier },
+        fingerprint: ["alertOps", subject],
+      });
+    } catch (e) {
+      console.error("[ALERT] Sentry capture failed:", e);
+    }
   }
   if (!emailConfigured) return;
   const rows = Object.entries(details)
