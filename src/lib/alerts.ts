@@ -12,23 +12,27 @@ import "server-only";
 import { site } from "@/data/site";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import * as Sentry from "@sentry/nextjs";
+import { alertTier, sentryLevel } from "@/lib/alert-tier";
 
 const ALERT_TO = process.env.ALERT_EMAIL || site.email;
 
 export async function alertOps(
   subject: string,
   details: Record<string, unknown>,
+  opts?: { money?: boolean },
 ): Promise<void> {
-  console.error(`[ALERT] ${subject}`, details);
+  const tier = alertTier(subject, opts);
+  console.error(`[ALERT:${tier}] ${subject}`, details);
   // Second channel. Email is one transport with one recipient; if Resend is the
   // thing that broke — or the inbox is full, muted or on holiday — the alert
   // vanishes. Sentry is a separate path with its own routing (Slack, SMS,
   // on-call), and a no-op when no DSN is set. Subject only: the details carry
   // customer email, PAN and order ids, and Sentry's retention is not ours.
   try {
+    // `tier` is what the Sentry alert rules route on — see lib/alert-tier.ts.
     Sentry.captureMessage(`[OPS] ${subject}`, {
-      level: /URGENT|FAILED|DOWN/.test(subject) ? "error" : "warning",
-      tags: { source: "alertOps" },
+      level: sentryLevel(tier),
+      tags: { source: "alertOps", tier },
       fingerprint: ["alertOps", subject],
     });
   } catch (e) {

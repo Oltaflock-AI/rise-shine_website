@@ -23,6 +23,14 @@ import "server-only";
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
 import { alertOps } from "@/lib/alerts";
 
+/**
+ * Checks whose failure means a customer's money may be stuck, not that the
+ * site is refusing customers. These page (SMS) rather than mail — see
+ * lib/alert-tier.ts. Everything else failing means bookings are being
+ * refused up front, which costs revenue but nobody's money.
+ */
+const MONEY_CHECKS: ReadonlySet<string> = new Set(["ledger_orphans"]);
+
 /** How long a check may stay broken before it earns another email. */
 const REMIND_AFTER_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -120,11 +128,15 @@ export async function recordCheck(
     // Nowhere to remember state. Alert on failure rather than swallowing it,
     // but not on every run.
     if (!result.ok && throttleAllows(result.key)) {
-      await alertOps(`DOWN: ${result.label}`, {
-        check: result.key,
-        detail: result.detail,
-        note: "Supabase admin is not configured, so this alert cannot be de-duplicated.",
-      });
+      await alertOps(
+        `DOWN: ${result.label}`,
+        {
+          check: result.key,
+          detail: result.detail,
+          note: "Supabase admin is not configured, so this alert cannot be de-duplicated.",
+        },
+        { money: MONEY_CHECKS.has(result.key) },
+      );
       return { alerted: true, reason: "no-state" };
     }
     return { alerted: false, reason: "no-state" };
@@ -179,6 +191,7 @@ export async function recordCheck(
         durationMs: result.durationMs ?? "—",
         ...(stateReadFailed ? { note: "ops_health read failed — alert not de-duplicated." } : {}),
       },
+      { money: MONEY_CHECKS.has(result.key) },
     );
     alerted = true;
     lastAlertInProcess.set(result.key, now.getTime());
