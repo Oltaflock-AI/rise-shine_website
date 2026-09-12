@@ -17,22 +17,20 @@ export default async function HomePage() {
   // Slim, serializable slice for the client-side Hero badge; Testimonials
   // fetches the full feed itself (the underlying GETs are memoized per render).
   const live = await getGoogleReviews();
+  const reviews = live
+    ? { rating: live.rating, count: live.count, url: live.url }
+    : undefined;
   return (
     <>
-      <Hero
-        reviews={
-          live
-            ? { rating: live.rating, count: live.count, url: live.url }
-            : undefined
-        }
-      />
+      <Hero reviews={reviews} />
       <SearchBar />
-      <div className="mx-auto -mt-2 mb-2 max-w-6xl px-4 sm:px-6">
-        <RecentSearches className="pt-4" />
+      <div className="mx-auto mb-2 max-w-6xl px-4 sm:px-6">
+        <RecentSearches className="pt-6" />
       </div>
+      {/* Packages first — the "offers" strip the OTA layout puts under the widget. */}
+      <FeaturedItineraries />
       <Marquee />
       <ServicesOverview />
-      <FeaturedItineraries />
       <AboutSplit />
       <StatsBand />
       <Testimonials />
