@@ -171,20 +171,66 @@ export async function probeProxy(): Promise<CheckResult> {
  */
 const STALE_MIN = 15;
 
-export async function probeCallbackQueue(): Promise<CheckResult> {
+/**
+ * A probe that reads Supabase. `dbError` is set when the READ failed, as
+ * opposed to the thing being read being wrong: the probe then reports ok with
+ * a "not checked" detail, and `probeSupabaseRest` turns the read failures into
+ * one check of their own.
+ *
+ * The two used to share a verdict. Overnight on 12-Sep-2026 the free-tier
+ * Postgres timed out five times in seven hours and every one of them paged as
+ * "DOWN: Captured payments with no booking" — the one subject that means a
+ * customer paid and got nothing — when not a rupee had moved. A label that
+ * means "money lost" must only ever mean that, or it stops being read.
+ */
+export type DbProbeResult = CheckResult & { dbError?: string };
+
+/** One retry with a short pause: a single timeout on a 5-minute cadence is noise, two in a row is a signal. */
+const READ_RETRY_MS = 1_500;
+
+type ReadOutcome = { error: { message: string } | null };
+
+// PromiseLike, not Promise: a Postgrest query builder is a thenable.
+async function readWithRetry<R extends ReadOutcome>(read: () => PromiseLike<R>): Promise<R> {
+  const attempt = async (): Promise<R> => {
+    const r = await read();
+    if (r.error) throw new Error(r.error.message);
+    return r;
+  };
+  try {
+    return await attempt();
+  } catch {
+    await new Promise((r) => setTimeout(r, READ_RETRY_MS));
+    return attempt();
+  }
+}
+
+function unchecked(base: { key: string; label: string }, what: string, e: unknown): DbProbeResult {
+  const dbError = `${what} read failed: ${e instanceof Error ? e.message : String(e)}`;
+  return { ...base, ok: true, detail: `not checked — ${dbError} (see supabase_rest)`, dbError };
+}
+
+export async function probeCallbackQueue(): Promise<DbProbeResult> {
   const base = { key: "callback_queue", label: "Callback queue dispatcher" };
   if (!supabaseAdminConfigured) return { ...base, ok: true, detail: "skipped — no Supabase admin" };
+  const cutoff = new Date(Date.now() - STALE_MIN * 60_000).toISOString();
+  const admin = createAdminClient();
+  let data: Array<{ due_at: string | null }> | null;
+  let count: number | null;
   try {
-    const cutoff = new Date(Date.now() - STALE_MIN * 60_000).toISOString();
-    const admin = createAdminClient();
-    const { data, error, count } = await admin
-      .from("callback_queue")
-      .select("id, phone, due_at", { count: "exact" })
-      .eq("status", "pending")
-      .lt("due_at", cutoff)
-      .order("due_at", { ascending: true })
-      .limit(5);
-    if (error) return { ...base, ok: false, detail: `queue read failed: ${error.message}` };
+    ({ data, count } = await readWithRetry(() =>
+      admin
+        .from("callback_queue")
+        .select("id, phone, due_at", { count: "exact" })
+        .eq("status", "pending")
+        .lt("due_at", cutoff)
+        .order("due_at", { ascending: true })
+        .limit(5),
+    ));
+  } catch (e) {
+    return unchecked(base, "queue", e);
+  }
+  try {
     const n = count ?? data?.length ?? 0;
     if (!n) return { ...base, ok: true, detail: "no overdue callbacks" };
     const oldest = data?.[0]?.due_at ?? "?";
@@ -207,28 +253,40 @@ export async function probeCallbackQueue(): Promise<CheckResult> {
  * now. Guest bookings are never mirrored by design, so this reads as
  * "check by hand", not as proof of loss.
  */
-export async function probeLedgerOrphans(): Promise<CheckResult> {
+export async function probeLedgerOrphans(): Promise<DbProbeResult> {
   const base = { key: "ledger_orphans", label: "Captured payments with no booking" };
   if (!supabaseAdminConfigured) return { ...base, ok: true, detail: "skipped — no Supabase admin" };
+  const admin = createAdminClient();
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const until = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  let captured: Array<{ cf_payment_id: string }> | null;
   try {
-    const admin = createAdminClient();
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const until = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: captured, error } = await admin
-      .from("payments")
-      .select("cf_payment_id, amount_inr, email, created_at")
-      .eq("status", "captured")
-      .gte("created_at", since)
-      .lt("created_at", until);
-    if (error) return { ...base, ok: false, detail: `ledger read failed: ${error.message}` };
-    const rows = captured ?? [];
-    if (!rows.length) return { ...base, ok: true, detail: "no captured payments in the window" };
+    ({ data: captured } = await readWithRetry(() =>
+      admin
+        .from("payments")
+        .select("cf_payment_id, amount_inr, email, created_at")
+        .eq("status", "captured")
+        .gte("created_at", since)
+        .lt("created_at", until),
+    ));
+  } catch (e) {
+    return unchecked(base, "ledger", e);
+  }
+  const rows = captured ?? [];
+  if (!rows.length) return { ...base, ok: true, detail: "no captured payments in the window" };
 
-    const ids = rows.map((p) => p.cf_payment_id);
-    const { data: matched } = await admin
-      .from("bookings")
-      .select("cf_payment_id")
-      .in("cf_payment_id", ids);
+  const ids = rows.map((p) => p.cf_payment_id);
+  let matched: Array<{ cf_payment_id: string }> | null;
+  try {
+    ({ data: matched } = await readWithRetry(() =>
+      admin.from("bookings").select("cf_payment_id").in("cf_payment_id", ids),
+    ));
+  } catch (e) {
+    // The bookings read failing must not make every captured payment look
+    // orphaned — that is the false alarm this whole split exists to prevent.
+    return unchecked(base, "bookings", e);
+  }
+  try {
     const known = new Set((matched ?? []).map((b) => b.cf_payment_id));
     const orphans = rows.filter((p) => !known.has(p.cf_payment_id));
     if (!orphans.length) return { ...base, ok: true, detail: `${rows.length} captured, all matched` };
@@ -242,6 +300,26 @@ export async function probeLedgerOrphans(): Promise<CheckResult> {
   } catch (e) {
     return { ...base, ok: false, detail: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Supabase PostgREST — can the monitor read its tables at all?
+ *
+ * Pure: folds the read failures the DB-backed probes reported into one check
+ * with its own key, so Sentry fingerprints "the database timed out" apart
+ * from "a customer paid and got nothing". `supabase_auth` covers GoTrue, a
+ * different service; this covers the REST layer every ledger and queue read
+ * goes through.
+ */
+export function probeSupabaseRest(probes: ReadonlyArray<DbProbeResult>): CheckResult {
+  const base = { key: "supabase_rest", label: "Supabase database reads" };
+  const failed = probes.filter((p) => p.dbError);
+  if (!failed.length) return { ...base, ok: true, detail: `${probes.length} table read(s) ok` };
+  return {
+    ...base,
+    ok: false,
+    detail: failed.map((p) => `${p.key}: ${p.dbError}`).join("; "),
+  };
 }
 
 /**

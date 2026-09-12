@@ -5,6 +5,7 @@ import {
   probeProxy,
   probeCallbackQueue,
   probeLedgerOrphans,
+  probeSupabaseRest,
   probeEmail,
   probeConfig,
   probeSupabaseAuth,
@@ -38,6 +39,7 @@ const CRON_MONITOR_SLUG = process.env.SENTRY_CRON_MONITOR_SLUG || "rise-shine-he
  *   cashfree_auth   the gateway accepts our keys
  *   callback_queue  something is actually draining the queue
  *   ledger_orphans  nobody paid and got nothing
+ *   supabase_rest   the table reads behind the two above worked at all
  *   supabase_auth   customers can sign in at all — no session, no booking
  *   email_auth      Resend accepts the key that carries confirmations AND alerts
  *   config          every production-critical env var is still set
@@ -97,8 +99,11 @@ export async function GET(req: Request) {
   ]);
   const quote = await probeTboQuote(search);
   const config = probeConfig();
+  // A failed READ is a database fault, not an orphan or a stalled queue; it
+  // gets its own key so the "money lost" label only ever means money lost.
+  const rest = probeSupabaseRest([queue, orphans]);
 
-  const results: CheckResult[] = [config, proxy, search, quote, cashfree, auth, queue, orphans, email];
+  const results: CheckResult[] = [config, proxy, search, quote, cashfree, auth, rest, queue, orphans, email];
 
   // Record sequentially: each one may send mail, and a burst of parallel Resend
   // calls during a total outage is its own small denial of service.
