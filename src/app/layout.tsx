@@ -79,13 +79,13 @@ export const metadata: Metadata = {
     url: site.url,
     title: `${site.name}: Handcrafted Holidays from Ahmedabad`,
     description,
-    images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: site.name }],
+    images: [{ url: "/brand/og-2026.png", width: 1200, height: 630, alt: site.name }],
   },
   twitter: {
     card: "summary_large_image",
     title: `${site.name}: Handcrafted Holidays from Ahmedabad`,
     description,
-    images: ["/brand/og.png"],
+    images: ["/brand/og-2026.png"],
   },
   icons: {
     icon: [
@@ -102,7 +102,7 @@ const jsonLd = {
   name: site.name,
   legalName: site.legalName,
   url: site.url,
-  image: `${site.url}/brand/og.png`,
+  image: `${site.url}/brand/og-2026.png`,
   logo: `${site.url}/brand/logo.png`,
   description,
   telephone: site.phone.landlineHref.replace("tel:", ""),
