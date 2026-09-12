@@ -77,21 +77,21 @@ export default function Leads() {
 
   return (
     <>
-      <PageHeader title="Trips & Leads" subtitle="Qualified travel enquiries ready for your expert team" />
+      <PageHeader title="Trips & Leads" subtitle="Travel enquiries that qualified on the call, ranked so the best one is at the top" />
 
       <div className="kpis kpis-3">
         <div className="kpi">
-          <div className="kpi-label">Qualified Leads</div>
+          <div className="kpi-label">Qualified leads</div>
           <div className="kpi-val num">{qualifiedCount}</div>
           <div className="kpi-sub">ready to follow up</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Callbacks Booked</div>
+          <div className="kpi-label">Callbacks booked</div>
           <div className="kpi-val num">{calls.filter((c) => c.fields.callback_time).length}</div>
           <div className="kpi-sub">1–4 PM slots</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Total Enquiries</div>
+          <div className="kpi-label">Total enquiries</div>
           <div className="kpi-val num">{calls.length}</div>
           <div className="kpi-sub">all calls</div>
         </div>
@@ -151,8 +151,8 @@ export default function Leads() {
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">CRM Records</div>
-          <div className="panel-sub">from the post-call webhook, joined to the callback queue</div>
+          <div className="panel-title">Call records</div>
+          <div className="panel-sub">Outcome of each call and where its callback request stands</div>
         </div>
         <div className="panel-body flush">
           {crmError ? (

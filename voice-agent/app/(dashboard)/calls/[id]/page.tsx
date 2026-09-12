@@ -82,7 +82,7 @@ export default function CallDetail() {
       {!processing && (call.duration_secs ?? 0) > 0 && (
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Call Recording</div>
+            <div className="panel-title">Call recording</div>
             <span className="panel-sub">{fmtDuration(call.duration_secs)}</span>
           </div>
           <div className="panel-body">
@@ -104,7 +104,7 @@ export default function CallDetail() {
       {/* Trip details */}
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">Trip Details · what Priya collected</div>
+          <div className="panel-title">Trip details · captured on the call</div>
           <span className="panel-sub">{filledFields.length} captured fields</span>
         </div>
         <div className="panel-body">
@@ -130,7 +130,7 @@ export default function CallDetail() {
 
       <div className="detail-cols">
         <div className="panel">
-          <div className="panel-head"><div className="panel-title">Call Summary</div></div>
+          <div className="panel-head"><div className="panel-title">Call summary</div></div>
           <div className="panel-body">
             {call.summary || call.title ? (
               <div className="bubble">

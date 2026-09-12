@@ -48,7 +48,7 @@ export default async function CustomersPage({
 
   return (
     <>
-      <PageHeader title="Customers" subtitle="Everyone with an account on the website — what they bought and what they have been doing" />
+      <PageHeader title="Customers" subtitle="Everyone with a website account — what they booked, what they paid and when they were last active" />
 
       <div className="kpis">
         <div className="kpi">

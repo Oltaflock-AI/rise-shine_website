@@ -81,23 +81,26 @@ export default function Overview() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="AI voice sales engine · live travel pipeline" />
+      <PageHeader title="Overview" subtitle="What the voice agent has produced so far — calls answered, leads worth chasing and callbacks to keep" />
 
       {/* The five numbers that describe the funnel, in funnel order:
           placed → picked up → qualified → how long → booked. */}
       <div className="kpis kpis-5">
-        <Kpi label="Voice Calls" value={m.total} sub={`${m.connected} connected · ${fmtDuration(m.talkSecs)} talk time`} icon={<IconPhone className="i" />} />
-        <Kpi label="Pickup Rate" value={m.total ? `${m.answerRate}%` : "—"} sub={m.total ? `${m.connected} of ${m.total} answered` : "no calls yet"} icon={<IconPhone className="i" />} />
-        <Kpi label="Qualified Leads" value={m.qualified} sub={m.connected ? `${m.qualRate}% of connected · ${m.hot} hot` : "—"} icon={<IconCheck className="i" />} />
-        <Kpi label="Avg Call Time" value={fmtDuration(m.avg)} sub="per connected call" icon={<IconClock className="i" />} />
-        <Kpi label="Callback Rate" value={m.connected ? `${Math.round((m.callbacks / m.connected) * 100)}%` : "—"} sub={`${m.callbacks} booked · 1–4 PM slots`} icon={<IconCalendar className="i" />} />
+        <Kpi label="Calls placed" value={m.total} sub={`${m.connected} connected · ${fmtDuration(m.talkSecs)} talk time`} icon={<IconPhone className="i" />} />
+        <Kpi label="Pickup rate" value={m.total ? `${m.answerRate}%` : "—"} sub={m.total ? `${m.connected} of ${m.total} answered` : "no calls yet"} icon={<IconPhone className="i" />} />
+        <Kpi label="Qualified leads" value={m.qualified} sub={m.connected ? `${m.qualRate}% of connected · ${m.hot} hot` : "—"} icon={<IconCheck className="i" />} />
+        <Kpi label="Avg call length" value={fmtDuration(m.avg)} sub="per connected call" icon={<IconClock className="i" />} />
+        <Kpi label="Callback rate" value={m.connected ? `${Math.round((m.callbacks / m.connected) * 100)}%` : "—"} sub={`${m.callbacks} booked · 1–4 PM slots`} icon={<IconCalendar className="i" />} />
       </div>
 
       <div className="two-col">
         {/* Priority leads */}
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Priority Leads · highest score first</div>
+            <div>
+              <div className="panel-title">Priority leads</div>
+              <div className="panel-sub">Highest score first — ring these back first</div>
+            </div>
             <Link href="/leads" className="panel-link">All leads →</Link>
           </div>
           <div className="panel-body flush">
@@ -129,7 +132,7 @@ export default function Overview() {
         <div className="stack">
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title">Top Destinations</div>
+              <div className="panel-title">Top destinations</div>
               <IconPlane className="panel-head-icon" />
             </div>
             <div className="panel-body">
@@ -156,7 +159,7 @@ export default function Overview() {
 
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title">Upcoming Callbacks</div>
+              <div className="panel-title">Upcoming callbacks</div>
               <IconCalendar className="panel-head-icon" />
             </div>
             <div className="panel-body flush">
@@ -182,7 +185,7 @@ export default function Overview() {
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">Recent Calls</div>
+          <div className="panel-title">Recent calls</div>
           <Link href="/calls" className="panel-link">All calls →</Link>
         </div>
         <div className="panel-body flush">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { IconCheck, IconInfo, IconTrash, IconUsers } from "@/components/icons";
+import { IconCheck, IconChevron, IconInfo, IconTrash, IconUsers } from "@/components/icons";
 import { initial } from "@/lib/format";
 import {
   ROLES,
@@ -68,6 +68,8 @@ export default function AccessPage() {
   // Inline "reset password" row: which member is open, and the draft password.
   const [resetFor, setResetFor] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState("");
+  // The attempt log is an audit trail, not a daily read — it starts folded.
+  const [showEvents, setShowEvents] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -178,12 +180,14 @@ export default function AccessPage() {
   }
 
   const members = snap?.members ?? [];
+  const refused = snap?.events?.filter((ev) => !ev.ok).length ?? 0;
+  const latest = snap?.events?.[0] ?? null;
   const canManage = can(snap?.viewer?.role ?? null, "manage_access");
   const signedIn = !!snap?.viewer && !snap.viewer.simulated;
 
   return (
     <>
-      <PageHeader title="Team Access" subtitle="Who can open this dashboard, and what they can do" />
+      <PageHeader title="Team Access" subtitle="Who can open this dashboard and what each person is allowed to do" />
 
       {snap && !snap.authEnabled && (
         <div className="notice">
@@ -202,7 +206,7 @@ export default function AccessPage() {
       {canManage && (
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Create an account</div>
+            <div className="panel-title">Add a team member</div>
             <IconUsers className="panel-head-icon" />
           </div>
           <div className="panel-body">
@@ -257,7 +261,7 @@ export default function AccessPage() {
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">Team · {members.length}</div>
+          <div className="panel-title">Team<span className="panel-count num">{members.length}</span></div>
         </div>
         <div className="panel-body flush">
           {!snap ? (
@@ -369,7 +373,7 @@ export default function AccessPage() {
       {signedIn && (
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">Change my password</div>
+            <div className="panel-title">Your password</div>
           </div>
           <div className="panel-body">
             <form className="access-form access-form-pw" onSubmit={onChangeOwnPassword}>
@@ -398,7 +402,7 @@ export default function AccessPage() {
                 />
               </label>
               <button className="btn btn-inline" type="submit" disabled={busy}>
-                {busy ? "Saving…" : "Change password"}
+                {busy ? "Saving…" : "Update password"}
               </button>
             </form>
             <p className="access-hint">Signed in as <b>{snap?.viewer?.email}</b>. Changing it signs out your other devices.</p>
@@ -407,41 +411,63 @@ export default function AccessPage() {
       )}
 
       {snap?.events && (
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title">Recent sign-in attempts</div>
-            <div className="panel-sub">every attempt is recorded, refused ones included</div>
-          </div>
-          <div className="panel-body flush">
-            {snap.events.length === 0 ? (
-              <div className="panel-empty">No sign-in attempts yet.</div>
-            ) : (
-              <div className="member-table">
-                <div className="event-row member-head">
-                  <span>Email</span>
-                  <span>Result</span>
-                  <span>When</span>
-                  <span>IP</span>
-                </div>
-                {snap.events.map((ev) => (
-                  <div className="event-row" key={ev.id}>
-                    <span className="member-email">{ev.email}</span>
-                    <span>
-                      <span className={`badge ${ev.ok ? "q" : "fail"}`}>{REASON_LABEL[ev.reason]}</span>
-                    </span>
-                    <span className="member-added" title={ev.at}>{fmtWhen(Date.parse(ev.at) / 1000)}</span>
-                    <span className="dim num">{ev.ip ?? "—"}</span>
-                  </div>
-                ))}
+        <div className={`panel panel-fold${showEvents ? " open" : ""}`}>
+          <button
+            type="button"
+            className="panel-head panel-fold-head"
+            onClick={() => setShowEvents((v) => !v)}
+            aria-expanded={showEvents}
+            aria-controls="signin-log"
+          >
+            <div>
+              <div className="panel-title">
+                Sign-in history
+                <span className="panel-count num">{snap.events.length}</span>
+                {refused > 0 && <span className="badge fail">{refused} refused</span>}
               </div>
-            )}
-          </div>
+              <div className="panel-sub">
+                {latest
+                  ? `Last attempt ${fmtWhen(Date.parse(latest.at) / 1000)} · ${latest.email} · ${REASON_LABEL[latest.reason].toLowerCase()}`
+                  : "Every attempt is recorded, refused ones included."}
+              </div>
+            </div>
+            <span className="panel-fold-toggle">
+              {showEvents ? "Hide" : "Show"}
+              <IconChevron className="panel-fold-chevron" />
+            </span>
+          </button>
+          {showEvents && (
+            <div className="panel-body flush" id="signin-log">
+              {snap.events.length === 0 ? (
+                <div className="panel-empty">No sign-in attempts yet.</div>
+              ) : (
+                <div className="member-table">
+                  <div className="event-row member-head">
+                    <span>Email</span>
+                    <span>Result</span>
+                    <span>When</span>
+                    <span>IP address</span>
+                  </div>
+                  {snap.events.map((ev) => (
+                    <div className="event-row" key={ev.id}>
+                      <span className="member-email">{ev.email}</span>
+                      <span>
+                        <span className={`badge ${ev.ok ? "q" : "fail"}`}>{REASON_LABEL[ev.reason]}</span>
+                      </span>
+                      <span className="member-added" title={ev.at}>{fmtWhen(Date.parse(ev.at) / 1000)}</span>
+                      <span className="dim num">{ev.ip ?? "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">What each role can do</div>
+          <div className="panel-title">Roles explained</div>
         </div>
         <div className="panel-body">
           <div className="role-legend">

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCalls } from "@/lib/useCalls";
-import { fmtWhen } from "@/lib/format";
 import {
   IconContact,
   IconOverview,
@@ -14,7 +13,7 @@ import {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { calls, error, lastSync } = useCalls();
+  const { calls } = useCalls();
 
   const qualified = calls.filter((c) => c.qualified === true).length;
 
@@ -69,9 +68,6 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-foot">
-        <div className={`sync-mini${error ? " sync-error-text" : ""}`} title={error ?? undefined}>
-          <span className="dot" /> {error ? "Data unavailable" : `Live · ${fmtWhen(Math.floor(lastSync.getTime() / 1000))}`}
-        </div>
         <button
           type="button"
           className="btn-quiet"

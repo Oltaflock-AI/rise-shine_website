@@ -55,7 +55,7 @@ export default async function QueuePage() {
     <>
       <PageHeader
         title="Callback Queue"
-        subtitle="Requests from /request-a-call, waiting for or already through the dialler"
+        subtitle="Callback requests from the website, waiting to be dialled or already handled"
       />
       {error ? (
         <div className="panel">

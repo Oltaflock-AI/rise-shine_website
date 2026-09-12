@@ -36,7 +36,7 @@ export default function VoiceCalls() {
 
   return (
     <>
-      <PageHeader title="Voice Calls" subtitle="Every call Priya placed · click any card for full insights" />
+      <PageHeader title="Voice Calls" subtitle="Every call the voice agent placed — open a card for the transcript, recording and captured details" />
 
       <div className="toolbar">
         <input
