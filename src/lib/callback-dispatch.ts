@@ -22,7 +22,7 @@ import "server-only";
  * way the promise itself could not, so a coarse schedule is fine for it.
  */
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
-import { placeOutboundCall } from "@/lib/elevenlabs-outbound";
+import { placeOutboundCall } from "@/lib/voice-outbound";
 import { markCallFailed, markCallPlaced, type QueuedCallback } from "@/lib/callback-queue";
 
 export type DispatchOutcome = "placed" | "failed" | "not-claimed" | "unconfigured";

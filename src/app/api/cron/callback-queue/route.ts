@@ -1,4 +1,4 @@
-import { elevenLabsConfigured } from "@/lib/elevenlabs-outbound";
+import { voiceConfigured } from "@/lib/voice-outbound";
 import { claimDueCallbacks, callbackQueueConfigured } from "@/lib/callback-queue";
 import { dispatchClaimedCallback } from "@/lib/callback-dispatch";
 
@@ -39,8 +39,8 @@ export async function GET(req: Request) {
   if (!callbackQueueConfigured) {
     return Response.json({ ok: false, error: "Supabase admin is not configured." }, { status: 503 });
   }
-  if (!elevenLabsConfigured) {
-    return Response.json({ ok: false, error: "ElevenLabs is not configured." }, { status: 503 });
+  if (!voiceConfigured()) {
+    return Response.json({ ok: false, error: "Voice calling is not configured." }, { status: 503 });
   }
 
   const claimed = await claimDueCallbacks(BATCH);
