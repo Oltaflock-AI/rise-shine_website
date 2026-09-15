@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { withBotId } from "botid/next/config";
 
 /**
  * Permanent redirects from the old riseandshinetravel.com static tour URLs to
@@ -66,8 +67,13 @@ const sentryEnabled = Boolean(
     process.env.SENTRY_PROJECT,
 );
 
+// BotID's rewrites proxy its challenge script through our own origin so ad
+// blockers cannot strip it. Wrapped unconditionally: without the rewrites every
+// protected form classifies as a bot in production.
+const withBots = withBotId(nextConfig);
+
 export default sentryEnabled
-  ? withSentryConfig(nextConfig, {
+  ? withSentryConfig(withBots, {
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       // Upload source maps only when there is a token to upload them with, so a
@@ -79,4 +85,4 @@ export default sentryEnabled
       tunnelRoute: "/monitoring",
       disableLogger: true,
     })
-  : nextConfig;
+  : withBots;

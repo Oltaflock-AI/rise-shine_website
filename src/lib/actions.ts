@@ -28,6 +28,7 @@ import { callbackDelayPhrase } from "@/lib/callback-delay";
 import { enqueueCallback } from "@/lib/callback-queue";
 import { dispatchCallbackNow } from "@/lib/callback-dispatch";
 import { rateLimit } from "@/lib/rate-limit";
+import { screenSubmission } from "@/lib/bot-guard-server";
 
 export type FormState = {
   status: "idle" | "success" | "error";
@@ -124,6 +125,18 @@ export async function submitEnquiry(
 
   const journeyType = val("journeyType");
   const packageKey = val("package");
+
+  // Bot screen AFTER validation (a bot that fails validation is answered like
+  // anyone else) and BEFORE any side effect: nothing below may dial, mail or
+  // queue for a crawler. A trip is answered with the ordinary success copy on
+  // purpose — see lib/bot-guard.ts.
+  if ((await screenSubmission(formData, `contact:${journeyType || packageKey || "general"}`)).bot) {
+    return {
+      status: "success",
+      message:
+        "Thank you! Your enquiry has reached the Rise & Shine team. We'll be in touch very shortly.",
+    };
+  }
   const pkg = isCatalogPackage(packageKey) ? CATALOG_PACKAGES[packageKey] : null;
 
   // Compose the "Additional Requirements" note from message + package.

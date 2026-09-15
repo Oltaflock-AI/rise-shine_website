@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BotGuardFields } from "./BotGuardFields";
 import { submitEnquiry } from "@/lib/actions";
 import { Button } from "../ui/Button";
 import { Field, FormNote, controlClass, initialFormState } from "./controls";
@@ -17,6 +18,7 @@ export function ContactForm() {
       action={action}
       className="rounded-brand-lg border border-line bg-white p-7 shadow-brand sm:p-10"
     >
+      <BotGuardFields />
       <h2 className="h-md mb-1.5">Request an instant callback</h2>
       <p className="mb-6 text-muted">
         Share your details and a travel expert will call you right away to help

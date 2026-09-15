@@ -20,6 +20,7 @@ import { headers } from "next/headers";
 import type { FormState } from "@/lib/actions";
 import { deliverLead } from "@/lib/lead-delivery";
 import { rateLimit } from "@/lib/rate-limit";
+import { screenSubmission } from "@/lib/bot-guard-server";
 import { callbackDelayPhrase } from "@/lib/callback-delay";
 import { enqueueCallback } from "@/lib/callback-queue";
 import { dispatchCallbackNow } from "@/lib/callback-dispatch";
@@ -63,6 +64,14 @@ export async function requestCallback(
   }
   if (phone.replace(/\D/g, "").length < 10) {
     return { status: "error", message: "Please enter a valid 10-digit mobile number." };
+  }
+
+  // A crawler must never reach the dialler. Silent success — see lib/bot-guard.ts.
+  if ((await screenSubmission(formData, "request-a-call")).bot) {
+    return {
+      status: "success",
+      message: `Thanks, ${name}! Our travel expert will call you in ${callbackDelayPhrase()}. Please keep your phone nearby.`,
+    };
   }
 
   const { ok } = rateLimit(`request-callback:${await callerIp()}`, MAX_PER_IP, WINDOW_MS);

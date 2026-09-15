@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BotGuardFields } from "./BotGuardFields";
 import { submitEnquiry } from "@/lib/actions";
 import { site } from "@/data/site";
 import { GOOGLE_FORM } from "@/lib/googleForm";
@@ -44,6 +45,7 @@ export function PlanTripForm({
       action={action}
       className="rounded-brand-lg border border-line bg-white p-7 shadow-brand sm:p-10"
     >
+      <BotGuardFields />
       <input type="hidden" name="package" value={packageKey} />
       <h2 className="h-md mb-1.5">Your trip details</h2>
       <p className="mb-6 text-muted">

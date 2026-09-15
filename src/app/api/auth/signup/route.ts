@@ -1,3 +1,4 @@
+import { botIdSaysBot } from "@/lib/bot-guard-server";
 import { mintSignupLink, siteOrigin } from "@/lib/auth-links";
 import { confirmSignupEmail, emailConfigured, sendEmail } from "@/lib/email";
 import { isDiallableIndianNumber, normalisePhone } from "@/lib/phone";
@@ -49,6 +50,14 @@ function throttled(key: string): boolean {
  * reveals this anyway by refusing the address.
  */
 export async function POST(req: Request) {
+  // A crawler creating accounts / requesting resets mails strangers on our
+  // domain (15-Sep-2026: dotted-Gmail signups in the same runs as the form
+  // spam). Same 200-shaped answer a person gets, nothing sent.
+  if (await botIdSaysBot()) {
+    console.warn("[bot-guard] dropped signup request: botid");
+    return Response.json({ ok: true, confirmationSent: emailConfigured });
+  }
+
   let body: {
     name?: unknown;
     email?: unknown;
