@@ -359,6 +359,7 @@ export const REQUIRED_ENV: ReadonlyArray<{ key: string; why: string }> = [
   { key: "CASHFREE_APP_ID", why: "no payment page, no flight bookings" },
   { key: "CASHFREE_SECRET_KEY", why: "no payment page, webhooks rejected" },
   { key: "RESEND_API_KEY", why: "confirmation email and every ops alert" },
+  { key: "ALERT_EMAIL", why: "unset, ops alerts default to the AGENCY inbox (39 mails on 12-Sep-2026)" },
   { key: "CRON_SECRET", why: "every cron route answers 503" },
   { key: "ELEVENLABS_AGENT_ID", why: "outbound calls fail, inbound webhook drops every event" },
   { key: "ELEVENLABS_API_KEY", why: "callback queue cannot dial" },

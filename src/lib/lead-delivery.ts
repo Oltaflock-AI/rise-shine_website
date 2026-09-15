@@ -25,8 +25,14 @@ import { detailsTable, esc, heading, paragraph, row, shell } from "@/lib/email-b
 import { formatDate } from "@/lib/format-date";
 import { logViewerActivity } from "@/lib/activity";
 
-/** Where a fallback lead lands. Same inbox ops alerts use. */
-const LEAD_TO = process.env.ALERT_EMAIL || site.email;
+/**
+ * Where a fallback lead lands: the agency's own inbox. Deliberately NOT
+ * `ALERT_EMAIL` — that used to be the fallback here, and with it unset both
+ * streams defaulted to info@, so the agency got 39 healthcheck mails on
+ * 12-Sep-2026 (Supabase flapping) in the same inbox as their customers'
+ * enquiries. Leads are theirs; ops noise is ours.
+ */
+const LEAD_TO = process.env.LEAD_EMAIL || site.email;
 
 export type LeadChannel = "google-form" | "email" | "none";
 

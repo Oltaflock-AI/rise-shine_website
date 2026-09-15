@@ -2,8 +2,10 @@ import "server-only";
 
 /**
  * Ops alerting for money-critical events — a failed refund must never be a
- * console line nobody reads. Alerts go to ALERT_EMAIL (default: the agency
- * inbox in site.ts) through the same Resend transport as customer email, and
+ * console line nobody reads. Alerts go to ALERT_EMAIL — the DEVELOPER's inbox;
+ * production must set it, because the default (the agency inbox in site.ts)
+ * put 39 healthcheck mails in front of the agency on 12-Sep-2026 — through
+ * the same Resend transport as customer email, and
  * ALWAYS console.error too so Vercel logs keep the full record even when
  * email is unconfigured. Best-effort by contract: callers already decided the
  * customer-facing outcome; an alert failure only logs.
