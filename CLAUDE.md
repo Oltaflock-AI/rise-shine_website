@@ -586,6 +586,14 @@ reaches the supplier.
 - **`FareRuleDetail` is third-party HTML.** It reaches the browser only through
   `sanitizeFareRuleHtml` (`lib/fare-rules.ts`, allowlist — tags in, all attributes out
   bar table spans). Never render it raw, never swap in a blocklist.
+- **Every public form is bot-screened** (`lib/bot-guard.ts` · `bot-guard-server.ts` ·
+  `forms/BotGuardFields.tsx`): honeypot + render-timestamp fields, then Vercel BotID.
+  A new form or route that mails, queues or DIALS anything must (a) render
+  `<BotGuardFields />`, (b) call `screenSubmission()` before its first side effect,
+  and (c) be listed in `initBotId({ protect })` in `instrumentation-client.ts` —
+  `checkBotId()` on an unlisted path classifies everyone as a bot. Drops are silent
+  successes on purpose (15-Sep-2026: a crawler mailed 8 spam enquiries and had the
+  AI agent cold-call four random numbers in a day).
 - **Enquiry forms** deliver through `lib/lead-delivery.ts`, never by calling the
   Google Form directly. It posts server-side to the agency's Google Form
   (`lib/googleForm.ts`) — the lead pipeline — and falls back to emailing
