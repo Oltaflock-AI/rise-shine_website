@@ -59,6 +59,7 @@ describe("Sarvam instant-outbound webhook", () => {
     });
     expect(row.metadata.direction).toBe("outbound");
     expect(row.started_at).not.toBeNull();
+    expect(row.duration_secs).toBe(105); // the column is INTEGER
   });
 
   it("exposes no app id when the dial predates the metadata, so the route cannot 401 it", () => {

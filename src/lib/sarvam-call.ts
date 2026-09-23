@@ -64,7 +64,9 @@ export function normaliseSarvamCall(p: SarvamCall) {
     lead_phone: number, to_number: number,
     from_number: text(p.agent_phone_number) ?? text(obj(p.channel_info).agent_phone_number),
     started_at: Number.isFinite(millis) ? new Date(millis).toISOString() : null,
-    duration_secs: Number.isFinite(seconds) ? Math.max(0, seconds) : 0,
+    // voice_calls.duration_secs is INTEGER and Sarvam sends 104.68 — unrounded,
+    // Postgres refused every connected call.
+    duration_secs: Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0,
     language: text(p.conversation_language), summary: text(vars.call_summary),
     qualified: ["inquiry_captured", "quote_requested"].includes(outcome ?? ""),
     destination: text(vars.destination), num_travelers: text(vars.party_size),
