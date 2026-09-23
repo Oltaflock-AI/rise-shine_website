@@ -147,6 +147,8 @@ export type HotelBookingDetail = {
   isVoucherBooked?: boolean;
   noOfRooms?: number;
   invoiceAmount?: number;
+  /** Selling fare (TotalFare) the guest paid — filled by the route, never by TBO. */
+  totalFare?: number;
   currency?: string;
   rooms?: VoucherRoom[];
   error?: string;

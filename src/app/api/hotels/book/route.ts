@@ -1,5 +1,4 @@
 import { bookHotel, type HotelBookRequest, type HotelBookRoom } from "@/lib/tbo-hotel-book";
-import { generateHotelVoucher } from "@/lib/tbo-hotel-post";
 import type { HotelValidationInfo } from "@/lib/tbo-hotel";
 import { getUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity";
@@ -247,18 +246,8 @@ export async function POST(req: Request) {
   if (result.ok) {
     // Record the outcome first so a repeat submit finds it before anything slower.
     if (payment) await settleIntent(payment.orderId, { status: "ticketed", result, cfPaymentId: payment.cfPaymentId });
-    // GenerateVoucher — TBO portal checkpoint 36. An IsVoucherBooking=true
-    // booking is already vouchered at Book, so this is confirmation rather than
-    // creation: TBO answering "already generated" is fine and the guest's
-    // booking must never fail because the voucher call did.
-    if (result.bookingId) {
-      try {
-        const v = await generateHotelVoucher(result.bookingId);
-        if (!v.ok) console.warn("[api/hotels/book] GenerateVoucher:", v.error);
-      } catch (e) {
-        console.warn("[api/hotels/book] GenerateVoucher threw (booking unaffected):", e);
-      }
-    }
+    // No GenerateVoucher: IsVoucherBooking=true is vouchered at Book, and TBO
+    // flags a GenerateVoucher call on an already-vouchered booking.
     try {
       const user = await getUser();
       if (user) {

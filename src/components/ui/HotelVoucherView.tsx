@@ -52,7 +52,7 @@ type Detail = {
   checkOut?: string;
   isVoucherBooked?: boolean;
   noOfRooms?: number;
-  invoiceAmount?: number;
+  totalFare?: number;
   currency?: string;
   rooms?: VoucherRoom[];
   error?: string;
@@ -229,7 +229,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
               Booking amount
             </dt>
             <dd className="text-lead font-bold text-navy">
-              {money(detail.invoiceAmount, currency)}
+              {money(detail.totalFare, currency)}
             </dd>
           </div>
           <div>
@@ -237,7 +237,7 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
               Voucher
             </dt>
             <dd className="text-body font-semibold text-ink">
-              {detail.isVoucherBooked ? "Issued" : "Not issued yet"}
+              {detail.isVoucherBooked || detail.status === 1 ? "Issued" : "Not issued yet"}
             </dd>
           </div>
         </dl>
@@ -250,11 +250,6 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
             </h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-body text-muted">
               {room.mealType && <span>{mealLabel(room.mealType, true)}</span>}
-              {room.totalFare != null && (
-                <span className="font-semibold text-ink">
-                  {money(room.totalFare, room.currency || currency)}
-                </span>
-              )}
             </div>
             {room.guests.length > 0 && (
               <p className="mt-2 flex items-start gap-1.5 text-body text-ink">

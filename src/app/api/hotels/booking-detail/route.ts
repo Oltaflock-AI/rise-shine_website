@@ -1,4 +1,4 @@
-import { hotelBookingDetail, generateHotelVoucher } from "@/lib/tbo-hotel-post";
+import { hotelBookingDetail } from "@/lib/tbo-hotel-post";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
 
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("bookings")
-    .select("id")
+    .select("id, cf_order_id")
     .eq("user_id", user.id)
     .eq("kind", "hotel")
     .eq("booking_id", bookingId)
@@ -50,15 +50,27 @@ export async function POST(req: Request) {
 
   const detail = await hotelBookingDetail({ bookingId });
 
-  // Voucher on demand. Instant (IsVoucherBooking) bookings self-voucher, so a
-  // "already vouchered" answer from TBO is a success as far as the guest is
-  // concerned — never fail the read because of it.
-  if (body.voucher && detail.ok && detail.status === 1 && !detail.isVoucherBooked) {
-    const v = await generateHotelVoucher(bookingId);
-    if (v.ok) {
-      const fresh = await hotelBookingDetail({ bookingId });
-      if (fresh.ok) return Response.json(fresh, { status: 200 });
+  // NEVER call GenerateVoucher here. Every booking we make is IsVoucherBooking=true,
+  // so it is vouchered at Book; TBO flagged a second call on an already-vouchered
+  // booking (and it errors outright on one under cancellation).
+
+  // TBO's GetBookingDetail carries only NetAmount / InvoiceAmount (the agency's
+  // cost) — no TotalFare — and TBO's portal rule is to show TotalFare. The selling
+  // fare is what we charged: booking_intents.amount_inr, written at order time from
+  // PreBook's TotalFare, unrounded. NetAmount-derived fields are stripped.
+  if (detail.ok) {
+    let totalFare: number | undefined;
+    if (row.cf_order_id) {
+      const { data: intent } = await admin
+        .from("booking_intents")
+        .select("amount_inr")
+        .eq("order_id", row.cf_order_id)
+        .maybeSingle();
+      if (intent?.amount_inr != null) totalFare = Number(intent.amount_inr);
     }
+    delete detail.invoiceAmount;
+    detail.totalFare = totalFare;
+    if (detail.rooms) detail.rooms = detail.rooms.map(({ totalFare: _net, ...r }) => r);
   }
 
   return Response.json(detail, { status: detail.ok ? 200 : 502 });
