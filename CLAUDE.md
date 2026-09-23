@@ -305,12 +305,22 @@ checked-in one.
 #### Sarvam is the live provider (since 12-Sep-2026)
 
 `VOICE_PROVIDER=sarvam` routes every dial through `lib/voice-outbound.ts` to
-Sarvam's instant-outbound API; ElevenLabs code stays as the fallback path. Agent
-"Rise and Shine - Priya" (`Rise-and-Sh-dfac354b-820f`) — voice `roopa` (Rupa),
-Hindi · Gujarati · English with language ID. Website dials pin
-`SARVAM_APP_VERSION`; the **inbound** number **+91 79714 42847** is a Sarvam
-deployment (`Rise-and-Sh-86e8578d-df36`, 24/7) pinned separately — bump BOTH
-after committing a new agent version (a deployment must be paused to edit).
+Sarvam's instant-outbound API; ElevenLabs code stays as the fallback path.
+**Two agents, two flows** — both voice `roopa` (Rupa), Hindi · Gujarati · English:
+
+| Agent | id | Job | Version pinned by |
+|---|---|---|---|
+| Rise and Shine - Priya | `Rise-and-Sh-dfac354b-820f` | website callbacks: qualifies an enquiry the customer already sent | Vercel `SARVAM_APP_ID` + `SARVAM_APP_VERSION` |
+| Rise and Shine - Priya (Inbound) | `Rise-and-Sh-d49d6eca-df18` | front desk on **079 7144 2847** (+917971442847): new trip · flights/hotels/visa · existing booking · office info | deployment `Rise-and-Sh-703ca454-b95d`, 24/7; `SARVAM_INBOUND_APP_ID` lets its webhooks in |
+
+Instant outbound needs no deployment (it names agent + connection + number
+itself), so both agents share the number. After committing a new version,
+bump the matching pin; a deployment must be PAUSED to edit, and its agent
+cannot be changed at all — patching `app_id` silently keeps the old agent and
+moves only the version, so re-point a number by delete + create. The Vobiz
+side is a Voice Application `sarvam-rise-shine` (Answer/Hangup URL
+`https://apps.sarvam.ai/api/app-runtime/v1/channels/vobiz`, POST) with the
+number attached — without that the carrier says the number does not exist.
 
 Post-call webhooks from both directions hit `/api/voice/sarvam/[token]`, which
 upserts `voice_calls` and forwards to Voxline. Two things broke it silently
