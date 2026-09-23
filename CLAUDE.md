@@ -302,6 +302,25 @@ id … not found`) *and* silently made the webhook drop every real event as
 `other-agent` while returning 200. Read the current id from ElevenLabs; never trust a
 checked-in one.
 
+#### Sarvam is the live provider (since 12-Sep-2026)
+
+`VOICE_PROVIDER=sarvam` routes every dial through `lib/voice-outbound.ts` to
+Sarvam's instant-outbound API; ElevenLabs code stays as the fallback path. Agent
+"Rise and Shine - Priya" (`Rise-and-Sh-dfac354b-820f`) — voice `roopa` (Rupa),
+Hindi · Gujarati · English with language ID. Website dials pin
+`SARVAM_APP_VERSION`; the **inbound** number **+91 79714 42847** is a Sarvam
+deployment (`Rise-and-Sh-86e8578d-df36`, 24/7) pinned separately — bump BOTH
+after committing a new agent version (a deployment must be paused to edit).
+
+Post-call webhooks from both directions hit `/api/voice/sarvam/[token]`, which
+upserts `voice_calls` and forwards to Voxline. Two things broke it silently
+from 15 to 23-Sep-2026, and every call went unrecorded: the instant-outbound payload
+has **no `app_id`** and uses `status`, not `connectivity_status` (the route
+401'd all of them), and `duration_secs` is INTEGER while Sarvam sends
+`104.68`. `lib/sarvam-call.ts` reads both payload shapes; dials tag
+`webhook_config.metadata` with phone and name because the instant payload
+carries neither.
+
 #### Telephony sits outside this repo
 
 Nothing here configures the phone network. The code sends only `agent_id`,
