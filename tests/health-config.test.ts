@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { missingRequiredEnv, probeConfig, probeSupabaseRest, REQUIRED_ENV } from "../src/lib/health-probe";
+import { ELEVENLABS_ENV, missingRequiredEnv, probeConfig, probeSupabaseRest, REQUIRED_ENV, SARVAM_ENV } from "../src/lib/health-probe";
 
 /**
  * The config check turns "variable quietly unset in Vercel" into a red check.
  * Pinned so the list cannot silently lose the entry that once cost a month of
  * dropped call records (ELEVENLABS_AGENT_ID).
  */
-const full = Object.fromEntries(REQUIRED_ENV.map((r) => [r.key, "x"]));
+const full = Object.fromEntries([...REQUIRED_ENV, ...ELEVENLABS_ENV].map((r) => [r.key, "x"]));
 
 describe("probeConfig", () => {
   it("passes when everything is set in production", () => {
@@ -29,7 +29,18 @@ describe("probeConfig", () => {
   });
 
   it("still lists the agent id — the one that failed silently before", () => {
-    expect(REQUIRED_ENV.some((r) => r.key === "ELEVENLABS_AGENT_ID")).toBe(true);
+    expect(ELEVENLABS_ENV.some((r) => r.key === "ELEVENLABS_AGENT_ID")).toBe(true);
+  });
+
+  it("checks the provider that is actually live", () => {
+    const base = Object.fromEntries(REQUIRED_ENV.map((r) => [r.key, "x"]));
+    const sarvam = Object.fromEntries(SARVAM_ENV.map((r) => [r.key, "x"]));
+    // ElevenLabs keys absent is fine once Sarvam places the calls…
+    expect(probeConfig({ ...base, ...sarvam, VOICE_PROVIDER: "sarvam", VERCEL_ENV: "production" }).ok).toBe(true);
+    // …and a missing Sarvam key is red even with every ElevenLabs key set.
+    const r = probeConfig({ ...full, ...sarvam, SARVAM_APP_ID: "", VOICE_PROVIDER: "sarvam", VERCEL_ENV: "production" });
+    expect(r.ok).toBe(false);
+    expect(r.detail).toContain("SARVAM_APP_ID");
   });
 });
 

@@ -25,7 +25,13 @@ export async function placeOutboundCall(opts: {toNumber: string; calleeName: str
         agent_variables: {callee_name: opts.calleeName.trim()},
       },
       user_config: {user_phone_number: normalisePhone(opts.toNumber)},
-      webhook_config: {url: process.env.SARVAM_CALLBACK_WEBHOOK_URL},
+      // Instant-outbound webhooks echo this back and carry no app id or callee
+      // number of their own, so the call record is identified from here.
+      webhook_config: {
+        url: process.env.SARVAM_CALLBACK_WEBHOOK_URL,
+        metadata: {app_id: process.env.SARVAM_APP_ID, direction: "outbound",
+          phone: normalisePhone(opts.toNumber), callee_name: opts.calleeName.trim()},
+      },
     }),
     cache: "no-store",
   });

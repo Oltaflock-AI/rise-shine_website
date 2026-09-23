@@ -361,14 +361,39 @@ export const REQUIRED_ENV: ReadonlyArray<{ key: string; why: string }> = [
   { key: "RESEND_API_KEY", why: "confirmation email and every ops alert" },
   { key: "ALERT_EMAIL", why: "unset, ops alerts default to the AGENCY inbox (39 mails on 12-Sep-2026)" },
   { key: "CRON_SECRET", why: "every cron route answers 503" },
+];
+
+/**
+ * The voice half depends on which provider places the calls (`VOICE_PROVIDER`,
+ * lib/voice-outbound.ts). Checking the other provider's keys would stay green
+ * while the live one was unset — exactly the silent failure this list exists for.
+ */
+export const ELEVENLABS_ENV: ReadonlyArray<{ key: string; why: string }> = [
   { key: "ELEVENLABS_AGENT_ID", why: "outbound calls fail, inbound webhook drops every event" },
   { key: "ELEVENLABS_API_KEY", why: "callback queue cannot dial" },
   { key: "ELEVENLABS_PHONE_NUMBER_ID", why: "callback queue cannot dial" },
   { key: "ELEVENLABS_WEBHOOK_SECRET", why: "call records rejected" },
 ];
 
+export const SARVAM_ENV: ReadonlyArray<{ key: string; why: string }> = [
+  { key: "SARVAM_VOICE_API_KEY", why: "callback queue cannot dial" },
+  { key: "SARVAM_ORG_ID", why: "callback queue cannot dial" },
+  { key: "SARVAM_WORKSPACE_ID", why: "callback queue cannot dial" },
+  { key: "SARVAM_APP_ID", why: "callback queue cannot dial" },
+  { key: "SARVAM_APP_VERSION", why: "callback queue cannot dial" },
+  { key: "SARVAM_CONNECTION_ID", why: "callback queue cannot dial" },
+  { key: "SARVAM_PHONE_NUMBER", why: "callback queue cannot dial" },
+  { key: "SARVAM_CALLBACK_WEBHOOK_URL", why: "callback queue cannot dial" },
+  { key: "SARVAM_WEBHOOK_TOKEN", why: "call records rejected (503)" },
+  { key: "SARVAM_VOXLINE_WEBHOOK_URL", why: "call records rejected (503)" },
+];
+
+export function requiredEnvFor(env: Record<string, string | undefined>): ReadonlyArray<{ key: string; why: string }> {
+  return [...REQUIRED_ENV, ...(env.VOICE_PROVIDER === "sarvam" ? SARVAM_ENV : ELEVENLABS_ENV)];
+}
+
 export function missingRequiredEnv(env: Record<string, string | undefined>): Array<{ key: string; why: string }> {
-  return REQUIRED_ENV.filter(({ key }) => !env[key]?.trim());
+  return requiredEnvFor(env).filter(({ key }) => !env[key]?.trim());
 }
 
 export function probeConfig(env: Record<string, string | undefined> = process.env): CheckResult {
@@ -377,7 +402,7 @@ export function probeConfig(env: Record<string, string | undefined> = process.en
   // without ElevenLabs is not an outage.
   if (env.VERCEL_ENV !== "production") return { ...base, ok: true, detail: `skipped — VERCEL_ENV=${env.VERCEL_ENV ?? "unset"}` };
   const missing = missingRequiredEnv(env);
-  if (!missing.length) return { ...base, ok: true, detail: `${REQUIRED_ENV.length} present` };
+  if (!missing.length) return { ...base, ok: true, detail: `${requiredEnvFor(env).length} present` };
   return {
     ...base,
     ok: false,
