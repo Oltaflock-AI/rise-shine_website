@@ -30,6 +30,8 @@ export function sarvamConnectivity(p: SarvamCall): string | null {
   return text(p.connectivity_status) ?? text(p.status);
 }
 
+const SUCCESSFUL_OUTCOMES = ["inquiry_captured", "quote_requested", "support_request", "info_only"];
+
 export function normaliseSarvamCall(p: SarvamCall) {
   const id = text(p.attempt_id) ?? text(p.interaction_id);
   if (!id) return null;
@@ -57,9 +59,12 @@ export function normaliseSarvamCall(p: SarvamCall) {
   const direction = text(meta.direction) ??
     (text(p.status) || text(p.campaign_id) ? "outbound" : "inbound");
   return {
-    conversation_id: id, agent_id: sarvamAppId(p), agent_name: "Rise and Shine - Priya",
+    conversation_id: id, agent_id: sarvamAppId(p),
+    agent_name: direction === "inbound" ? "Rise and Shine - Priya (Inbound)" : "Rise and Shine - Priya",
     status: connected ? "done" : "initiation_failed",
-    call_successful: ["inquiry_captured", "quote_requested"].includes(outcome ?? "") ? "success" : "failure",
+    // The inbound front desk also succeeds by logging a support request or
+    // answering a question; only travel enquiries count as qualified leads.
+    call_successful: SUCCESSFUL_OUTCOMES.includes(outcome ?? "") ? "success" : "failure",
     lead_name: text(vars.caller_name) ?? text(initial.callee_name) ?? text(vars.callee_name) ?? text(meta.callee_name),
     lead_phone: number, to_number: number,
     from_number: text(p.agent_phone_number) ?? text(obj(p.channel_info).agent_phone_number),
@@ -71,7 +76,8 @@ export function normaliseSarvamCall(p: SarvamCall) {
     qualified: ["inquiry_captured", "quote_requested"].includes(outcome ?? ""),
     destination: text(vars.destination), num_travelers: text(vars.party_size),
     travel_month: text(vars.dates), special_requests: text(vars.notes),
-    transcript, analysis: {outcome, budget: vars.budget, occasion: vars.occasion},
+    transcript, analysis: {outcome, budget: vars.budget, occasion: vars.occasion,
+      enquiry_type: text(vars.enquiry_type), booking_reference: text(vars.booking_reference)},
     data_collection: vars, metadata: {provider: "sarvam", direction, interaction_id: p.interaction_id, connectivity_status: connectivity},
     dynamic_variables: initial, failure_reason: text(p.failure_reason),
   };

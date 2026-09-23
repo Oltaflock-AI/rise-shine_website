@@ -80,4 +80,13 @@ describe("Sarvam instant-outbound webhook", () => {
     expect(row.metadata.direction).toBe("inbound");
     expect(row.lead_phone).toBe("+919999999999");
   });
+
+  it("records a front-desk support call as successful but not as a lead", () => {
+    const row = normaliseSarvamCall({app_id: "inbound", attempt_id: "in-2", connectivity_status: "connected",
+      final_agent_variables: {caller_name: "Rakesh Patel", enquiry_type: "existing_booking", outcome: "support_request",
+        notes: "Move Dubai trip from 14 Oct to 21 Oct; asked about refund"}})!;
+    expect(row).toMatchObject({call_successful: "success", qualified: false, lead_name: "Rakesh Patel",
+      agent_name: "Rise and Shine - Priya (Inbound)"});
+    expect(row.analysis).toMatchObject({enquiry_type: "existing_booking", outcome: "support_request"});
+  });
 });

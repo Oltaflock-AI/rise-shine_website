@@ -19,8 +19,11 @@ export async function POST(req: Request, ctx: {params: Promise<{token: string}>}
   // The URL token is the authentication. The app id only filters out another
   // agent's traffic, and instant-outbound payloads (every website callback) do
   // not carry one at all — requiring it 401'd every real call from 15-Sep-2026.
+  // Two agents post here: the callback agent (SARVAM_APP_ID, website dials) and
+  // the front-desk agent that answers the public number (SARVAM_INBOUND_APP_ID).
   const appId = sarvamAppId(p);
-  if (appId && appId !== process.env.SARVAM_APP_ID) return Response.json({ok: false}, {status: 401});
+  const ours = [process.env.SARVAM_APP_ID, process.env.SARVAM_INBOUND_APP_ID].filter(Boolean);
+  if (appId && !ours.includes(appId)) return Response.json({ok: false}, {status: 401});
   const row = normaliseSarvamCall(p);
   if (!row) return Response.json({ok: true, ignored: "no-call-id"});
   try {

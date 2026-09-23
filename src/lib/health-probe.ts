@@ -385,6 +385,7 @@ export const SARVAM_ENV: ReadonlyArray<{ key: string; why: string }> = [
   { key: "SARVAM_PHONE_NUMBER", why: "callback queue cannot dial" },
   { key: "SARVAM_CALLBACK_WEBHOOK_URL", why: "callback queue cannot dial" },
   { key: "SARVAM_WEBHOOK_TOKEN", why: "call records rejected (503)" },
+  { key: "SARVAM_INBOUND_APP_ID", why: "every call to the public number rejected (401)" },
   { key: "SARVAM_VOXLINE_WEBHOOK_URL", why: "call records rejected (503)" },
 ];
 
