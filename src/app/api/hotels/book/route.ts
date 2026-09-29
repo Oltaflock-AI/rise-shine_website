@@ -256,7 +256,9 @@ export async function POST(req: Request) {
           request,
           body.stay ?? {},
           result,
-          payment ? { ...payment, amountInr: Math.round(paidInr ?? request.netAmount) } : undefined,
+          payment
+            ? { ...payment, amountInr: Math.round(paidInr ?? request.netAmount), amountExact: paidInr ?? request.netAmount }
+            : undefined,
         );
         // Address book: the invoice address, with the lead guest's contact details.
         // TBO's hotel Book carries no address, so the form's `billing` is the only copy.

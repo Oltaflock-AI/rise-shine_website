@@ -35,6 +35,8 @@ type BookingRow = {
   booking_id: number | null;
   fare_inr: number | null;
   amount_paid_inr: number | null;
+  /** Exact paid amount (0019); null on bookings older than booking_intents. */
+  amount_paid: number | string | null;
   cf_payment_id: string | null;
   // flight
   pnr: string | null;
@@ -63,11 +65,18 @@ type PaxRow = {
 };
 
 const BOOKING_COLUMNS =
-  "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, cf_payment_id, " +
+  "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, amount_paid, cf_payment_id, " +
   "pnr, origin, destination, depart_date, airline_code, flight_number, ticket_numbers, " +
   "hotel_name, city, check_in, check_out, rooms, confirmation_no";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+// TBO's portal rule: fares exact, to the paisa. Postgres numeric arrives as a string.
+const inr2 = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function paidLabel(bk: { amount_paid: number | string | null; amount_paid_inr: number | null; fare_inr: number | null }): string {
+  if (bk.amount_paid != null && bk.amount_paid !== "") return `₹${inr2.format(Number(bk.amount_paid))}`;
+  const v = bk.amount_paid_inr ?? bk.fare_inr;
+  return v == null ? "" : `₹${inr.format(v)}`;
+}
 const fmtDate = formatDate;
 
 /** The date that decides upcoming vs past (travel date, not booked-on). */
@@ -303,9 +312,7 @@ export function AccountView() {
               {bk.kind === "hotel" ? bk.confirmation_no || "—" : bk.pnr || "—"}
             </p>
             <p className="text-meta text-muted">
-              {bk.amount_paid_inr != null || bk.fare_inr != null
-                ? `₹${inr.format(bk.amount_paid_inr ?? bk.fare_inr ?? 0)}`
-                : ""}
+              {paidLabel(bk)}
             </p>
           </div>
         </div>
@@ -335,13 +342,13 @@ export function AccountView() {
                   <dd className="text-ink">{bk.booking_id}</dd>
                 </div>
               )}
-              {bk.amount_paid_inr != null && (
+              {(bk.amount_paid != null || bk.amount_paid_inr != null) && (
                 <div>
                   <dt className="text-meta font-bold uppercase tracking-wide text-muted">
                     Payment
                   </dt>
                   <dd className="text-ink">
-                    ₹{inr.format(bk.amount_paid_inr)} paid online
+                    {paidLabel({ ...bk, fare_inr: null })} paid online
                     {bk.cf_payment_id ? ` · ${bk.cf_payment_id}` : ""}
                   </dd>
                 </div>

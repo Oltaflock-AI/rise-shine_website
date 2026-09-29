@@ -16,7 +16,7 @@ export const runtime = "nodejs";
  *  • the voucher page, which renders the stay, rooms, guests, amount and
  *    cancellation policy straight from this response (checkpoints 39, 41).
  *
- * Body: { bookingId, voucher?: boolean }
+ * Body: { bookingId }
  *
  * Auth required, and the bookingId must belong to the CALLER's own bookings —
  * otherwise any signed-in user could read arbitrary TBO bookings by id.
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "Booking management is not available right now." }, { status: 503 });
   }
 
-  let body: { bookingId?: number; voucher?: boolean };
+  let body: { bookingId?: number };
   try {
     body = await req.json();
   } catch {

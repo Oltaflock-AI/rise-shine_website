@@ -124,10 +124,13 @@ async function call(method: string, fields: Json): Promise<Json> {
 export type VoucherRoom = {
   roomTypeName?: string;
   mealType?: string;
+  /** TBO's comma-joined room inclusions ("Free WiFi,Breakfast"), shown as-is. */
+  inclusion?: string;
   totalFare?: number;
   currency?: string;
   guests: string[];
-  cancelPolicies: Array<{ fromDate: string; chargeType?: string | number; charge: number }>;
+  /** Each row is a window: charge applies between fromDate and toDate (TBO's own bounds). */
+  cancelPolicies: Array<{ fromDate: string; toDate?: string; chargeType?: string | number; charge: number; currency?: string }>;
 };
 
 export type HotelBookingDetail = {
@@ -185,56 +188,89 @@ export async function hotelBookingDetail(args: {
     return { ok: false, error: e instanceof Error ? e.message : "network" };
   }
 
-  type RawPax = { Title?: string; FirstName?: string; LastName?: string; PaxType?: number; Age?: number };
-  type RawRoomDetail = {
-    RoomTypeName?: string;
-    MealType?: string;
-    Price?: { PublishedPrice?: number; RoomPrice?: number; Tax?: number; CurrencyCode?: string };
-    TotalFare?: number;
+  return mapBookingDetail(j);
+}
+
+type RawPax = { Title?: string; FirstName?: string; LastName?: string; PaxType?: number; Age?: number };
+type RawCancelRow = {
+  FromDate?: string;
+  ToDate?: string;
+  ChargeType?: string | number;
+  Charge?: number;
+  CancellationCharge?: number;
+  Currency?: string;
+};
+type RawRoomDetail = {
+  RoomTypeName?: string;
+  MealType?: string;
+  Inclusion?: string;
+  Price?: { PublishedPrice?: number; RoomPrice?: number; Tax?: number; CurrencyCode?: string };
+  TotalFare?: number;
+  Currency?: string;
+  HotelPassenger?: RawPax[];
+  CancelPolicies?: RawCancelRow[];
+  CancellationPolicies?: RawCancelRow[] | null;
+};
+type GetBookingDetailRaw = {
+  GetBookingDetailResult?: {
+    ResponseStatus?: number;
+    Status?: number;
+    HotelBookingStatus?: string;
+    BookingId?: number;
+    ConfirmationNo?: string;
+    BookingRefNo?: string;
+    HotelName?: string;
+    AddressLine1?: string;
+    City?: string;
+    CheckInDate?: string;
+    CheckOutDate?: string;
+    IsVoucherBooked?: boolean;
+    NoOfRooms?: number;
+    InvoiceAmount?: number;
     Currency?: string;
-    HotelPassenger?: RawPax[];
-    CancellationPolicies?: Array<{ FromDate?: string; ChargeType?: string | number; Charge?: number; CancellationCharge?: number }>;
+    /** Where GetBookingDetail puts the rooms (verified live, 29-Sep-2026). */
+    Rooms?: RawRoomDetail[];
+    /** Older/alternate name — kept as a fallback only. */
+    HotelRoomsDetails?: RawRoomDetail[];
+    Error?: { ErrorCode?: number; ErrorMessage?: string };
   };
-  type R = {
-    GetBookingDetailResult?: {
-      ResponseStatus?: number;
-      Status?: number;
-      HotelBookingStatus?: string;
-      BookingId?: number;
-      ConfirmationNo?: string;
-      BookingRefNo?: string;
-      HotelName?: string;
-      AddressLine1?: string;
-      City?: string;
-      CheckInDate?: string;
-      CheckOutDate?: string;
-      IsVoucherBooked?: boolean;
-      NoOfRooms?: number;
-      InvoiceAmount?: number;
-      Currency?: string;
-      HotelRoomsDetails?: RawRoomDetail[];
-      Error?: { ErrorCode?: number; ErrorMessage?: string };
-    };
-  };
-  const R = (j as R).GetBookingDetailResult;
+};
+
+/**
+ * GetBookingDetail RS → the voucher's shape. Pure, so the field names it depends
+ * on are pinned by tests/hotel-booking-detail.test.ts against a real response.
+ */
+export function mapBookingDetail(raw: unknown): HotelBookingDetail {
+  const R = (raw as GetBookingDetailRaw).GetBookingDetailResult;
   if (!R || R.ResponseStatus !== 1) {
     return { ok: false, error: R?.Error?.ErrorMessage || "Booking not found." };
   }
 
   // Everything the voucher has to show: rooms, guests, per-room fare and the
   // cancellation policy as TBO holds it (portal checkpoints 39 and 41).
-  const rooms: VoucherRoom[] = (R.HotelRoomsDetails ?? []).map((rd) => ({
+  //
+  // TBO returns the rooms as `Rooms`, and each room's policy as `CancelPolicies`
+  // (FromDate/ToDate/CancellationCharge). We read `HotelRoomsDetails` and
+  // `CancellationPolicies` until 29-Sep-2026 — neither exists on this response,
+  // and because both reads were optional the voucher silently lost its room
+  // type, guest names and cancellation policy rather than failing. The old names
+  // stay as fallbacks only.
+  const rawRooms = R.Rooms?.length ? R.Rooms : (R.HotelRoomsDetails ?? []);
+  const rooms: VoucherRoom[] = rawRooms.map((rd) => ({
     roomTypeName: rd.RoomTypeName,
     mealType: rd.MealType,
+    inclusion: rd.Inclusion?.trim() || undefined,
     totalFare: rd.TotalFare ?? rd.Price?.PublishedPrice ?? rd.Price?.RoomPrice,
     currency: rd.Currency ?? rd.Price?.CurrencyCode,
     guests: (rd.HotelPassenger ?? [])
       .map((p) => [p.Title, p.FirstName, p.LastName].filter(Boolean).join(" ").trim())
       .filter(Boolean),
-    cancelPolicies: (rd.CancellationPolicies ?? []).map((c) => ({
+    cancelPolicies: (rd.CancelPolicies?.length ? rd.CancelPolicies : (rd.CancellationPolicies ?? [])).map((c) => ({
       fromDate: c.FromDate ?? "",
+      toDate: c.ToDate,
       chargeType: c.ChargeType,
-      charge: c.Charge ?? c.CancellationCharge ?? 0,
+      charge: c.CancellationCharge ?? c.Charge ?? 0,
+      currency: c.Currency,
     })),
   }));
 

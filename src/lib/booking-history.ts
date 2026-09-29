@@ -21,7 +21,14 @@ function toDate(s?: string): string | null {
 }
 
 /** A confirmed Cashfree payment, mirrored alongside the booking for the account view. */
-export type BookingPayment = { cfPaymentId: string; orderId: string; amountInr: number };
+export type BookingPayment = {
+  cfPaymentId: string;
+  orderId: string;
+  /** Rupees. Written to the INTEGER column `amount_paid_inr`, so it rounds there. */
+  amountInr: number;
+  /** The same amount unrounded, for `amount_paid` (0019) — what "My bookings" shows. */
+  amountExact?: number;
+};
 
 /**
  * Insert one `bookings` row (owned by `userId`) plus its `passengers`. Only
@@ -61,6 +68,7 @@ export async function saveBookingHistory(
       cf_order_id: payment?.orderId ?? null,
       cf_payment_id: payment?.cfPaymentId ?? null,
       amount_paid_inr: payment?.amountInr ?? null,
+      amount_paid: payment?.amountExact ?? payment?.amountInr ?? null,
     })
     .select("id")
     .single();
@@ -139,6 +147,7 @@ export async function saveHotelBookingHistory(
       cf_order_id: payment?.orderId ?? null,
       cf_payment_id: payment?.cfPaymentId ?? null,
       amount_paid_inr: payment?.amountInr ?? null,
+      amount_paid: payment?.amountExact ?? payment?.amountInr ?? null,
     })
     .select("id")
     .single();

@@ -29,13 +29,15 @@ import { whatsappEnabled } from "@/lib/whatsapp";
 type VoucherRoom = {
   roomTypeName?: string;
   mealType?: string;
-  totalFare?: number;
+  inclusion?: string;
   currency?: string;
   guests: string[];
   cancelPolicies: Array<{
     fromDate: string;
+    toDate?: string;
     chargeType?: string | number;
     charge: number;
+    currency?: string;
   }>;
 };
 type Detail = {
@@ -58,10 +60,10 @@ type Detail = {
   error?: string;
 };
 
-/** TBO dates arrive as ISO or "DD-MM-YYYY hh:mm:ss" (UTC). */
+/** TBO dates arrive as ISO, "DD-MM-YYYY hh:mm:ss" or "DD/MM/YYYY hh:mm:ss" (UTC). */
 function toISO(s?: string): string {
   if (!s) return "";
-  const dmy = /^(\d{2})-(\d{2})-(\d{4})/.exec(s);
+  const dmy = /^(\d{2})[-/](\d{2})[-/](\d{4})/.exec(s);
   if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
   return s.slice(0, 10);
 }
@@ -97,9 +99,9 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
     fetch("/api/hotels/booking-detail", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // voucher:true asks TBO to issue the voucher if the booking is confirmed
-      // but not yet vouchered (hold bookings); instant bookings self-voucher.
-      body: JSON.stringify({ bookingId, voucher: true }),
+      // Read-only. Every booking is IsVoucherBooking=true, so it is vouchered at
+      // Book — TBO flags a GenerateVoucher call on an already-vouchered booking.
+      body: JSON.stringify({ bookingId }),
     })
       .then((r) => r.json())
       .then((j) => alive && setDetail(j as Detail))
@@ -251,6 +253,11 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-body text-muted">
               {room.mealType && <span>{mealLabel(room.mealType, true)}</span>}
             </div>
+            {room.inclusion && (
+              <p className="mt-1.5 text-body text-muted">
+                Includes: {room.inclusion.split(",").map((x) => x.trim()).filter(Boolean).join(" · ")}
+              </p>
+            )}
             {room.guests.length > 0 && (
               <p className="mt-2 flex items-start gap-1.5 text-body text-ink">
                 <Users
@@ -270,8 +277,9 @@ export function HotelVoucherView({ bookingId }: { bookingId: number }) {
                 <ul className="list-disc pl-5 text-muted">
                   {room.cancelPolicies.map((p, k) => (
                     <li key={k}>
-                      From {formatDate(toISO(p.fromDate)) || p.fromDate} (UTC):{" "}
-                      {chargeLabel(p, room.currency || currency)}
+                      {formatDate(toISO(p.fromDate)) || p.fromDate}
+                      {p.toDate ? ` to ${formatDate(toISO(p.toDate)) || p.toDate}` : " onwards"}{" "}
+                      (UTC): {chargeLabel(p, p.currency || room.currency || currency)}
                     </li>
                   ))}
                 </ul>
