@@ -71,7 +71,8 @@ export async function POST(req: Request) {
       // with parallel ≤100-code requests (their recommendation) rather than
       // truncating to the first hundred; the ceiling bounds latency and load.
       hotelCodes = stubs.slice(0, CITY_SEARCH_CODE_CEILING).map((s) => s.code);
-    } catch {
+    } catch (e) {
+      console.error(`[api/hotels] hotel list for city ${body.cityCode} unavailable:`, e instanceof Error ? e.message : e);
       return Response.json({ ok: false, error: "Could not resolve hotels for that city." }, { status: 502 });
     }
   }

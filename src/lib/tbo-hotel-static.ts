@@ -18,6 +18,7 @@
  *   TBO_HOTEL_STATIC_PASSWORD  static-data password
  */
 import { tboFetch } from "./tbo-fetch";
+import { createAdminClient, supabaseAdminConfigured } from "./supabase/admin";
 import type { RoomContent } from "./hotel-room-match";
 
 const DEFAULT_BASE = "http://api.tbotechnology.in/TBOHolidays_HotelAPI";
@@ -177,14 +178,50 @@ export async function cityList(countryCode: string): Promise<TboCity[]> {
 /**
  * TBOHotelCodeList — POST { CityCode }. City-wise hotel stubs (code, name,
  * rating, address, geo) used to seed a Search's HotelCodes for that city.
+ *
+ * TBO's static API is unreliable: for cities with thousands of hotels it
+ * intermittently answers Status 500 "No Hotels Found" after ~5.3 s, and the same
+ * request succeeds a moment later (measured 29-Sep-2026, from our proxy and from
+ * a plain connection alike). With the list held only in a function's memory, one
+ * bad answer on a cold instance put "Live rates are unavailable" in front of the
+ * whole city. So the last good list is kept durably (`tbo_static_cache`, 0020):
+ *
+ *   memory (a day) → stored copy younger than 15 days → TBO → stored copy of any age
+ *
+ * TBO is retried only when there is nothing to fall back on, and an empty list is
+ * never stored. 15 days is TBO's own static-refresh recommendation, and what we
+ * told them we do; popular cities are refreshed nightly by /api/cron/hotel-static.
  */
-export async function hotelCodesByCity(
-  cityCode: string | number,
-): Promise<TboHotelStub[]> {
-  const key = String(cityCode);
-  const hit = hotelCodeCache.get(key);
-  if (hit && hit.exp > Date.now()) return hit.data;
+const STATIC_MAX_AGE = 15 * DAY;
+/** How long a function trusts a stored copy served because TBO just failed. */
+const FALLBACK_TTL = 10 * 60 * 1000;
 
+async function readStoredCodes(key: string): Promise<{ data: TboHotelStub[]; fetchedAt: number } | null> {
+  if (!supabaseAdminConfigured) return null;
+  try {
+    const { data, error } = await createAdminClient()
+      .from("tbo_static_cache")
+      .select("data, fetched_at")
+      .eq("key", `codes:${key}`)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data || !Array.isArray(data.data) || !data.data.length) return null;
+    return { data: data.data as TboHotelStub[], fetchedAt: new Date(data.fetched_at).getTime() };
+  } catch (e) {
+    console.warn(`[tbo-hotel-static] stored hotel list read failed for city ${key}:`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function writeStoredCodes(key: string, data: TboHotelStub[]): Promise<void> {
+  if (!supabaseAdminConfigured || !data.length) return;
+  const { error } = await createAdminClient()
+    .from("tbo_static_cache")
+    .upsert({ key: `codes:${key}`, data, fetched_at: new Date().toISOString() });
+  if (error) console.warn(`[tbo-hotel-static] stored hotel list write failed for city ${key}:`, error.message);
+}
+
+async function fetchCodesFromTbo(key: string, attempts: number): Promise<TboHotelStub[]> {
   type RawHotel = {
     HotelCode?: string | number;
     HotelName?: string;
@@ -196,19 +233,63 @@ export async function hotelCodesByCity(
     CountryCode?: string;
   };
   type Resp = { Status?: TboStatus; Hotels?: RawHotel[] };
-  const j = await call<Resp>("TBOHotelCodeList", { CityCode: key });
-  const data = (j.Hotels ?? []).map((h) => ({
-    code: String(h.HotelCode ?? ""),
-    name: h.HotelName ?? "",
-    rating: h.HotelRating ?? "",
-    address: h.Address ?? "",
-    lat: h.Latitude,
-    lng: h.Longitude,
-    cityName: h.CityName,
-    countryCode: h.CountryCode,
-  }));
-  hotelCodeCache.set(key, { data, exp: Date.now() + DAY });
-  return data;
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 1_000));
+    try {
+      const j = await call<Resp>("TBOHotelCodeList", { CityCode: key });
+      const data = (j.Hotels ?? []).map((h) => ({
+        code: String(h.HotelCode ?? ""),
+        name: h.HotelName ?? "",
+        rating: h.HotelRating ?? "",
+        address: h.Address ?? "",
+        lat: h.Latitude,
+        lng: h.Longitude,
+        cityName: h.CityName,
+        countryCode: h.CountryCode,
+      }));
+      if (data.length) return data;
+      last = new TboHotelError("TBOHotelCodeList returned no hotels.", 500);
+    } catch (e) {
+      last = e;
+    }
+    console.warn(
+      `[tbo-hotel-static] TBOHotelCodeList city ${key} attempt ${i + 1}/${attempts} failed:`,
+      last instanceof Error ? last.message : last,
+    );
+  }
+  throw last instanceof Error ? last : new TboHotelError("TBOHotelCodeList failed.", 0);
+}
+
+export async function hotelCodesByCity(
+  cityCode: string | number,
+  opts: { refresh?: boolean } = {},
+): Promise<TboHotelStub[]> {
+  const key = String(cityCode);
+  const hit = hotelCodeCache.get(key);
+  if (!opts.refresh && hit && hit.exp > Date.now()) return hit.data;
+
+  const stored = await readStoredCodes(key);
+  if (!opts.refresh && stored && Date.now() - stored.fetchedAt < STATIC_MAX_AGE) {
+    hotelCodeCache.set(key, { data: stored.data, exp: Date.now() + DAY });
+    return stored.data;
+  }
+
+  try {
+    // A visitor with a fallback in hand should not wait out three 5-second
+    // failures; the nightly refresh (opts.refresh) has the time to retry.
+    const data = await fetchCodesFromTbo(key, stored && !opts.refresh ? 1 : 3);
+    await writeStoredCodes(key, data);
+    hotelCodeCache.set(key, { data, exp: Date.now() + DAY });
+    return data;
+  } catch (e) {
+    if (!stored) throw e;
+    console.warn(
+      `[tbo-hotel-static] serving stored hotel list for city ${key} from ${new Date(stored.fetchedAt).toISOString()} — TBO failed`,
+    );
+    hotelCodeCache.set(key, { data: stored.data, exp: Date.now() + FALLBACK_TTL });
+    return stored.data;
+  }
 }
 
 /**

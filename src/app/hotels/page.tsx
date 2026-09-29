@@ -361,8 +361,10 @@ async function HotelResults({
   let stubs: Awaited<ReturnType<typeof hotelCodesByCity>> = [];
   try {
     stubs = await hotelCodesByCity(city.cityCode);
-  } catch {
-    /* fall through to the unavailable state below */
+  } catch (e) {
+    // Falls through to the unavailable state below — but never silently: this
+    // is the line that says why a city showed "Live rates are unavailable".
+    console.error(`[hotels] hotel list for ${city.label} (${city.cityCode}) unavailable:`, e instanceof Error ? e.message : e);
   }
   const stubByCode = new Map(stubs.map((s) => [s.code, s]));
   const codes = stubs.map((s) => s.code).slice(0, CITY_SEARCH_CODE_CEILING);
