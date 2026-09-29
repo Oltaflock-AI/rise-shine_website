@@ -135,9 +135,12 @@ type Guest = {
 export function HotelBookingForm({
   b,
   contactEmail,
+  onConfirmedFare,
 }: {
   b: Record<string, string>;
   contactEmail: string;
+  /** PreBook's TotalFare, so the page header shows the total the guest pays. */
+  onConfirmedFare?: (fare: number) => void;
 }) {
   const rooms = Math.max(1, Number(b.rooms || 1));
   const adults = Math.max(1, Number(b.adults || 2));
@@ -259,6 +262,14 @@ export function HotelBookingForm({
     };
   }, [b.bookingCode, b.cc]);
 
+  // The header was printed from the search price; PreBook's TotalFare is the
+  // one charged. They differ by paise often enough (17,574.69 → 17,574.78 on
+  // 29-Sep-2026 with IsPriceChanged=false), and TBO has flagged a book page
+  // showing two different totals before — so hand the confirmed one up.
+  useEffect(() => {
+    if (quote?.ok && quote.totalFare) onConfirmedFare?.(quote.totalFare);
+  }, [quote, onConfirmedFare]);
+
   const v = quote?.validation;
   const money = useMemo(
     () =>
@@ -274,7 +285,8 @@ export function HotelBookingForm({
   // (floored at the B2C RecommendedSellingRate). TBO portal checkpoint 30 —
   // NetAmount is TBO's charge to the agency, is never displayed, and rides only
   // in the Book RQ (checkpoint 31).
-  const amountInr = quote?.totalFare ?? Number(b.fare || 0);
+  const searchFare = Number(b.fare || 0);
+  const amountInr = quote?.totalFare ?? searchFare;
   // Windows that have already closed are dropped, so this can never promise a
   // refund deadline that passed before the guest reached the page.
   const cancelHeadline = cancellationHeadline(
@@ -612,10 +624,16 @@ export function HotelBookingForm({
     <div className="grid gap-8 pb-24 lg:grid-cols-[1fr_20rem] lg:pb-0">
       {/* ── guests ── */}
       <div className="space-y-6">
-        {quote.isPriceChanged && (
+        {/* TBO's IsPriceChanged stays false on paise-level moves, but the guest
+            saw the search price a moment ago — say so whenever it moved. */}
+        {(quote.isPriceChanged ||
+          (searchFare > 0 && quote.totalFare != null && Math.abs(quote.totalFare - searchFare) >= 0.01)) && (
           <p className="rounded-brand border border-red/30 bg-red/5 px-4 py-3 text-body text-ink">
-            The hotel re-priced this rate. The total shown is the confirmed
-            price.
+            The hotel re-confirmed this rate at {money.format(amountInr)}
+            {searchFare > 0 && Math.abs(amountInr - searchFare) >= 0.01
+              ? ` (was ${money.format(searchFare)} at search)`
+              : ""}
+            . That confirmed price is what you pay.
           </p>
         )}
         {quote.isCancellationPolicyChanged && (

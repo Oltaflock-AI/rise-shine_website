@@ -20,6 +20,8 @@ export function HotelCheckoutView() {
   const { user, ready } = useAuth();
   const router = useRouter();
   const [b, setB] = useState<Booking | null>(null);
+  // PreBook's TotalFare once the form has it — the total actually charged.
+  const [confirmedFare, setConfirmedFare] = useState<number | null>(null);
 
   useEffect(() => {
     setB(Object.fromEntries(new URLSearchParams(window.location.search)));
@@ -97,23 +99,22 @@ export function HotelCheckoutView() {
               </div>
               <div className="text-right">
                 <div className="text-[1.4rem] font-extrabold tabular-nums text-navy">
-                  {money.format(Number(b.fare || 0))}
+                  {money.format(confirmedFare ?? Number(b.fare || 0))}
                 </div>
-                {/* "at search" alone read as a disclaimer without saying what
-                    happens next. The rate is re-priced by PreBook below, and a
-                    change is called out there — say so. */}
+                {/* One total on the page: the search price only until PreBook
+                    answers, then the confirmed TotalFare the guest is charged. */}
                 <div className="text-meta text-muted">
                   total · {nights} night{nights > 1 ? "s" : ""}
                 </div>
                 <div className="text-meta text-muted">
-                  re-confirmed with the hotel below
+                  {confirmedFare != null ? "confirmed with the hotel" : "re-confirming with the hotel…"}
                 </div>
               </div>
             </div>
           </div>
 
           {canBook ? (
-            <HotelBookingForm b={b} contactEmail={user?.email ?? ""} />
+            <HotelBookingForm b={b} contactEmail={user?.email ?? ""} onConfirmedFare={setConfirmedFare} />
           ) : (
             <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
               <h2 className="h-sm mb-2">This rate has expired</h2>
