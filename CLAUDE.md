@@ -89,6 +89,14 @@ and an external pinger. Those constraints are gone; the schedules are back in
 abort it from the Deployments page or Instant Rollback. Skew Protection came on
 with it.
 
+**Functions run in `bom1` (Mumbai)**, pinned by `regions` in `vercel.json` since
+29-Sep-2026. Until then they ran in the project default `iad1` (Washington DC) while
+everything they talk to is in India — TBO (Mumbai), the proxy VPS (Bangalore),
+Supabase (`ap-south-1`), Cashfree and the customers — so every TBO call crossed the
+planet twice: ~240 ms per round trip, and a new tunnel + TLS handshake through the
+proxy costs four of them. Don't remove the pin. It does not change the egress IP TBO
+whitelisted: that is the proxy's, wherever the function runs.
+
 ### Hotels
 
 Hotel search joins TBO's static city/hotel catalogue (`tbo-hotel-static.ts`) with

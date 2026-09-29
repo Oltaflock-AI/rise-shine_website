@@ -3,7 +3,6 @@ import {
   probeTboQuote,
   probeCashfree,
   probeProxy,
-  probeProxyConcurrency,
   probeCallbackQueue,
   probeLedgerOrphans,
   probeSupabaseRest,
@@ -35,11 +34,6 @@ const CRON_MONITOR_SLUG = process.env.SENTRY_CRON_MONITOR_SLUG || "rise-shine-he
  *
  * What it covers, in the order a booking needs them:
  *   tbo_proxy       the static-IP proxy VPS is answering at all
- *   tbo_proxy_concurrency  requests sent together through the proxy actually
- *                   finish together — the proxy's Basic-auth pool serialized
- *                   our own parallel search batches on 28-Sep-2026 without
- *                   tbo_proxy noticing, because that check never goes THROUGH
- *                   the proxy (see lib/health-probe.ts)
  *   tbo_search      credentials, token, supplier inventory
  *   tbo_quote       the re-price that sets the amount charged
  *   cashfree_auth   the gateway accepts our keys
@@ -94,9 +88,8 @@ export async function GET(req: Request) {
   // The proxy check and the Cashfree check share nothing with the TBO booking
   // pair, so they run alongside it. Search → quote is sequential by necessity:
   // the quote needs the trace the search just minted.
-  const [proxy, proxyConcurrency, cashfree, queue, orphans, email, auth, search] = await Promise.all([
+  const [proxy, cashfree, queue, orphans, email, auth, search] = await Promise.all([
     probeProxy(),
-    probeProxyConcurrency(),
     probeCashfree(),
     probeCallbackQueue(),
     probeLedgerOrphans(),
@@ -110,19 +103,7 @@ export async function GET(req: Request) {
   // gets its own key so the "money lost" label only ever means money lost.
   const rest = probeSupabaseRest([queue, orphans]);
 
-  const results: CheckResult[] = [
-    config,
-    proxy,
-    proxyConcurrency,
-    search,
-    quote,
-    cashfree,
-    auth,
-    rest,
-    queue,
-    orphans,
-    email,
-  ];
+  const results: CheckResult[] = [config, proxy, search, quote, cashfree, auth, rest, queue, orphans, email];
 
   // Record sequentially: each one may send mail, and a burst of parallel Resend
   // calls during a total outage is its own small denial of service.

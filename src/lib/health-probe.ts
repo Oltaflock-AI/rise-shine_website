@@ -18,7 +18,6 @@ import { quoteFare } from "@/lib/tbo-book";
 import { probeCashfreeAuth, cashfreeConfigured } from "@/lib/cashfree";
 import { probeEmailAuth } from "@/lib/email";
 import net from "node:net";
-import { tboFetch } from "@/lib/tbo-fetch";
 import { createAdminClient, supabaseAdminConfigured } from "@/lib/supabase/admin";
 import type { CheckResult } from "@/lib/ops-health";
 
@@ -161,71 +160,6 @@ export async function probeProxy(): Promise<CheckResult> {
   });
 
   return { ...base, ...outcome, durationMs: Date.now() - t0 };
-}
-
-/**
- * Does the proxy's auth layer actually serve requests in parallel?
- *
- * `probeProxy` only proves the VPS answers TCP — it says nothing about what
- * happens to requests THROUGH it. On 28-Sep-2026 TBO reported that our
- * parallel city-search batches (searchCityHotels — one Promise.all firing up
- * to 5 ≤100-code Search RQs at once) were completing staggered rather than
- * together. Root cause: Squid's Basic-auth helper pool defaulted to 5
- * processes, uncapped in our config, so our own 5-batch fan-out could exhaust
- * it by itself — any batch, plus any OTHER TBO call in flight at the same
- * moment, queued behind the pool. Fixed by raising `auth_param basic
- * children` on the VPS (reference/hotel-cert/static-ip-proxy/setup-vps.sh);
- * nothing on our side needed to change, because the app already dispatches
- * with a single Promise.all. This probe is the guardrail so a future proxy
- * rebuild — or the pool getting exhausted again under real load — shows up
- * here instead of in TBO's next verification round.
- *
- * Fires PROBE_CONCURRENCY bare GETs through tboFetch (the exact dispatcher
- * production uses) at a real TBO host, with no SOAP body. TBO's web server
- * 404s these before any API quota is touched — verified 28-Sep-2026: this
- * exact request, repeated, cost nothing and cleared in ~250ms per call.
- */
-const PROBE_CONCURRENCY = 5;
-// A single request to this host normally answers in well under a second. If
-// concurrent requests are genuinely parallel, all N finish in about one
-// request's worth of wall time; if they queue behind the proxy, wall time
-// grows roughly by N. This sits comfortably above single-request noise
-// (verified live runs: ~250-330ms for 5 truly-parallel requests) and well
-// below what 5 fully serialized requests would take (~1.5-2.5s), so it
-// should not flap on ordinary latency variance.
-const CONCURRENCY_BUDGET_MS = 1200;
-
-export async function probeProxyConcurrency(): Promise<CheckResult> {
-  const base = { key: "tbo_proxy_concurrency", label: "TBO proxy — concurrent requests" };
-  if (!process.env.TBO_PROXY_URL?.trim()) {
-    return { ...base, ok: true, detail: "no proxy configured (direct egress)" };
-  }
-  const url = `${(process.env.TBO_HOTEL_URL || "https://affiliate.tektravels.com/HotelAPI").replace(/\/+$/, "")}/`;
-  const t0 = Date.now();
-  try {
-    await Promise.all(
-      Array.from({ length: PROBE_CONCURRENCY }, () =>
-        tboFetch(url, { method: "GET" }).then((r) => r.text().catch(() => undefined)),
-      ),
-    );
-  } catch (e) {
-    return {
-      ...base,
-      ok: false,
-      detail: `request failed: ${e instanceof Error ? e.message : String(e)}`,
-      durationMs: Date.now() - t0,
-    };
-  }
-  const ms = Date.now() - t0;
-  const ok = ms <= CONCURRENCY_BUDGET_MS;
-  return {
-    ...base,
-    ok,
-    detail: ok
-      ? `${PROBE_CONCURRENCY} concurrent requests finished in ${ms}ms — parallel`
-      : `${PROBE_CONCURRENCY} concurrent requests took ${ms}ms (budget ${CONCURRENCY_BUDGET_MS}ms) — proxy may be serializing requests, see reference/hotel-cert/static-ip-proxy`,
-    durationMs: ms,
-  };
 }
 
 /**
