@@ -142,6 +142,11 @@ export type HotelSearchArgs = {
    * a 100-code city sweep.
    */
   detailed?: boolean;
+  /**
+   * Always ask TBO; never answer from the short result cache. Set by
+   * searchCityHotels — see there for why a city search must reach TBO every time.
+   */
+  fresh?: boolean;
 };
 
 /**
@@ -346,7 +351,7 @@ export async function searchHotels(
     args.mealType,
     args.detailed,
   ]);
-  const hit = searchCache.get(key);
+  const hit = args.fresh ? undefined : searchCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
 
   const PaxRooms = args.rooms.map((r) => {
@@ -452,6 +457,13 @@ export async function searchHotels(
  * Batches that return nothing are normal on a city sweep: the merged result is
  * every hotel that priced, cheapest first, and only an all-batches failure is a
  * failure.
+ *
+ * Every city search goes to TBO, never to the 5-minute result cache. TBO's
+ * verifier checks this point by watching their own log while they search
+ * ("on real time basis", 02-Oct-2026); with the cache, a repeat of the same
+ * search inside five minutes was answered from memory, so nothing reached TBO
+ * and the parallel batches "did not appear". The single-hotel room page keeps
+ * the cache.
  */
 export async function searchCityHotels(
   args: Omit<HotelSearchArgs, "hotelCodes"> & { hotelCodes: string[] },
@@ -476,7 +488,7 @@ export async function searchCityHotels(
   const settled = await Promise.all(
     chunks.map((codes, i) => {
       const sentAt = Date.now() - t0;
-      return searchHotels({ ...rest, hotelCodes: codes }).then((r) => {
+      return searchHotels({ ...rest, hotelCodes: codes, fresh: true }).then((r) => {
         console.info(
           `[tbo-hotel] batch ${i + 1}/${chunks.length} · ${codes.length} codes · sent +${sentAt}ms · done +${Date.now() - t0}ms · ${r.ok ? `${r.offers.length} hotels` : r.error}`,
         );
