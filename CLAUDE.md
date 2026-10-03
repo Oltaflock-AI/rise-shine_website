@@ -212,8 +212,11 @@ never mentions. Don't build anything that assumes a room photo exists.
   `RecommendedSellingRate`. Fares are displayed **unrounded** (2 dp) everywhere.
 - **`Filters.NoOfRooms` is never sent** — TBO wants the full room feed (0 behaviour).
   The results card trims to the cheapest room on our side, after the response.
-- **A city search fans out in parallel** ≤100-code batches (`CITY_SEARCH_CODE_CEILING`),
-  never one truncated request. `/hotels` does this itself; it does not call `/api/hotels`.
+- **A city search fans out in parallel** ≤100-code batches covering EVERY code the
+  city has in static data — Mumbai 2,323 codes = 24 requests. Never cap it: TBO's
+  FAQ defines parallel search as the whole city, and a 500-code cap (5 requests)
+  failed portal point 0 three times (28-Sep → 02-Oct-2026) even though all five
+  left within milliseconds. `/hotels` does this itself; it does not call `/api/hotels`.
 - **Guest nationality is collected, not assumed.** Any nationality for stays in India;
   Indian nationality only for international stays (`src/data/nationalities.ts`), and
   Book must carry the same value Search used.

@@ -1,4 +1,4 @@
-import { searchCityHotels, CITY_SEARCH_CODE_CEILING, type RoomOccupancy } from "@/lib/tbo-hotel";
+import { searchCityHotels, type RoomOccupancy } from "@/lib/tbo-hotel";
 import { hotelCodesByCity } from "@/lib/tbo-hotel-static";
 import { tooMany } from "@/lib/rate-limit";
 import { stayDatesError } from "@/lib/stay-dates";
@@ -67,10 +67,9 @@ export async function POST(req: Request) {
   if (!hotelCodes.length && body.cityCode) {
     try {
       const stubs = await hotelCodesByCity(body.cityCode);
-      // TBO caps one Search RQ at 100 HotelCodes; bigger cities are covered
-      // with parallel ≤100-code requests (their recommendation) rather than
-      // truncating to the first hundred; the ceiling bounds latency and load.
-      hotelCodes = stubs.slice(0, CITY_SEARCH_CODE_CEILING).map((s) => s.code);
+      // TBO caps one Search RQ at 100 HotelCodes; the whole city is covered
+      // with parallel ≤100-code requests (their recommendation), never a slice.
+      hotelCodes = stubs.map((s) => s.code);
     } catch (e) {
       console.error(`[api/hotels] hotel list for city ${body.cityCode} unavailable:`, e instanceof Error ? e.message : e);
       return Response.json({ ok: false, error: "Could not resolve hotels for that city." }, { status: 502 });

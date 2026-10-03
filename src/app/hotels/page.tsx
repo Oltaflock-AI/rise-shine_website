@@ -10,7 +10,7 @@ import {
   HotelResultsClient,
   type HotelItem,
 } from "@/components/ui/HotelResultsClient";
-import { searchCityHotels, CITY_SEARCH_CODE_CEILING } from "@/lib/tbo-hotel";
+import { searchCityHotels } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { curateAmenities } from "@/lib/hotel-amenities";
 import { hotelRatingsBatch } from "@/lib/hotel-ratings";
@@ -367,9 +367,10 @@ async function HotelResults({
     console.error(`[hotels] hotel list for ${city.label} (${city.cityCode}) unavailable:`, e instanceof Error ? e.message : e);
   }
   const stubByCode = new Map(stubs.map((s) => [s.code, s]));
-  const codes = stubs.map((s) => s.code).slice(0, CITY_SEARCH_CODE_CEILING);
+  // Every code, never a slice: one Search RQ per ≤100 codes, all in flight at
+  // once (see searchCityHotels for why a capped city fails TBO's check).
+  const codes = stubs.map((s) => s.code);
 
-  // One Search RQ per ≤100 codes, all in flight at once (see searchCityHotels).
   const res = await searchCityHotels({
     checkInISO: sp.checkIn!,
     checkOutISO: sp.checkOut!,

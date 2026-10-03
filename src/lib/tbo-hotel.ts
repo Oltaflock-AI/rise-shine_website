@@ -149,13 +149,6 @@ export type HotelSearchArgs = {
   fresh?: boolean;
 };
 
-/**
- * How many of a city's hotels we price per search. TBO caps ONE Search RQ at
- * 100 HotelCodes, so this is covered by parallel ≤100-code requests; the
- * ceiling only keeps a mega-city's fan-out (and the page's latency) bounded.
- */
-export const CITY_SEARCH_CODE_CEILING = 500;
-
 export type CancelPolicy = {
   fromDate: string;
   chargeType?: string | number;
@@ -449,8 +442,13 @@ export async function searchHotels(
 /**
  * Price a whole city: ONE Search RQ per ≤100 HotelCodes, all dispatched together.
  *
- * TBO caps a Search at 100 codes and asks for parallel requests rather than a
- * truncated one (portal checkpoints 0 and 10). The per-batch timings are logged
+ * Pass EVERY code TBO's static data lists for the city — never a slice. That is
+ * TBO's definition of "parallel search" (API FAQ: refer the city's hotel codes
+ * from static data, break them into chunks of 100, hit those requests in
+ * parallel) and portal checkpoints 0 and 10. Until 03-Oct-2026 the city was cut
+ * to its first 500 codes, so a Mumbai search (2,323 codes) sent 5 requests where
+ * TBO's verifier expects 24 — parallel by any clock, and still rejected three
+ * times as "parallel searches not appearing". The per-batch timings are logged
  * because TBO twice read our fan-out as sequential — "sent at +0ms" for every
  * batch is the evidence, and it costs one log line.
  *
@@ -469,9 +467,12 @@ export async function searchCityHotels(
   args: Omit<HotelSearchArgs, "hotelCodes"> & { hotelCodes: string[] },
 ): Promise<HotelSearchResult> {
   const { hotelCodes, ...rest } = args;
+  // Codes are disjoint across batches, so the merge below can never render a
+  // hotel twice — unless the static list itself repeats a code.
+  const unique = [...new Set(hotelCodes)];
   const chunks: string[][] = [];
-  for (let i = 0; i < hotelCodes.length; i += 100)
-    chunks.push(hotelCodes.slice(i, i + 100));
+  for (let i = 0; i < unique.length; i += 100)
+    chunks.push(unique.slice(i, i + 100));
 
   if (!chunks.length) {
     return {
